@@ -96,6 +96,50 @@ export class AuthorizationController {
   });
 
   /**
+   * 获取患者的授权列表（包含医生信息），用于家属端 H5 展示
+   */
+  public getPatientAuthorizationsDetailed = asyncHandler(async (req: Request, res: Response) => {
+    const patientId = req.params.patientId;
+
+    const authorizations = this.models.authorization.findByPatientId(patientId);
+
+    const detailed = authorizations.map((auth) => {
+      const doctor = this.models.doctor.findById(auth.doctorId);
+      const hospital = doctor ? this.models.hospital.findById(doctor.hospitalId) : undefined;
+
+      return {
+        id: auth.id,
+        doctorId: auth.doctorId,
+        doctorName: doctor?.name || '',
+        hospital: hospital?.hospitalName || '',
+        department: doctor?.department || '',
+        licenseNumber: doctor?.licenseNumber || '',
+        patientId: auth.patientId,
+        authorizationType: auth.authorizationType,
+        authorizedAt: auth.authorizedAt,
+        expiresAt: auth.expiresAt,
+        status: auth.status,
+        scope: {
+          startDate: auth.scopeDataStart,
+          endDate: auth.scopeDataEnd,
+          dataRange: auth.scopeDataRange,
+        },
+        ipAddress: auth.ipAddress,
+        deviceId: auth.deviceId,
+        lastAccessedAt: auth.lastAccessedAt,
+        accessCount: auth.accessCount,
+      };
+    });
+
+    const response: ApiResponse = {
+      success: true,
+      data: detailed,
+    };
+
+    res.json(response);
+  });
+
+  /**
    * 获取医生的授权列表
    */
   public getDoctorAuthorizations = asyncHandler(async (req: Request, res: Response) => {

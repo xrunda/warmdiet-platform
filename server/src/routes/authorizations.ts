@@ -37,6 +37,18 @@ router.post('/', authenticatePatient[0], authenticatePatient[1], (req, res, next
 router.get('/patient/:patientId', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.getPatientAuthorizations(req, res, next));
 
 /**
+ * @route   GET /api/patients/:patientId/authorizations/detailed
+ * @desc    获取患者的授权列表（包含医生信息），用于家属端 H5
+ * @access  Private (Patient)
+ */
+router.get(
+  '/patient/:patientId/detailed',
+  authenticatePatient[0],
+  authenticatePatient[1],
+  (req, res, next) => getModels().controller.getPatientAuthorizationsDetailed(req, res, next)
+);
+
+/**
  * @route   GET /api/doctors/:doctorId/authorizations
  * @desc    获取医生的授权列表
  * @access  Private (Doctor)

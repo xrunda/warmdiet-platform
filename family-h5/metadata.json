@@ -1,0 +1,7 @@
+{
+  "name": "颐养膳食助手",
+  "description": "专为老年人设计的健康膳食管理与营养分析助手，支持语音对话记录、智能营养点评及家属远程监护。",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

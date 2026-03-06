@@ -4,7 +4,7 @@
 
 import { Router } from 'express';
 import { createReportController } from '../controllers/reportController';
-import { authenticatePatient, authenticateDoctor } from '../middleware/auth';
+import { authenticatePatient, authenticateDoctorOrPatient } from '../middleware/auth';
 import { initModels } from '../models';
 import { databaseConfig } from '../config/database';
 
@@ -34,20 +34,20 @@ router.post('/patient/:patientId', authenticatePatient[0], authenticatePatient[1
  * @desc    获取患者的健康报告列表
  * @access  Private (Patient, Doctor)
  */
-router.get('/patient/:patientId', authenticateDoctor[0], authenticateDoctor[1], (req, res, next) => getModels().controller.getReports(req, res, next));
+router.get('/patient/:patientId', authenticateDoctorOrPatient[0], authenticateDoctorOrPatient[1], (req, res, next) => getModels().controller.getReports(req, res, next));
 
 /**
  * @route   GET /api/patients/:patientId/reports/latest
  * @desc    获取最新报告
  * @access  Private (Patient, Doctor)
  */
-router.get('/patient/:patientId/latest', authenticateDoctor[0], authenticateDoctor[1], (req, res, next) => getModels().controller.getLatestReport(req, res, next));
+router.get('/patient/:patientId/latest', authenticateDoctorOrPatient[0], authenticateDoctorOrPatient[1], (req, res, next) => getModels().controller.getLatestReport(req, res, next));
 
 /**
  * @route   GET /api/patients/:patientId/reports/:reportId
  * @desc    获取单份报告
  * @access  Private (Patient, Doctor)
  */
-router.get('/patient/:patientId/:reportId', authenticateDoctor[0], authenticateDoctor[1], (req, res, next) => getModels().controller.getReport(req, res, next));
+router.get('/patient/:patientId/:reportId', authenticateDoctorOrPatient[0], authenticateDoctorOrPatient[1], (req, res, next) => getModels().controller.getReport(req, res, next));
 
 export default router;

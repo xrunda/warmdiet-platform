@@ -17,6 +17,7 @@ import authorizationRoutes from './routes/authorizations';
 import mealRoutes from './routes/meals';
 import reportRoutes from './routes/reports';
 import accessLogRoutes from './routes/accessLogs';
+import demoRoutes from './routes/demo';
 
 export function createApp(): Application {
   const app = express();
@@ -56,6 +57,7 @@ export function createApp(): Application {
   app.use('/api/meals', mealRoutes);
   app.use('/api/reports', reportRoutes);
   app.use('/api/access-logs', accessLogRoutes);
+  app.use('/api/demo', demoRoutes);
   // app.use('/api/patients', patientRoutes);
 
   // 404 处理
