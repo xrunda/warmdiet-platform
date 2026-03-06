@@ -19,8 +19,11 @@ const navItems = [
 ];
 
 function App() {
-  const { isAuthenticated, loading, user } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // 调试日志
+  console.log('App render:', { isAuthenticated, loading, activeTab });
 
   if (loading) {
     return (

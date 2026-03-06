@@ -2,6 +2,7 @@
  * Toast 通知组件
  */
 
+import React from 'react';
 import { useToast } from '../../hooks/useToast';
 
 export function ToastContainer() {

@@ -14,8 +14,8 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '../../../.env') });
 
 export const config = {
-  // 服务器配置
-  port: parseInt(process.env.PORT || '3001', 10),
+  // 服务器配置（开发环境默认使用 4000，避免与本地工具端口冲突）
+  port: parseInt(process.env.PORT || '4000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
 
   // 数据库配置

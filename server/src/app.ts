@@ -2,14 +2,15 @@
  * Express 应用配置
  */
 
-import express, { Application } from 'express';
+import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import morgan from 'morgan';
 import { config } from './config/env';
 import { getLoggerMiddleware } from './middleware/requestLogger';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { dataSanitizer } from './middleware/sanitizer';
+
+// 导入路由
 import hospitalRoutes from './routes/hospitals';
 import doctorRoutes from './routes/doctors';
 import authorizationRoutes from './routes/authorizations';

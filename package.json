@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port=3000",
+    "dev": "vite --port=4001",
     "dev:server": "nodemon --exec tsx server/src/index.ts",
     "build": "vite build",
     "build:server": "tsc -p server/tsconfig.json",

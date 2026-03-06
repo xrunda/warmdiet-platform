@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run lint 2>&1 || true)",
+      "Bash(npm run build 2>&1 | head -50)",
+      "Bash(pkill -f \"nodemon.*tsx server/src/index.ts\" 2>/dev/null; pkill -f \"vite --port=3000\" 2>/dev/null; sleep 2)",
+      "Bash(sleep 8 && curl -s http://localhost:3001/health 2>/dev/null || echo \"后端服务正在启动中...\")",
+      "Bash(sleep 8 && curl -s http://localhost:3000 2>/dev/null | head -5 || echo \"前端服务正在启动中...\")",
+      "Bash(curl -s http://localhost:3000 | head -20)",
+      "Bash(curl -s http://localhost:3001 2>&1 | head -5)",
+      "Bash(cd server && sqlite3 data/warmdiet.db \"SELECT id, code, name, planType FROM hospitals;\")",
+      "Bash(cd server && sqlite3 data/warmdiet.db \".tables\")",
+      "Bash(cd server && sqlite3 data/warmdiet.db \"SELECT name FROM sqlite_master WHERE type='table';\")",
+      "Bash(sqlite3 server/data/warmdiet.db \"SELECT id, code, name, planType FROM hospital_accounts LIMIT 5;\")",
+      "Bash(sqlite3 data/warmdiet.db \"SELECT id, code, name, planType FROM hospital_accounts LIMIT 5;\")",
+      "Bash(sqlite3 data/warmdiet.db \"PRAGMA table_info\\(hospital_accounts\\);\")",
+      "Bash(sqlite3 data/warmdiet.db \"SELECT hospital_id, hospital_name, plan_type FROM hospital_accounts LIMIT 5;\")",
+      "Bash(grep -n \"findByHospitalId\" server/src/models/*.ts)",
+      "Bash(curl -s -X POST http://localhost:3001/api/hospitals/login \\\\\n  -H \"Content-Type: application/json\" \\\\\n  -d '{\"hospitalId\":\"91110000MD0010209\",\"password\":\"any\"}' | jq .)",
+      "Bash(curl -s -X POST http://localhost:3001/api/hospitals/login \\\\\n  -H \"Content-Type: application/json\" \\\\\n  -d '{\"hospitalId\":\"91110000MA12345678\",\"password\":\"any\"}' | jq .)",
+      "Bash(sqlite3 data/warmdiet.db \"SELECT hospital_id, hospital_name, plan_type FROM hospital_accounts;\")",
+      "Bash(grep -n \"getSubscription\" server/src/controllers/*.ts)",
+      "Bash(find . -name \"*.ts\" -path \"*/controllers/*\" -type f 2>/dev/null | head -10)",
+      "Bash(curl -s -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJob3NwaXRhbF90ZXN0XzAwMSIsInR5cGUiOiJob3NwaXRhbCIsImhvc3BpdGFsSWQiOiJob3NwaXRhbF90ZXN0XzAwMSIsImlhdCI6MTc3Mjc3Njc2OCwiZXhwIjoxNzczMzgxNTY4fQ.RT6Fc0e4QuBMSBp1QC_-XoZj6LQpbGhhA-s8eBwBxrc\" http://localhost:3001/api/hospitals/hospital_test_001/subscription 2>&1)",
+      "Bash(curl -s http://localhost:3000 | head -50)",
+      "Bash(curl -s \"http://localhost:3000/src/main.tsx\" 2>&1 | head -10)",
+      "Bash(ls -la node_modules/.vite/deps/tailwindcss* 2>/dev/null | head -5)",
+      "Bash(pkill -f \"vite --port=3000\" 2>/dev/null; sleep 2)",
+      "Bash(curl -s \"http://localhost:3000/src/components/hospitals/Dashboard.tsx\" 2>&1 | head -50)",
+      "Bash(curl -s \"http://localhost:3000/node_modules/.vite/deps/tailwindcss.js\" 2>&1 | head -30)",
+      "Bash(curl -s \"http://localhost:3000/src/index.css\" 2>&1 | head -30)",
+      "Bash(ls -la *.config.* 2>/dev/null)",
+      "Bash(curl -s \"http://localhost:3000/src/components/doctor/DoctorList.tsx\" 2>&1 | head -20)",
+      "Bash(curl -s \"http://localhost:3000/src/components/doctors/DoctorList.tsx\" 2>&1 | head -20)",
+      "Bash(curl -s \"http://localhost:3000/src/App.tsx\" 2>&1 | head -30)",
+      "Bash(curl -s \"http://localhost:3000/src/components/common/Navigation.tsx\" 2>&1 | head -40)"
+    ]
+  }
+}

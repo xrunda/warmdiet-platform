@@ -1,442 +1,253 @@
 /**
- * 授权管理组件 - 患者端
+ * 授权管理 - 纯 CSS 版本
  */
 
-import { useState, useEffect } from 'react';
-import { api } from '../../services/api';
-import { useToast } from '../../hooks/useToast';
-import { useAuth } from '../../hooks/useAuth';
-
-interface Authorization {
-  id: string;
-  doctorId: string;
-  doctorName: string;
-  hospital: string;
-  department: string;
-  licenseNumber: string;
-  authorizationType: ('meal_records' | 'health_reports' | 'chat_logs')[];
-  authorizedAt: string;
-  expiresAt?: string;
-  status: 'active' | 'revoked' | 'expired';
-}
+import { useState } from 'react';
 
 export function AuthorizationList() {
-  const [authorizations, setAuthorizations] = useState<Authorization[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const { success, error } = useToast();
-  const { user } = useAuth();
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    loadAuthorizations();
-  }, [user]);
-
-  const loadAuthorizations = async () => {
-    if (!user?.userId) return;
-
-    try {
-      const response: any = await api.getPatientAuthorizations(user.userId);
-      setAuthorizations(response.data || []);
-    } catch (err: any) {
-      error(err.message || '加载授权列表失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRevoke = async (id: string) => {
-    if (!confirm('确定要撤销此授权吗？医生将无法继续访问您的数据。')) return;
-
-    try {
-      await api.revokeAuthorization(id);
-      success('授权已撤销');
-      loadAuthorizations();
-    } catch (err: any) {
-      error(err.message || '撤销失败');
-    }
-  };
-
-  const handleExtend = async (id: string) => {
-    const days = prompt('请输入延长的天数：', '30');
-    if (!days) return;
-
-    const daysNum = parseInt(days);
-    if (isNaN(daysNum) || daysNum <= 0) {
-      error('请输入有效的天数');
-      return;
-    }
-
-    try {
-      await api.extendAuthorization(id, daysNum);
-      success(`授权已延长 ${daysNum} 天`);
-      loadAuthorizations();
-    } catch (err: any) {
-      error(err.message || '延长失败');
-    }
-  };
-
-  if (loading) {
-    return <div className="text-center py-8">加载中...</div>;
-  }
-
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">🔐 授权管理</h2>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
-        >
-          + 添加授权
-        </button>
-      </div>
-
-      {/* 已授权医生 */}
-      <div className="mb-8">
-        <h3 className="text-lg font-semibold text-gray-700 mb-4">已授权医生 ({authorizations.filter(a => a.status === 'active').length})</h3>
-
-        {authorizations.filter(a => a.status === 'active').length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            <p className="text-gray-500">暂无授权，点击"添加授权"开始授权</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {authorizations
-              .filter(a => a.status === 'active')
-              .map(auth => (
-                <AuthorizationCard
-                  key={auth.id}
-                  auth={auth}
-                  onRevoke={handleRevoke}
-                  onExtend={handleExtend}
-                />
-              ))}
-          </div>
-        )}
-      </div>
-
-      {/* 授权历史 */}
-      {authorizations.filter(a => a.status !== 'active').length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">授权历史</h3>
-          <div className="space-y-2">
-            {authorizations
-              .filter(a => a.status !== 'active')
-              .map(auth => (
-                <div key={auth.id} className="bg-white rounded-lg shadow p-4 flex justify-between items-center">
-                  <div>
-                    <p className="font-semibold text-gray-800">{auth.doctorName}</p>
-                    <p className="text-sm text-gray-600">
-                      {auth.status === 'revoked' ? '已撤销' : '已过期'} · {new Date(auth.authorizedAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <span className={`px-2 py-1 text-xs rounded-full ${
-                    auth.status === 'revoked' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {auth.status === 'revoked' ? '已撤销' : '已过期'}
-                  </span>
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
-
-      {showAddModal && (
-        <AddAuthorizationModal
-          onClose={() => setShowAddModal(false)}
-          onSuccess={() => {
-            setShowAddModal(false);
-            loadAuthorizations();
-            success('授权成功');
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-function AuthorizationCard({
-  auth,
-  onRevoke,
-  onExtend,
-}: {
-  auth: Authorization;
-  onRevoke: (id: string) => void;
-  onExtend: (id: string) => void;
-}) {
-  const getAuthTypeLabels = () => {
-    const labels: { [key: string]: string } = {
-      meal_records: '餐食记录',
-      health_reports: '健康报告',
-      chat_logs: '对话日志',
+  const getStatusConfig = (status: string) => {
+    const config = {
+      pending: { label: '待审批', icon: '⏳', color: '#f59e0b', bg: '#fef3c7', border: '#fcd34d' },
+      approved: { label: '已授权', icon: '✅', color: '#10b981', bg: '#d1fae5', border: '#34d399' },
+      rejected: { label: '已拒绝', icon: '❌', color: '#ef4444', bg: '#fee2e2', border: '#fecaca' },
+      expired: { label: '已过期', icon: '⏰', color: '#6b7280', bg: '#f3f4f6', border: '#e2e8f0' },
     };
-    return auth.authorizationType.map(type => labels[type]).join('、');
+    return config[status as keyof typeof config] || config.pending;
   };
 
-  return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-2xl">
-            👨‍⚕️
-          </div>
-          <div>
-            <h3 className="font-semibold text-gray-800">{auth.doctorName}</h3>
-            <p className="text-sm text-gray-600">
-              {auth.hospital} · {auth.department}
-            </p>
-          </div>
-        </div>
-        <span className="text-green-500 text-sm font-medium">✓ 有效中</span>
-      </div>
+  const mockAuths = [
+    { id: '1', patient: '张三', doctor: '王医生', status: 'pending', scope: ['健康档案', '饮食记录'], date: '2024-03-05' },
+    { id: '2', patient: '李四', doctor: '王医生', status: 'approved', scope: ['健康档案'], date: '2024-03-01' },
+    { id: '3', patient: '王五', doctor: '王医生', status: 'rejected', scope: ['健康档案'], date: '2024-02-25' },
+    { id: '4', patient: '赵六', doctor: '张医生', status: 'approved', scope: ['健康档案', '饮食记录'], date: '2024-03-04' },
+  ];
 
-      <div className="space-y-2 text-sm text-gray-600 mb-4">
-        <div className="flex items-center gap-2">
-          <span className="font-medium">执业证号：</span>
-          <span>{auth.licenseNumber}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="font-medium">授权类型：</span>
-          <span>{getAuthTypeLabels()}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="font-medium">授权时间：</span>
-          <span>{new Date(auth.authorizedAt).toLocaleDateString()}</span>
-        </div>
-        {auth.expiresAt && (
-          <div className="flex items-center gap-2">
-            <span className="font-medium">有效期至：</span>
-            <span>{new Date(auth.expiresAt).toLocaleDateString()}</span>
-          </div>
-        )}
-      </div>
+  const stats = {
+    total: mockAuths.length,
+    pending: mockAuths.filter(a => a.status === 'pending').length,
+    approved: mockAuths.filter(a => a.status === 'approved').length,
+    rejected: mockAuths.filter(a => a.status === 'rejected').length,
+  };
 
-      <div className="flex gap-2">
-        <button
-          onClick={() => onExtend(auth.id)}
-          className="flex-1 px-3 py-2 text-sm bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition"
-        >
-          延长授权
-        </button>
-        <button
-          onClick={() => onRevoke(auth.id)}
-          className="flex-1 px-3 py-2 text-sm bg-red-100 text-red-800 rounded hover:bg-red-200 transition"
-        >
-          撤销授权
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function AddAuthorizationModal({
-  onClose,
-  onSuccess,
-}: {
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const [step, setStep] = useState(1);
-  const [searchKeyword, setSearchKeyword] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
-  const [authConfig, setAuthConfig] = useState({
-    authorizationType: ['meal_records'] as ('meal_records' | 'health_reports' | 'chat_logs')[],
-    scopeDataRange: 'recent_30d' as 'recent_7d' | 'recent_30d' | 'recent_90d' | 'all',
-    expiresInDays: 90,
+  const filteredAuths = mockAuths.filter(auth => {
+    const matchesStatus = statusFilter === 'all' || auth.status === statusFilter;
+    const matchesSearch = searchTerm === '' || auth.patient.toLowerCase().includes(searchTerm.toLowerCase()) || auth.doctor.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesStatus && matchesSearch;
   });
 
-  const [loading, setLoading] = useState(false);
-  const { error } = useToast();
-  const { user } = useAuth();
-
-  const handleSearch = async () => {
-    if (!searchKeyword.trim()) return;
-
-    try {
-      setLoading(true);
-      const response: any = await api.searchDoctors(searchKeyword);
-      setSearchResults(response.data || []);
-    } catch (err: any) {
-      error(err.message || '搜索失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!user?.userId || !selectedDoctor) return;
-
-    try {
-      setLoading(true);
-      await api.createAuthorization({
-        doctorId: selectedDoctor.id,
-        patientId: user.userId,
-        ...authConfig,
-        scopeDataStart: new Date().toISOString().split('T')[0],
-      });
-      onSuccess();
-    } catch (err: any) {
-      error(err.message || '授权失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const toggleAuthType = (type: 'meal_records' | 'health_reports' | 'chat_logs') => {
-    setAuthConfig({
-      ...authConfig,
-      authorizationType: authConfig.authorizationType.includes(type)
-        ? authConfig.authorizationType.filter(t => t !== type)
-        : [...authConfig.authorizationType, type],
-    });
-  };
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold">添加授权</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
-        </div>
+    <div style={{ minHeight: '100%', backgroundColor: '#f8fafc', padding: '24px' }}>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>授权管理</h1>
+        <p style={{ color: '#64748b', marginTop: '4px', fontSize: '14px', marginBottom: 0 }}>
+          管理患者对医生数据的访问授权
+        </p>
+      </div>
 
-        {/* 步骤 1: 搜索医生 */}
-        {step === 1 && (
-          <div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                搜索医生
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={searchKeyword}
-                  onChange={(e) => setSearchKeyword(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  placeholder="输入医生姓名或执业证号"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-                <button
-                  onClick={handleSearch}
-                  disabled={loading}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-                >
-                  搜索
-                </button>
+      {/* 统计卡片 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+        {[
+          { label: '总授权数', value: stats.total, icon: '📋', color: '#64748b', bgLight: '#f1f5f9' },
+          { label: '待审批', value: stats.pending, icon: '⏳', color: '#f59e0b', bgLight: '#fef3c7' },
+          { label: '已授权', value: stats.approved, icon: '✅', color: '#10b981', bgLight: '#d1fae5' },
+          { label: '已拒绝', value: stats.rejected, icon: '❌', color: '#ef4444', bgLight: '#fee2e2' },
+        ].map((stat, idx) => (
+          <div
+            key={stat.label}
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              padding: '24px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+              border: '1px solid #e2e8f0',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flexStart' }}>
+              <div>
+                <p style={{ color: '#64748b', fontSize: '14px', fontWeight: 500, margin: 0 }}>{stat.label}</p>
+                <p style={{ fontSize: '36px', fontWeight: 'bold', color: '#1e293b', marginTop: '8px', marginBottom: 0 }}>
+                  {loading ? '...' : stat.value}
+                </p>
+              </div>
+              <div
+                style={{
+                  width: '56px',
+                  height: '56px',
+                  borderRadius: '16px',
+                  background: stat.color,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '24px',
+                  boxShadow: '0 4px 6px rgba(0,0,0,0.15)'
+                }}
+              >
+                {stat.icon}
               </div>
             </div>
+          </div>
+        ))}
+      </div>
 
-            {searchResults.length > 0 && (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {searchResults.map(doctor => (
-                  <div
-                    key={doctor.id}
-                    onClick={() => setSelectedDoctor(doctor)}
-                    className={`p-4 border rounded-lg cursor-pointer hover:bg-gray-50 ${
-                      selectedDoctor?.id === doctor.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                    }`}
-                  >
-                    <p className="font-semibold">{doctor.name}</p>
-                    <p className="text-sm text-gray-600">
-                      {doctor.hospital} · {doctor.department}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
+      {/* 筛选和搜索 */}
+      <div style={{ background: 'white', borderRadius: '12px', padding: '24px', marginBottom: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0' }}>
+        <div style={{ display: 'flex', gap: '16px' }}>
+          <input
+            type="text"
+            placeholder="搜索患者或医生姓名..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '12px',
+              fontSize: '14px',
+              outline: 'none'
+            }}
+          />
 
-            {selectedDoctor && (
-              <div className="mt-4 flex justify-end">
-                <button
-                  onClick={() => setStep(2)}
-                  className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-                >
-                  下一步
-                </button>
-              </div>
-            )}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            style={{
+              padding: '12px 16px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '12px',
+              fontSize: '14px',
+              color: '#64748b',
+              outline: 'none'
+            }}
+          >
+            <option value="all">全部状态</option>
+            <option value="pending">待审批</option>
+            <option value="approved">已授权</option>
+            <option value="rejected">已拒绝</option>
+            <option value="expired">已过期</option>
+          </select>
+
+          {(searchTerm || statusFilter !== 'all') && (
+            <button
+              onClick={() => { setSearchTerm(''); setStatusFilter('all'); }}
+              style={{
+                padding: '12px 16px',
+                color: '#64748b',
+                background: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: 'pointer'
+              }}
+            >
+              清除筛选
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 授权列表 */}
+      <div
+        style={{
+          background: 'white',
+          borderRadius: '12px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+          border: '1px solid #e2e8f0'
+        }}
+      >
+        {loading && (
+          <div style={{ padding: '64px', textAlign: 'center', color: '#94a3b8' }}>加载中...</div>
+        )}
+
+        {!loading && filteredAuths.length === 0 && (
+          <div style={{ padding: '64px', textAlign: 'center', color: '#94a3b8' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔐</div>
+            <h3 style={{ color: '#1e293b', fontSize: '18px', fontWeight: 600, marginBottom: '8px' }}>
+              暂无授权记录
+            </h3>
+            <p style={{ color: '#64748b' }}>
+              患者将通过此页面授权医生访问其健康数据
+            </p>
           </div>
         )}
 
-        {/* 步骤 2: 配置授权 */}
-        {step === 2 && (
+        {!loading && filteredAuths.length > 0 && (
           <div>
-            <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-4">
-                授权给：<strong>{selectedDoctor?.name}</strong>（{selectedDoctor?.hospital}）
-              </p>
+            {filteredAuths.map((auth, idx) => {
+              const statusConfig = getStatusConfig(auth.status);
+              return (
+                <div
+                  key={auth.id}
+                  style={{
+                    borderBottom: '1px solid #f1f5f9',
+                    animation: `fadeIn 0.3s ease-out ${idx * 0.05}s both`
+                  }}
+                >
+                  <div style={{ padding: '16px' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '12px'
+                      }}
+                    >
+                      <div>
+                        <p
+                          style={{
+                            color: '#1e293b',
+                            fontWeight: 600,
+                            fontSize: '16px',
+                            margin: 0
+                          }}
+                        >
+                          {auth.patient}
+                        </p>
+                        <p style={{ color: '#64748b', fontSize: '12px', margin: 0 }}>→</p>
+                        <p
+                          style={{
+                            color: '#1e293b',
+                            fontWeight: 600,
+                            fontSize: '16px',
+                            margin: 0
+                          }}
+                        >
+                          {auth.doctor}
+                        </p>
+                      </div>
+                      <span
+                        style={{
+                          padding: '4px 12px',
+                          borderRadius: '12px',
+                          fontSize: '12px',
+                          background: statusConfig.bg,
+                          color: statusConfig.color,
+                          fontWeight: 600,
+                          border: `1px solid ${statusConfig.border}`
+                        }}
+                      >
+                        {statusConfig.label}
+                      </span>
+                    </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  授权范围
-                </label>
-                <div className="space-y-2">
-                  {[
-                    { key: 'meal_records', label: '日常餐食记录' },
-                    { key: 'health_reports', label: '健康分析报告' },
-                    { key: 'chat_logs', label: '饮食对话日志' },
-                  ].map(item => (
-                    <label key={item.key} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={authConfig.authorizationType.includes(item.key as any)}
-                        onChange={() => toggleAuthType(item.key as any)}
-                        className="w-4 h-4 text-blue-500"
-                      />
-                      <span>{item.label}</span>
-                    </label>
-                  ))}
+                    <div style={{ marginTop: '12px' }}>
+                      <p style={{ color: '#64748b', fontSize: '14px', marginBottom: 8 }}>
+                        授权范围：{auth.scope.join('、')}
+                      </p>
+                      <p style={{ color: '#94a3b8', fontSize: '12px' }}>
+                        授权日期：{auth.date}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  数据时间范围
-                </label>
-                <select
-                  value={authConfig.scopeDataRange}
-                  onChange={(e) => setAuthConfig({ ...authConfig, scopeDataRange: e.target.value as any })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                >
-                  <option value="recent_7d">最近 7 天</option>
-                  <option value="recent_30d">最近 30 天</option>
-                  <option value="recent_90d">最近 90 天</option>
-                  <option value="all">全部</option>
-                </select>
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  授权有效期
-                </label>
-                <select
-                  value={authConfig.expiresInDays}
-                  onChange={(e) => setAuthConfig({ ...authConfig, expiresInDays: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                >
-                  <option value={30}>30 天</option>
-                  <option value={90}>90 天</option>
-                  <option value={180}>180 天</option>
-                  <option value={99999}>永久</option>
-                </select>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setStep(1)}
-                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
-                >
-                  上一步
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={loading || authConfig.authorizationType.length === 0}
-                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition disabled:opacity-50"
-                >
-                  {loading ? '授权中...' : '确认授权'}
-                </button>
-              </div>
-            </div>
+              );
+            })}
           </div>
         )}
       </div>

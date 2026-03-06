@@ -105,7 +105,7 @@ export function DoctorList() {
         </button>
       </div>
 
-      {/* 筛选 */}
+      {/* 筛选和搜索 */}
       <div style={{ background: 'white', borderRadius: '12px', padding: '24px', marginBottom: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0' }}>
         <div style={{ display: 'flex', gap: '16px' }}>
           <div style={{ flex: 1 }}>
@@ -120,8 +120,7 @@ export function DoctorList() {
                 background: '#f8fafc',
                 border: '1px solid #e2e8f0',
                 borderRadius: '12px',
-                fontSize: '14px',
-                outline: 'none'
+                fontSize: '14px'
               }}
             />
           </div>
@@ -137,8 +136,7 @@ export function DoctorList() {
                 border: '1px solid #e2e8f0',
                 borderRadius: '12px',
                 fontSize: '14px',
-                color: '#64748b',
-                outline: 'none'
+                color: '#64748b'
               }}
             >
               {departments.map(dept => (
@@ -158,8 +156,7 @@ export function DoctorList() {
                 border: '1px solid #e2e8f0',
                 borderRadius: '12px',
                 fontSize: '14px',
-                color: '#64748b',
-                outline: 'none'
+                color: '#64748b'
               }}
             >
               <option value="all">全部状态</option>
@@ -190,7 +187,7 @@ export function DoctorList() {
       </div>
 
       {/* 医生列表 */}
-      <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0' }}>
+      <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
         {loading ? (
           <div style={{ padding: '64px', textAlign: 'center', color: '#94a3b8' }}>加载中...</div>
         ) : filteredDoctors.length === 0 ? (
@@ -200,9 +197,7 @@ export function DoctorList() {
               {searchTerm || statusFilter !== 'all' || departmentFilter !== 'all' ? '未找到匹配的医生' : '暂无医生'}
             </h3>
             <p style={{ color: '#64748b' }}>
-              {searchTerm || statusFilter !== 'all' || departmentFilter !== 'all'
-                ? '请尝试调整筛选条件'
-                : '暂无医生，请点击"+ 添加医生"添加'}
+              {searchTerm || statusFilter !== 'all' || departmentFilter !== 'all' ? '请尝试调整筛选条件' : '暂无医生，请点击"添加医生"添加'}
             </p>
           </div>
         ) : (

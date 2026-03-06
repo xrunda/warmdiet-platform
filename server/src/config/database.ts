@@ -66,6 +66,32 @@ class DatabaseConfig {
     this.db!.exec(schema);
 
     console.log('✅ Tables created successfully');
+
+    // 运行种子数据
+    this.seedData();
+  }
+
+  /**
+   * 插入种子数据
+   */
+  private seedData(): void {
+    const seedsPath = path.join(__dirname, '../../database/seeds.sql');
+
+    if (!fs.existsSync(seedsPath)) {
+      console.warn('⚠️ Seeds file not found:', seedsPath);
+      return;
+    }
+
+    // 检查是否已有数据
+    const count = this.db!.prepare('SELECT COUNT(*) as count FROM hospital_accounts').get() as { count: number };
+    if (count.count > 0) {
+      console.log('✅ Database already seeded, skipping...');
+      return;
+    }
+
+    const seeds = fs.readFileSync(seedsPath, 'utf-8');
+    this.db!.exec(seeds);
+    console.log('✅ Seed data inserted successfully');
   }
 
   /**

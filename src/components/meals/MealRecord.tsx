@@ -1,475 +1,345 @@
 /**
- * 餐食记录组件
+ * 餐食记录 - 纯 CSS 版本
  */
 
-import { useState, useEffect } from 'react';
-import { api } from '../../services/api';
-import { useToast } from '../../hooks/useToast';
-import { useAuth } from '../../hooks/useAuth';
-
-interface Food {
-  name: string;
-  amount: number;
-  unit: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-}
-
-interface Meal {
-  id: string;
-  mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack';
-  mealDate: string;
-  mealTime: string;
-  foods: Food[];
-  nutritionScore: number;
-  calories: number;
-  notes?: string;
-}
+import { useState } from 'react';
 
 export function MealRecord() {
-  const [meals, setMeals] = useState<Meal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const { success, error } = useToast();
-  const { user } = useAuth();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [dateFilter, setDateFilter] = useState('today');
+  const [mealTypeFilter, setMealTypeFilter] = useState('all');
 
-  useEffect(() => {
-    loadMeals();
-  }, [user]);
+  const mockMealRecords = [
+    {
+      id: '1',
+      patientName: '张三',
+      date: '2024-03-06',
+      mealType: 'breakfast',
+      foods: [
+        { name: '牛奶', amount: '250ml', calories: 150 },
+        { name: '全麦面包', amount: '2片', calories: 180 },
+        { name: '鸡蛋', amount: '2个', calories: 140 },
+      ],
+      calories: 470,
+      protein: 22,
+      carbs: 45,
+      fat: 18,
+      notes: '营养搭配合理',
+    },
+    {
+      id: '2',
+      patientName: '李四',
+      date: '2024-03-05',
+      mealType: 'lunch',
+      foods: [
+        { name: '米饭', amount: '1碗', calories: 200 },
+        { name: '清蒸鱼', amount: '200g', calories: 150 },
+        { name: '炒青菜', amount: '200g', calories: 60 },
+      ],
+      calories: 410,
+      protein: 28,
+      carbs: 65,
+      fat: 15,
+      notes: '午餐控制得很好',
+    },
+    {
+      id: '3',
+      patientName: '王五',
+      date: '2024-03-06',
+      mealType: 'dinner',
+      foods: [
+        { name: '小米粥', amount: '1碗', calories: 80 },
+        { name: '凉拌黄瓜', amount: '200g', calories: 40 },
+        { name: '煮鸡蛋', amount: '1个', calories: 70 },
+      ],
+      calories: 190,
+      protein: 12,
+      carbs: 28,
+      fat: 6,
+      notes: '晚餐清淡健康',
+    },
+    {
+      id: '4',
+      patientName: '赵六',
+      date: '2024-03-05',
+      mealType: 'breakfast',
+      foods: [
+        { name: '豆浆', amount: '250ml', calories: 80 },
+        { name: '包子', amount: '3个', calories: 270 },
+      ],
+      calories: 350,
+      protein: 18,
+      carbs: 48,
+      fat: 12,
+      notes: '碳水化合物较高',
+    },
+    {
+      id: '5',
+      patientName: '张三',
+      date: '2024-03-06',
+      mealType: 'lunch',
+      foods: [
+        { name: '面条', amount: '1碗', calories: 220 },
+        { name: '红烧牛肉', amount: '150g', calories: 300 },
+        { name: '炒时蔬', amount: '200g', calories: 80 },
+      ],
+      calories: 600,
+      protein: 35,
+      carbs: 75,
+      fat: 25,
+      notes: '午餐热量偏高',
+    },
+  ];
 
-  const loadMeals = async () => {
-    if (!user?.userId) return;
-
-    try {
-      const response: any = await api.getMeals(user.userId);
-      setMeals(response.data || []);
-    } catch (err: any) {
-      error(err.message || '加载餐食记录失败');
-    } finally {
-      setLoading(false);
-    }
+  const stats = {
+    total: mockMealRecords.length,
+    todayRecords: mockMealRecords.filter(r => r.date === '2024-03-06').length,
+    totalCalories: mockMealRecords.reduce((sum, r) => sum + r.calories, 0),
+    avgCalories: Math.round(mockMealRecords.reduce((sum, r) => sum + r.calories, 0) / mockMealRecords.length),
   };
 
-  const handleDelete = async (mealId: string) => {
-    if (!confirm('确定要删除这条餐食记录吗？')) return;
-
-    try {
-      await api.deleteMeal(user!.userId, mealId);
-      success('餐食记录已删除');
-      loadMeals();
-    } catch (err: any) {
-      error(err.message || '删除失败');
-    }
+  const getCalorieLevel = (calories: number) => {
+    if (calories < 300) return { label: '低热量', color: '#10b981', bg: '#d1fae5' };
+    if (calories < 500) return { label: '中等热量', color: '#3b82f6', bg: '#bfdbfe' };
+    return { label: '高热量', color: '#f97316', bg: '#fee2e2' };
   };
 
-  const getMealTypeLabel = (type: string) => {
-    const labels: { [key: string]: string } = {
-      breakfast: '🌅 早餐',
-      lunch: '☀️ 午餐',
-      dinner: '🌙 晚餐',
-      snack: '🍪 加餐',
+  const getMealTypeIcon = (type: string) => {
+    const icons = {
+      breakfast: '🌅',
+      lunch: '☀️',
+      dinner: '🌙',
+      snack: '🍪',
     };
-    return labels[type] || type;
+    return icons[type] || breakfast;
   };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-green-600';
-    if (score >= 60) return 'text-yellow-600';
-    return 'text-red-600';
-  };
-
-  if (loading) {
-    return <div className="text-center py-8">加载中...</div>;
-  }
-
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">🍽️ 餐食记录</h2>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
-        >
-          + 添加餐食
-        </button>
-      </div>
-
-      {meals.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center">
-          <p className="text-gray-500">暂无餐食记录，点击"添加餐食"开始记录</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {meals.map(meal => (
-            <MealCard
-              key={meal.id}
-              meal={meal}
-              getMealTypeLabel={getMealTypeLabel}
-              getScoreColor={getScoreColor}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
-      )}
-
-      {showAddModal && (
-        <AddMealModal
-          onClose={() => setShowAddModal(false)}
-          onSuccess={() => {
-            setShowAddModal(false);
-            loadMeals();
-            success('餐食记录添加成功');
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-function MealCard({
-  meal,
-  getMealTypeLabel,
-  getScoreColor,
-  onDelete,
-}: {
-  meal: Meal;
-  getMealTypeLabel: (type: string) => string;
-  getScoreColor: (score: number) => string;
-  onDelete: (id: string) => void;
-}) {
-  const totalCalories = meal.calories;
-  const totalProtein = meal.foods.reduce((sum, f) => sum + f.protein, 0);
-  const totalCarbs = meal.foods.reduce((sum, f) => sum + f.carbs, 0);
-  const totalFat = meal.foods.reduce((sum, f) => sum + f.fat, 0);
-
-  return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <h3 className="font-semibold text-lg text-gray-800">
-            {getMealTypeLabel(meal.mealType)}
-          </h3>
-          <p className="text-sm text-gray-600">
-            {new Date(meal.mealDate).toLocaleDateString()} · {meal.mealTime}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className={`text-2xl font-bold ${getScoreColor(meal.nutritionScore)}`}>
-            {meal.nutritionScore}分
-          </p>
-          <p className="text-xs text-gray-500">营养评分</p>
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <h4 className="text-sm font-medium text-gray-700 mb-2">食物清单</h4>
-        <div className="space-y-1">
-          {meal.foods.map((food, idx) => (
-            <div key={idx} className="text-sm text-gray-600 flex justify-between">
-              <span>
-                {food.name} · {food.amount}{food.unit}
-              </span>
-              <span>{food.calories} kcal</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-4 gap-4 mb-4 text-center">
-        <div className="bg-gray-50 rounded-lg p-3">
-          <p className="text-lg font-bold text-gray-800">{totalCalories}</p>
-          <p className="text-xs text-gray-500">热量</p>
-        </div>
-        <div className="bg-gray-50 rounded-lg p-3">
-          <p className="text-lg font-bold text-blue-600">{totalProtein.toFixed(1)}g</p>
-          <p className="text-xs text-gray-500">蛋白质</p>
-        </div>
-        <div className="bg-gray-50 rounded-lg p-3">
-          <p className="text-lg font-bold text-yellow-600">{totalCarbs.toFixed(1)}g</p>
-          <p className="text-xs text-gray-500">碳水</p>
-        </div>
-        <div className="bg-gray-50 rounded-lg p-3">
-          <p className="text-lg font-bold text-red-600">{totalFat.toFixed(1)}g</p>
-          <p className="text-xs text-gray-500">脂肪</p>
-        </div>
-      </div>
-
-      {meal.notes && (
-        <div className="mb-4 text-sm text-gray-600">
-          <span className="font-medium">备注：</span>
-          {meal.notes}
-        </div>
-      )}
-
-      <button
-        onClick={() => onDelete(meal.id)}
-        className="text-sm text-red-600 hover:text-red-700"
-      >
-        删除记录
-      </button>
-    </div>
-  );
-}
-
-function AddMealModal({
-  onClose,
-  onSuccess,
-}: {
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const [formData, setFormData] = useState({
-    mealType: 'breakfast' as 'breakfast' | 'lunch' | 'dinner' | 'snack',
-    mealDate: new Date().toISOString().split('T')[0],
-    mealTime: new Date().toTimeString().slice(0, 5),
-    foods: [] as Food[],
-    notes: '',
+  const filteredRecords = mockMealRecords.filter(record => {
+    const matchesDate = dateFilter === 'all' || (dateFilter === 'today' && record.date === '2024-03-06');
+    const matchesType = mealTypeFilter === 'all' || record.mealType === mealTypeFilter;
+    const matchesSearch = searchTerm === '' || record.patientName.includes(searchTerm);
+    return matchesDate && matchesType && matchesSearch;
   });
 
-  const [loading, setLoading] = useState(false);
-  const { error } = useToast();
-  const { user } = useAuth();
-
-  const addFood = () => {
-    setFormData({
-      ...formData,
-      foods: [...formData.foods, {
-        name: '',
-        amount: 100,
-        unit: 'g',
-        calories: 0,
-        protein: 0,
-        carbs: 0,
-        fat: 0,
-      }],
-    });
-  };
-
-  const updateFood = (index: number, field: keyof Food, value: any) => {
-    const newFoods = [...formData.foods];
-    newFoods[index][field] = value;
-    setFormData({ ...formData, foods: newFoods });
-  };
-
-  const removeFood = (index: number) => {
-    setFormData({
-      ...formData,
-      foods: formData.foods.filter((_, i) => i !== index),
-    });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (formData.foods.length === 0) {
-      error('请至少添加一种食物');
-      return;
-    }
-
-    const totalCalories = formData.foods.reduce((sum, f) => sum + f.calories, 0);
-    const nutritionScore = Math.min(100, Math.max(0, 100 - (totalCalories > 800 ? (totalCalories - 800) / 20 : 0)));
-
-    try {
-      setLoading(true);
-      await api.createMeal(user!.userId, {
-        ...formData,
-        foods: formData.foods,
-        nutritionScore: Math.round(nutritionScore),
-        calories: totalCalories,
-      });
-      onSuccess();
-    } catch (err: any) {
-      error(err.message || '添加餐食失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full p-6 max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold">添加餐食记录</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
-        </div>
+    <div style={{ minHeight: '100%', backgroundColor: '#f8fafc', padding: '24px' }}>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>餐食记录</h1>
+        <p style={{ color: '#64748b', marginTop: '4px', fontSize: '14px', marginBottom: 0 }}>
+          查看患者的饮食记录
+        </p>
+      </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                餐食类型 *
-              </label>
-              <select
-                value={formData.mealType}
-                onChange={(e) => setFormData({ ...formData, mealType: e.target.value as any })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              >
-                <option value="breakfast">早餐</option>
-                <option value="lunch">午餐</option>
-                <option value="dinner">晚餐</option>
-                <option value="snack">加餐</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                用餐时间 *
-              </label>
-              <input
-                type="time"
-                value={formData.mealTime}
-                onChange={(e) => setFormData({ ...formData, mealTime: e.target.value })}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              日期 *
-            </label>
-            <input
-              type="date"
-              value={formData.mealDate}
-              onChange={(e) => setFormData({ ...formData, mealDate: e.target.value })}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-          </div>
-
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="block text-sm font-medium text-gray-700">
-                食物清单 *
-              </label>
-              <button
-                type="button"
-                onClick={addFood}
-                className="text-sm text-blue-600 hover:text-blue-700"
-              >
-                + 添加食物
-              </button>
-            </div>
-
-            {formData.foods.map((food, idx) => (
-              <div key={idx} className="bg-gray-50 rounded-lg p-4 mb-2">
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-medium">食物 {idx + 1}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeFood(idx)}
-                    className="text-sm text-red-600 hover:text-red-700"
-                  >
-                    删除
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <input
-                    type="text"
-                    placeholder="食物名称"
-                    value={food.name}
-                    onChange={(e) => updateFood(idx, 'name', e.target.value)}
-                    className="col-span-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
-                  <input
-                    type="number"
-                    placeholder="数量"
-                    value={food.amount}
-                    onChange={(e) => updateFood(idx, 'amount', parseFloat(e.target.value) || 0)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
-                  <select
-                    value={food.unit}
-                    onChange={(e) => updateFood(idx, 'unit', e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  >
-                    <option value="g">克 (g)</option>
-                    <option value="ml">毫升 (ml)</option>
-                    <option value="个">个</option>
-                    <option value="碗">碗</option>
-                    <option value="份">份</option>
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-4 gap-3">
-                  <div>
-                    <label className="text-xs text-gray-600">热量</label>
-                    <input
-                      type="number"
-                      placeholder="0"
-                      value={food.calories}
-                      onChange={(e) => updateFood(idx, 'calories', parseFloat(e.target.value) || 0)}
-                      className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-600">蛋白质</label>
-                    <input
-                      type="number"
-                      placeholder="0"
-                      value={food.protein}
-                      onChange={(e) => updateFood(idx, 'protein', parseFloat(e.target.value) || 0)}
-                      className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-600">碳水</label>
-                    <input
-                      type="number"
-                      placeholder="0"
-                      value={food.carbs}
-                      onChange={(e) => updateFood(idx, 'carbs', parseFloat(e.target.value) || 0)}
-                      className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-600">脂肪</label>
-                    <input
-                      type="number"
-                      placeholder="0"
-                      value={food.fat}
-                      onChange={(e) => updateFood(idx, 'fat', parseFloat(e.target.value) || 0)}
-                      className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-                </div>
+      {/* 统计卡片 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+        {[
+          { label: '总记录数', value: stats.total, icon: '📊', color: '#64748b', bgLight: '#f1f5f9' },
+          { label: '今日记录', value: stats.todayRecords, icon: '📅', color: '#3b82f6', bgLight: '#bfdbfe' },
+          { label: '平均热量', value: `${stats.avgCalories} kcal`, icon: '🔥', color: '#f97316', bgLight: '#fee2e2' },
+          { label: '总摄入热量', value: `${stats.totalCalories} kcal`, icon: '🍽️', color: '#ef4444', bgLight: '#fee2e2' },
+        ].map((stat, idx) => (
+          <div
+            key={stat.label}
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              padding: '24px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+              border: '1px solid #e2e8f0',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flexStart' }}>
+              <div>
+                <p style={{ color: '#64748b', fontSize: '14px', fontWeight: 500, margin: 0 }}>{stat.label}</p>
+                <p style={{ fontSize: '36px', fontWeight: 'bold', color: '#1e293b', marginTop: '8px', marginBottom: 0 }}>
+                  {stat.value}
+                </p>
               </div>
-            ))}
+              <div
+                style={{
+                  width: '56px',
+                  height: '56px',
+                  borderRadius: '16px',
+                  background: stat.color,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '24px',
+                  boxShadow: '0 4px 6px rgba(0,0,0,0.15)'
+                }}
+              >
+                {stat.icon}
+              </div>
+            </div>
           </div>
+        ))}
+      </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              备注
-            </label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="可选备注信息"
-              rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-          </div>
+      {/* 筛选和搜索 */}
+      <div style={{ background: 'white', borderRadius: '12px', padding: '24px', marginBottom: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0' }}>
+        <div style={{ display: 'flex', gap: '16px' }}>
+          <input
+            type="text"
+            placeholder="搜索患者姓名或食物..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '12px',
+              fontSize: '14px',
+              outline: 'none'
+            }}
+          />
 
-          <div className="flex gap-3">
+          <select
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            style={{
+              padding: '12px 16px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '12px',
+              fontSize: '14px',
+              color: '#64748b',
+              outline: 'none'
+            }}
+          >
+            <option value="all">全部时间</option>
+            <option value="today">今天</option>
+            <option value="week">最近7天</option>
+            <option value="month">最近30天</option>
+          </select>
+
+          <select
+            value={mealTypeFilter}
+            onChange={(e) => setMealTypeFilter(e.target.value)}
+            style={{
+              padding: '12px 16px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '12px',
+              fontSize: '14px',
+              color: '#64748b',
+              outline: 'none'
+            }}
+          >
+            <option value="all">全部餐别</option>
+            <option value="breakfast">早餐</option>
+            <option value="lunch">午餐</option>
+            <option value="dinner">晚餐</option>
+            <option value="snack">加餐</option>
+          </select>
+
+          {(searchTerm || dateFilter !== 'all' || mealTypeFilter !== 'all') && (
             <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
+              onClick={() => { setSearchTerm(''); setDateFilter('all'); setMealTypeFilter('all'); }}
+              style={{
+                padding: '12px 16px',
+                color: '#64748b',
+                background: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: 'pointer'
+              }}
             >
-              取消
+              清除筛选
             </button>
-            <button
-              type="submit"
-              disabled={loading || formData.foods.length === 0}
-              className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition disabled:opacity-50"
-            >
-              {loading ? '添加中...' : '添加'}
-            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 餐食记录列表 */}
+      <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0' }}>
+        {loading ? (
+          <div style={{ padding: '64px', textAlign: 'center', color: '#94a3b8' }}>加载中...</div>
+        ) : filteredRecords.length === 0 ? (
+          <div style={{ padding: '64px', textAlign: 'center', color: '#94a3b8' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🍽️</div>
+            <h3 style={{ color: '#1e293b', fontSize: '18px', fontWeight: 600, marginBottom: '8px' }}>
+              暂无餐食记录
+            </h3>
+            <p style={{ color: '#64748b' }}>
+              患者将从此处记录每日的饮食情况
+            </p>
           </div>
-        </form>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+            {filteredRecords.map((record, idx) => {
+              const calorieLevel = getCalorieLevel(record.calories);
+              return (
+                <div
+                  key={record.id}
+                  style={{
+                    background: 'white',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    border: '1px solid #e2e8f0',
+                    animation: `fadeIn 0.3s ease-out ${idx * 0.05}s both`
+                  }}
+                >
+                  <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '10px',
+                        background: 'linear-gradient(135deg, #fef3c7, #d1fae5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '20px'
+                      }}>
+                        {getMealTypeIcon(record.mealType)}
+                      </div>
+                      <div>
+                        <p style={{ color: '#1e293b', fontWeight: 600, fontSize: '14px', margin: 0 }}>{record.patientName}</p>
+                        <p style={{ color: '#64748b', fontSize: '12px' }}>• {record.date}</p>
+                      </div>
+                    </div>
+                    <span style={{
+                      padding: '4px 10px',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      background: calorieLevel.bg,
+                      color: calorieLevel.color,
+                      fontWeight: 600,
+                      border: `1px solid ${calorieLevel.border}`
+                    }}>
+                      {calorieLevel.label}
+                    </span>
+                  </div>
+
+                  <div style={{ marginTop: '12px', padding: '12px', background: '#f8fafc', borderRadius: '8px' }}>
+                    <p style={{ color: '#64748b', fontSize: '14px', fontWeight: 600, marginBottom: 4, margin: 0 }}>
+                      热量：{record.calories} kcal
+                    </p>
+                    <p style={{ color: '#94a3b8', fontSize: '12px' }}>蛋白质：{record.protein}g</p>
+                    <p style={{ color: '#94a3b8', fontSize: '12px' }}>碳水：{record.carbs}g</p>
+                    <p style={{ color: '#94a3b8', fontSize: '12px' }}>脂肪：{record.fat}g</p>
+                  </div>
+
+                  <div style={{ marginTop: '12px' }}>
+                    <p style={{ color: '#64748b', fontSize: '14px', marginBottom: 8 }}>
+                      食物：{record.foods.map((f) => f.name).join('、')}
+                    </p>
+                  </div>
+                  {record.notes && (
+                    <p style={{ color: '#94a3b8', fontSize: '12px', marginTop: 8 }}>
+                      <span style={{ color: '#6b7280' }}>📝</span> {record.notes}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

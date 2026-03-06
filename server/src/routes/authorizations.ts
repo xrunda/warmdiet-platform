@@ -9,63 +9,73 @@ import { initModels } from '../models';
 import { databaseConfig } from '../config/database';
 
 const router = Router();
-const models = initModels(databaseConfig.getDatabase());
-const controller = createAuthorizationController(models);
+
+// 延迟初始化模型
+let models: ReturnType<typeof initModels>;
+let controller: ReturnType<typeof createAuthorizationController>;
+
+function getModels() {
+  if (!models) {
+    models = initModels(databaseConfig.getDatabase());
+    controller = createAuthorizationController(models);
+  }
+  return { models, controller };
+}
 
 /**
  * @route   POST /api/authorizations
  * @desc    创建授权
  * @access  Private (Patient)
  */
-router.post('/', authenticatePatient[0], authenticatePatient[1], controller.createAuthorization);
+router.post('/', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.createAuthorization(req, res, next));
 
 /**
  * @route   GET /api/patients/:patientId/authorizations
  * @desc    获取患者的授权列表
  * @access  Private (Patient)
  */
-router.get('/patient/:patientId', authenticatePatient[0], authenticatePatient[1], controller.getPatientAuthorizations);
+router.get('/patient/:patientId', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.getPatientAuthorizations(req, res, next));
 
 /**
  * @route   GET /api/doctors/:doctorId/authorizations
  * @desc    获取医生的授权列表
  * @access  Private (Doctor)
  */
-router.get('/doctor/:doctorId', authenticateDoctor[0], authenticateDoctor[1], controller.getDoctorAuthorizations);
+router.get('/doctor/:doctorId', authenticateDoctor[0], authenticateDoctor[1], (req, res, next) => getModels().controller.getDoctorAuthorizations(req, res, next));
 
 /**
  * @route   GET /api/authorizations/:id
  * @desc    获取授权详情
  * @access  Private
  */
-router.get('/:id', authenticateDoctor[0], authenticateDoctor[1], controller.getAuthorization);
+router.get('/:id', authenticateDoctor[0], authenticateDoctor[1], (req, res, next) => getModels().controller.getAuthorization(req, res, next));
 
 /**
  * @route   PUT /api/authorizations/:id
  * @desc    更新授权
  * @access  Private (Patient)
  */
-router.put('/:id', authenticatePatient[0], authenticatePatient[1], controller.createAuthorization);
+router.put('/:id', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.createAuthorization(req, res, next));
 
 /**
  * @route   DELETE /api/authorizations/:id
  * @desc    撤销授权
  * @access  Private (Patient)
  */
-router.delete('/:id', authenticatePatient[0], authenticatePatient[1], controller.revokeAuthorization);
+router.delete('/:id', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.revokeAuthorization(req, res, next));
 
 /**
  * @route   POST /api/authorizations/:id/extend
  * @desc    延长授权
  * @access  Private (Patient)
  */
-router.post('/:id/extend', authenticatePatient[0], authenticatePatient[1], controller.extendAuthorization);
+router.post('/:id/extend', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.extendAuthorization(req, res, next));
 
 /**
  * @route   GET /api/authorizations/verify
  * @desc    验证访问权限
  * @access  Public
  */
-router.get('/verify', controller.verifyAccess);
+router.get('/verify', (req, res, next) => getModels().controller.verifyAccess(req, res, next));
 
 export default router;

@@ -18,9 +18,9 @@ CREATE TABLE IF NOT EXISTS hospital_accounts (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX idx_hospital_id ON hospital_accounts(hospital_id);
-CREATE INDEX idx_subscription_status ON hospital_accounts(subscription_status);
-CREATE INDEX idx_subscription_end ON hospital_accounts(subscription_end);
+CREATE INDEX IF NOT EXISTS idx_hospital_id ON hospital_accounts(hospital_id);
+CREATE INDEX IF NOT EXISTS idx_subscription_status ON hospital_accounts(subscription_status);
+CREATE INDEX IF NOT EXISTS idx_subscription_end ON hospital_accounts(subscription_end);
 
 -- 医生账号表
 CREATE TABLE IF NOT EXISTS doctor_accounts (
@@ -38,8 +38,8 @@ CREATE TABLE IF NOT EXISTS doctor_accounts (
   FOREIGN KEY (hospital_id) REFERENCES hospital_accounts(id)
 );
 
-CREATE INDEX idx_doctor_license ON doctor_accounts(license_number);
-CREATE INDEX idx_doctor_hospital ON doctor_accounts(hospital_id);
+CREATE INDEX IF NOT EXISTS idx_doctor_license ON doctor_accounts(license_number);
+CREATE INDEX IF NOT EXISTS idx_doctor_hospital ON doctor_accounts(hospital_id);
 
 -- 患者账号表
 CREATE TABLE IF NOT EXISTS patient_accounts (
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS patient_accounts (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX idx_patient_email ON patient_accounts(email);
+CREATE INDEX IF NOT EXISTS idx_patient_email ON patient_accounts(email);
 
 -- 授权记录表
 CREATE TABLE IF NOT EXISTS doctor_authorizations (
@@ -76,10 +76,10 @@ CREATE TABLE IF NOT EXISTS doctor_authorizations (
   FOREIGN KEY (doctor_id) REFERENCES doctor_accounts(id)
 );
 
-CREATE INDEX idx_auth_patient ON doctor_authorizations(patient_id);
-CREATE INDEX idx_auth_doctor ON doctor_authorizations(doctor_id);
-CREATE INDEX idx_auth_status ON doctor_authorizations(status);
-CREATE INDEX idx_auth_expires ON doctor_authorizations(expires_at);
+CREATE INDEX IF NOT EXISTS idx_auth_patient ON doctor_authorizations(patient_id);
+CREATE INDEX IF NOT EXISTS idx_auth_doctor ON doctor_authorizations(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_auth_status ON doctor_authorizations(status);
+CREATE INDEX IF NOT EXISTS idx_auth_expires ON doctor_authorizations(expires_at);
 
 -- 授权日志表
 CREATE TABLE IF NOT EXISTS authorization_logs (
@@ -93,8 +93,8 @@ CREATE TABLE IF NOT EXISTS authorization_logs (
   FOREIGN KEY (authorization_id) REFERENCES doctor_authorizations(id)
 );
 
-CREATE INDEX idx_logs_auth ON authorization_logs(authorization_id);
-CREATE INDEX idx_logs_timestamp ON authorization_logs(timestamp);
+CREATE INDEX IF NOT EXISTS idx_logs_auth ON authorization_logs(authorization_id);
+CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON authorization_logs(timestamp);
 
 -- 餐食记录表
 CREATE TABLE IF NOT EXISTS meal_records (
@@ -112,8 +112,8 @@ CREATE TABLE IF NOT EXISTS meal_records (
   FOREIGN KEY (patient_id) REFERENCES patient_accounts(id)
 );
 
-CREATE INDEX idx_meal_patient ON meal_records(patient_id);
-CREATE INDEX idx_meal_date ON meal_records(meal_date);
+CREATE INDEX IF NOT EXISTS idx_meal_patient ON meal_records(patient_id);
+CREATE INDEX IF NOT EXISTS idx_meal_date ON meal_records(meal_date);
 
 -- 健康报告表
 CREATE TABLE IF NOT EXISTS health_reports (
@@ -129,8 +129,8 @@ CREATE TABLE IF NOT EXISTS health_reports (
   FOREIGN KEY (patient_id) REFERENCES patient_accounts(id)
 );
 
-CREATE INDEX idx_report_patient ON health_reports(patient_id);
-CREATE INDEX idx_report_date ON health_reports(report_date);
+CREATE INDEX IF NOT EXISTS idx_report_patient ON health_reports(patient_id);
+CREATE INDEX IF NOT EXISTS idx_report_date ON health_reports(report_date);
 
 -- 访问记录表（用于计费和审计）
 CREATE TABLE IF NOT EXISTS access_logs (
@@ -145,7 +145,7 @@ CREATE TABLE IF NOT EXISTS access_logs (
   FOREIGN KEY (hospital_id) REFERENCES hospital_accounts(id)
 );
 
-CREATE INDEX idx_access_doctor ON access_logs(doctor_id);
-CREATE INDEX idx_access_patient ON access_logs(patient_id);
-CREATE INDEX idx_access_hospital ON access_logs(hospital_id);
-CREATE INDEX idx_access_timestamp ON access_logs(accessed_at);
+CREATE INDEX IF NOT EXISTS idx_access_doctor ON access_logs(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_access_patient ON access_logs(patient_id);
+CREATE INDEX IF NOT EXISTS idx_access_hospital ON access_logs(hospital_id);
+CREATE INDEX IF NOT EXISTS idx_access_timestamp ON access_logs(accessed_at);
