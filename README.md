@@ -119,12 +119,146 @@ DATABASE_URL=file:./data/warmdiet.db  # 后续添加
 npm run dev
 ```
 
-访问 http://localhost:5173
+访问 http://localhost:3000
 
 ### 构建生产版本
 
 ```bash
 npm run build
+```
+
+---
+
+## 🚢 阿里云 K8s 部署
+
+### 前置要求
+
+- 阿里云容器服务 ACK（Kubernetes）
+- 阿里云容器镜像服务 ACR
+- 域名（可选）
+
+### 快速部署
+
+#### 1. 构建并推送 Docker 镜像
+
+```bash
+# 登录阿里云容器镜像服务
+docker login --username=your_username registry.cn-hangzhou.aliyuncs.com
+
+# 构建镜像
+docker build -t registry.cn-hangzhou.aliyuncs.com/your-namespace/warmdiet:latest .
+
+# 推送镜像
+docker push registry.cn-hangzhou.aliyuncs.com/your-namespace/warmdiet:latest
+```
+
+#### 2. 配置 K8s 资源
+
+修改 `k8s/secret.yaml` 中的密钥：
+
+```yaml
+stringData:
+  JWT_SECRET: "your-random-jwt-secret"  # 必须修改
+  GEMINI_API_KEY: "your-gemini-api-key" # 可选
+```
+
+#### 3. 部署到 K8s
+
+```bash
+# 创建命名空间
+kubectl apply -f k8s/namespace.yaml
+
+# 创建配置和密钥
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/secret.yaml
+
+# 部署应用
+kubectl apply -f k8s/deployment.yaml
+
+# 配置存储
+kubectl apply -f k8s/pvc.yaml
+
+# 配置 Ingress（域名访问）
+kubectl apply -f k8s/ingress.yaml
+
+# 配置自动扩缩容
+kubectl apply -f k8s/hpa.yaml
+```
+
+#### 4. 验证部署
+
+```bash
+# 查看部署状态
+kubectl get deployment -n warmdiet
+
+# 查看 Pod 状态
+kubectl get pods -n warmdiet
+
+# 查看服务
+kubectl get svc -n warmdiet
+
+# 查看日志
+kubectl logs -f -n warmdiet -l app=warmdiet
+```
+
+#### 5. 更新应用
+
+```bash
+# 重新构建镜像
+docker build -t registry.cn-hangzhou.aliyuncs.com/your-namespace/warmdiet:v2 .
+docker push registry.cn-hangzhou.aliyuncs.com/your-namespace/warmdiet:v2
+
+# 更新 Deployment 中的镜像版本
+kubectl set image deployment/warmdiet warmdiet=registry.cn-hangzhou.aliyuncs.com/your-namespace/warmdiet:v2 -n warmdiet
+
+# 或者更新 deployment.yaml 后重新 apply
+kubectl apply -f k8s/deployment.yaml
+```
+
+### K8s 资源说明
+
+| 文件 | 说明 |
+|-----|------|
+| `namespace.yaml` | 创建命名空间 |
+| `configmap.yaml` | 环境配置 |
+| `secret.yaml` | 敏感信息（密钥） |
+| `deployment.yaml` | Deployment + Service |
+| `pvc.yaml` | 持久化存储 |
+| `ingress.yaml` | 域名访问配置 |
+| `hpa.yaml` | 自动扩缩容配置 |
+
+### 监控和日志
+
+```bash
+# 查看 Pod 日志
+kubectl logs -f -n warmdiet -l app=warmdiet
+
+# 进入 Pod
+kubectl exec -it -n warmdiet <pod-name> -- sh
+
+# 查看资源使用
+kubectl top pods -n warmdiet
+kubectl top nodes
+
+# 查看事件
+kubectl get events -n warmdiet --sort-by='.lastTimestamp'
+```
+
+### 故障排查
+
+```bash
+# Pod 状态异常
+kubectl describe pod <pod-name> -n warmdiet
+
+# 服务无法访问
+kubectl describe svc warmdiet-service -n warmdiet
+kubectl get endpoints warmdiet-service -n warmdiet
+
+# Ingress 问题
+kubectl describe ingress warmdiet-ingress -n warmdiet
+
+# 查看所有资源
+kubectl get all -n warmdiet
 ```
 
 ## 📚 文档

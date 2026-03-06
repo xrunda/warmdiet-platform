@@ -7,10 +7,11 @@
     "dev": "vite --port=3000",
     "dev:server": "nodemon --exec tsx server/src/index.ts",
     "build": "vite build",
+    "build:server": "tsc -p server/tsconfig.json",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "server": "tsx server/src/index.ts"
+    "server": "node server/dist/index.js"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
