@@ -63,9 +63,10 @@ export function Navigation({ items, activeTab, onTabChange }: NavigationProps) {
       {/* 主内容区 */}
       <div className="flex-1 overflow-auto">
         <div className="p-8">
-          {items.find(item => item.id === activeTab)?.component && (
-            <items.find(item => item.id === activeTab)!.component />
-          )}
+          {(() => {
+            const ActiveComponent = items.find(item => item.id === activeTab)?.component;
+            return ActiveComponent ? <ActiveComponent /> : null;
+          })()}
         </div>
       </div>
     </div>
