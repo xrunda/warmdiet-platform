@@ -4,6 +4,11 @@
 
 import dotenv from 'dotenv';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+// ES module 中获取 __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // 加载 .env 文件
 dotenv.config({ path: path.join(__dirname, '../../../.env') });

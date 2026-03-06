@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "server": "node server/dist/index.js"
+    "server": "node server/dist/index.js",
+    "init-db": "node server/scripts/init-seed.cjs"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
