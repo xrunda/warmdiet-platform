@@ -2,8 +2,15 @@
 
 > 医疗健康管理系统 - 患者日常餐食记录与医生授权管理平台
 
-<div align="center">
-  <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+<div style="text-align: center; width: 100%;">
+  <!-- 核心：设置 max-width:100% 自适应容器，height:auto 保持等比 -->
+  <img 
+    width="2752" 
+    height="1536" 
+    alt="GHBanner" 
+    src="unnamed.png" 
+    style="max-width: 100%; height: auto; display: inline-block;"
+  />
 </div>
 
 ## 📋 项目简介
