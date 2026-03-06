@@ -10,12 +10,12 @@ import { config } from './config/env';
 import { getLoggerMiddleware } from './middleware/requestLogger';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { dataSanitizer } from './middleware/sanitizer';
-import hospitalRoutes from './routes/hospitals';
-import doctorRoutes from './routes/doctors';
-import authorizationRoutes from './routes/authorizations';
-import mealRoutes from './routes/meals';
-import reportRoutes from './routes/reports';
-import accessLogRoutes from './routes/accessLogs';
+import { createHospitalRoutes } from './routes/hospitals';
+import { createDoctorRoutes } from './routes/doctors';
+import { createAuthorizationRoutes } from './routes/authorizations';
+import { createMealRoutes } from './routes/meals';
+import { createReportRoutes } from './routes/reports';
+import { createAccessLogRoutes } from './routes/accessLogs';
 
 export function createApp(): Application {
   const app = express();
@@ -49,12 +49,12 @@ export function createApp(): Application {
   });
 
   // API 路由
-  app.use('/api/hospitals', hospitalRoutes);
-  app.use('/api/doctors', doctorRoutes);
-  app.use('/api/authorizations', authorizationRoutes);
-  app.use('/api/meals', mealRoutes);
-  app.use('/api/reports', reportRoutes);
-  app.use('/api/access-logs', accessLogRoutes);
+  app.use('/api/hospitals', createHospitalRoutes());
+  app.use('/api/doctors', createDoctorRoutes());
+  app.use('/api/authorizations', createAuthorizationRoutes());
+  app.use('/api/meals', createMealRoutes());
+  app.use('/api/reports', createReportRoutes());
+  app.use('/api/access-logs', createAccessLogRoutes());
   // app.use('/api/patients', patientRoutes);
 
   // 404 处理
