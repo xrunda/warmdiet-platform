@@ -1,11 +1,26 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { LoginForm } from './components/hospitals/LoginForm';
 import { HospitalDashboard } from './components/hospitals/Dashboard';
+import { DoctorList } from './components/doctors/DoctorList';
+import { AuthorizationList } from './components/authorization/AuthorizationList';
+import { MealRecord } from './components/meals/MealRecord';
+import { HealthReport } from './components/reports/HealthReport';
+import { Navigation } from './components/common/Navigation';
 import { ToastProvider } from './components/common/Toast';
 
+// 导航菜单项
+const navItems = [
+  { id: 'dashboard', label: '仪表盘', icon: '📊', component: HospitalDashboard },
+  { id: 'doctors', label: '医生管理', icon: '👨‍⚕️', component: DoctorList },
+  { id: 'authorizations', label: '授权管理', icon: '🔐', component: AuthorizationList },
+  { id: 'meals', label: '餐食记录', icon: '🍽️', component: MealRecord },
+  { id: 'reports', label: '健康报告', icon: '📋', component: HealthReport },
+];
+
 function App() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   if (loading) {
     return (
@@ -20,7 +35,11 @@ function App() {
       {!isAuthenticated ? (
         <LoginForm />
       ) : (
-        <HospitalDashboard />
+        <Navigation
+          items={navItems}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+        />
       )}
     </ToastProvider>
   );
