@@ -106,11 +106,10 @@ npm install
 
 ### 环境配置
 
-创建 `.env.local` 文件：
+创建 `.env.local` 文件（参考 `.env.local.example`）：
 
 ```env
-GEMINI_API_KEY=your_gemini_api_key
-DATABASE_URL=file:./data/warmdiet.db  # 后续添加
+VITE_API_URL=http://localhost:3001/api
 ```
 
 ### 运行开发服务器
@@ -129,7 +128,38 @@ npm run build
 
 ---
 
-## 🚢 阿里云 K8s 部署
+## 🌐 部署
+
+### 前端部署到 Vercel
+
+详细文档请查看：[docs/VERCEL_DEPLOYMENT.md](./docs/VERCEL_DEPLOYMENT.md)
+
+#### 快速部署（3 步）
+
+1. **连接 GitHub 仓库**
+   - 登录 [Vercel](https://vercel.com)
+   - 导入 `xrunda/warmdiet-platform` 仓库
+
+2. **配置环境变量**
+   - `VITE_API_URL`: 你的后端 API 地址
+
+3. **点击 Deploy**
+
+部署完成后，Vercel 会提供一个 URL（如 `https://warmdiet-frontend.vercel.app`）。
+
+#### 自动部署
+
+推送代码到 GitHub，Vercel 会自动触发部署：
+
+```bash
+git add .
+git commit -m "feat: new feature"
+git push origin main
+```
+
+---
+
+## 🚢 后端部署到阿里云 K8s
 
 ### 前置要求
 
