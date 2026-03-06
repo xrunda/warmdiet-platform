@@ -44,22 +44,143 @@ async function request<T>(path: string, options: { method?: HttpMethod; body?: a
   return json.data as T;
 }
 
-// ===== 具体 API =====
+// ===== Dashboard / Home =====
 
-export async function fetchPatientMeals() {
+export async function fetchDashboard() {
   const { patientId } = await getDemoToken();
-  return request(`/meals/patient/${patientId}`);
+  return request<any>(`/patients/${patientId}/dashboard`);
 }
 
-export async function fetchPatientMealStats() {
+// ===== Meals =====
+
+export async function fetchPatientMeals(date?: string) {
   const { patientId } = await getDemoToken();
-  return request(`/meals/patient/${patientId}/stats`);
+  const query = date ? `?startDate=${date}&endDate=${date}` : '';
+  return request<any[]>(`/meals/patient/${patientId}${query}`);
+}
+
+export async function fetchPatientMealStats(days?: number) {
+  const { patientId } = await getDemoToken();
+  const query = days ? `?days=${days}` : '';
+  return request<any>(`/meals/patient/${patientId}/stats${query}`);
+}
+
+export async function createMeal(data: {
+  mealType: string;
+  mealDate: string;
+  mealTime: string;
+  foods: Array<{ name: string; amount: number; unit: string; calories: number; protein: number; carbs: number; fat: number }>;
+  nutritionScore: number;
+  calories: number;
+  notes?: string;
+}) {
+  const { patientId } = await getDemoToken();
+  return request<any>(`/meals/patient/${patientId}`, { method: 'POST', body: data });
+}
+
+// ===== Health Reports =====
+
+export async function fetchHealthReports() {
+  const { patientId } = await getDemoToken();
+  return request<any[]>(`/reports/patient/${patientId}`);
 }
 
 export async function fetchLatestHealthReport() {
   const { patientId } = await getDemoToken();
-  return request(`/reports/patient/${patientId}/latest`);
+  return request<any>(`/reports/patient/${patientId}/latest`);
 }
+
+// ===== Patient Profile =====
+
+export async function fetchPatientProfile() {
+  const { patientId } = await getDemoToken();
+  return request<any>(`/patients/${patientId}`);
+}
+
+export async function updatePatientProfile(data: any) {
+  const { patientId } = await getDemoToken();
+  return request<any>(`/patients/${patientId}`, { method: 'PUT', body: data });
+}
+
+// ===== Health Conditions =====
+
+export async function fetchHealthConditions() {
+  const { patientId } = await getDemoToken();
+  return request<any[]>(`/patients/${patientId}/health-conditions`);
+}
+
+export async function addHealthCondition(data: { conditionName: string; conditionType: string; diagnosedDate?: string; notes?: string }) {
+  const { patientId } = await getDemoToken();
+  return request<any>(`/patients/${patientId}/health-conditions`, { method: 'POST', body: data });
+}
+
+export async function removeHealthCondition(condId: string) {
+  const { patientId } = await getDemoToken();
+  return request<any>(`/patients/${patientId}/health-conditions/${condId}`, { method: 'DELETE' });
+}
+
+// ===== Medications =====
+
+export async function fetchMedications() {
+  const { patientId } = await getDemoToken();
+  return request<any[]>(`/patients/${patientId}/medications`);
+}
+
+export async function addMedication(data: { name: string; dosage: string; frequency: string; timing: string }) {
+  const { patientId } = await getDemoToken();
+  return request<any>(`/patients/${patientId}/medications`, { method: 'POST', body: data });
+}
+
+export async function removeMedication(medId: string) {
+  const { patientId } = await getDemoToken();
+  return request<any>(`/patients/${patientId}/medications/${medId}`, { method: 'DELETE' });
+}
+
+// ===== Preferences =====
+
+export async function fetchPreferences() {
+  const { patientId } = await getDemoToken();
+  return request<any>(`/patients/${patientId}/preferences`);
+}
+
+export async function updatePreferences(data: { tastePreferences: string[]; likedFoods: string[]; dislikedFoods: string[] }) {
+  const { patientId } = await getDemoToken();
+  return request<any>(`/patients/${patientId}/preferences`, { method: 'PUT', body: data });
+}
+
+// ===== Medical Orders =====
+
+export async function fetchMedicalOrders() {
+  const { patientId } = await getDemoToken();
+  return request<any[]>(`/patients/${patientId}/medical-orders`);
+}
+
+export async function updateMedicalOrder(orderId: string, data: { content: string; doctorName: string }) {
+  const { patientId } = await getDemoToken();
+  return request<any>(`/patients/${patientId}/medical-orders/${orderId}`, { method: 'PUT', body: data });
+}
+
+// ===== Diet Alerts =====
+
+export async function fetchDietAlerts(date?: string) {
+  const { patientId } = await getDemoToken();
+  const query = date ? `?date=${date}` : '';
+  return request<any[]>(`/patients/${patientId}/diet-alerts${query}`);
+}
+
+// ===== Conversation Logs =====
+
+export async function fetchConversationLogs(date: string) {
+  const { patientId } = await getDemoToken();
+  return request<any[]>(`/patients/${patientId}/conversation-logs?date=${date}`);
+}
+
+export async function fetchConversationDates() {
+  const { patientId } = await getDemoToken();
+  return request<string[]>(`/patients/${patientId}/conversation-logs/dates`);
+}
+
+// ===== Authorizations =====
 
 export async function fetchPatientAuthorizationsDetailed() {
   const { patientId } = await getDemoToken();
@@ -95,4 +216,3 @@ export async function createAuthorization(payload: {
 export async function revokeAuthorization(id: string) {
   return request(`/authorizations/${id}`, { method: 'DELETE' });
 }
-

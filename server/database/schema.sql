@@ -149,3 +149,99 @@ CREATE INDEX IF NOT EXISTS idx_access_doctor ON access_logs(doctor_id);
 CREATE INDEX IF NOT EXISTS idx_access_patient ON access_logs(patient_id);
 CREATE INDEX IF NOT EXISTS idx_access_hospital ON access_logs(hospital_id);
 CREATE INDEX IF NOT EXISTS idx_access_timestamp ON access_logs(accessed_at);
+
+-- 患者健康状况表
+CREATE TABLE IF NOT EXISTS patient_health_conditions (
+  id TEXT PRIMARY KEY,
+  patient_id TEXT NOT NULL,
+  condition_name TEXT NOT NULL,
+  condition_type TEXT NOT NULL CHECK(condition_type IN ('disease', 'surgery', 'allergy')),
+  diagnosed_date TEXT,
+  notes TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (patient_id) REFERENCES patient_accounts(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_health_cond_patient ON patient_health_conditions(patient_id);
+
+-- 患者用药记录表
+CREATE TABLE IF NOT EXISTS patient_medications (
+  id TEXT PRIMARY KEY,
+  patient_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  dosage TEXT NOT NULL,
+  frequency TEXT NOT NULL,
+  timing TEXT NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (patient_id) REFERENCES patient_accounts(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_medication_patient ON patient_medications(patient_id);
+
+-- 患者饮食偏好表
+CREATE TABLE IF NOT EXISTS patient_preferences (
+  id TEXT PRIMARY KEY,
+  patient_id TEXT NOT NULL UNIQUE,
+  taste_preferences TEXT NOT NULL DEFAULT '[]',
+  liked_foods TEXT NOT NULL DEFAULT '[]',
+  disliked_foods TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (patient_id) REFERENCES patient_accounts(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pref_patient ON patient_preferences(patient_id);
+
+-- 患者医嘱表
+CREATE TABLE IF NOT EXISTS patient_medical_orders (
+  id TEXT PRIMARY KEY,
+  patient_id TEXT NOT NULL,
+  content TEXT NOT NULL,
+  doctor_name TEXT NOT NULL,
+  order_date TEXT NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (patient_id) REFERENCES patient_accounts(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_order_patient ON patient_medical_orders(patient_id);
+
+-- 饮食预警表
+CREATE TABLE IF NOT EXISTS diet_alerts (
+  id TEXT PRIMARY KEY,
+  patient_id TEXT NOT NULL,
+  meal_id TEXT,
+  level TEXT NOT NULL CHECK(level IN ('high', 'medium', 'low')),
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,
+  suggestion TEXT NOT NULL,
+  alert_date TEXT NOT NULL,
+  is_read INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (patient_id) REFERENCES patient_accounts(id),
+  FOREIGN KEY (meal_id) REFERENCES meal_records(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_alert_patient ON diet_alerts(patient_id);
+CREATE INDEX IF NOT EXISTS idx_alert_date ON diet_alerts(alert_date);
+
+-- 对话记录表
+CREATE TABLE IF NOT EXISTS conversation_logs (
+  id TEXT PRIMARY KEY,
+  patient_id TEXT NOT NULL,
+  role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
+  content TEXT NOT NULL,
+  timestamp TEXT NOT NULL,
+  log_date TEXT NOT NULL,
+  extra TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (patient_id) REFERENCES patient_accounts(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_conv_patient ON conversation_logs(patient_id);
+CREATE INDEX IF NOT EXISTS idx_conv_date ON conversation_logs(log_date);

@@ -2,121 +2,113 @@
  * 餐食记录 - 纯 CSS 版本
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { api } from '../../services/api';
 
 export function MealRecord() {
+  const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [dateFilter, setDateFilter] = useState('today');
+  const [dateFilter, setDateFilter] = useState('all');
   const [mealTypeFilter, setMealTypeFilter] = useState('all');
 
-  const mockMealRecords = [
-    {
-      id: '1',
-      patientName: '张三',
-      date: '2024-03-06',
-      mealType: 'breakfast',
-      foods: [
-        { name: '牛奶', amount: '250ml', calories: 150 },
-        { name: '全麦面包', amount: '2片', calories: 180 },
-        { name: '鸡蛋', amount: '2个', calories: 140 },
-      ],
-      calories: 470,
-      protein: 22,
-      carbs: 45,
-      fat: 18,
-      notes: '营养搭配合理',
-    },
-    {
-      id: '2',
-      patientName: '李四',
-      date: '2024-03-05',
-      mealType: 'lunch',
-      foods: [
-        { name: '米饭', amount: '1碗', calories: 200 },
-        { name: '清蒸鱼', amount: '200g', calories: 150 },
-        { name: '炒青菜', amount: '200g', calories: 60 },
-      ],
-      calories: 410,
-      protein: 28,
-      carbs: 65,
-      fat: 15,
-      notes: '午餐控制得很好',
-    },
-    {
-      id: '3',
-      patientName: '王五',
-      date: '2024-03-06',
-      mealType: 'dinner',
-      foods: [
-        { name: '小米粥', amount: '1碗', calories: 80 },
-        { name: '凉拌黄瓜', amount: '200g', calories: 40 },
-        { name: '煮鸡蛋', amount: '1个', calories: 70 },
-      ],
-      calories: 190,
-      protein: 12,
-      carbs: 28,
-      fat: 6,
-      notes: '晚餐清淡健康',
-    },
-    {
-      id: '4',
-      patientName: '赵六',
-      date: '2024-03-05',
-      mealType: 'breakfast',
-      foods: [
-        { name: '豆浆', amount: '250ml', calories: 80 },
-        { name: '包子', amount: '3个', calories: 270 },
-      ],
-      calories: 350,
-      protein: 18,
-      carbs: 48,
-      fat: 12,
-      notes: '碳水化合物较高',
-    },
-    {
-      id: '5',
-      patientName: '张三',
-      date: '2024-03-06',
-      mealType: 'lunch',
-      foods: [
-        { name: '面条', amount: '1碗', calories: 220 },
-        { name: '红烧牛肉', amount: '150g', calories: 300 },
-        { name: '炒时蔬', amount: '200g', calories: 80 },
-      ],
-      calories: 600,
-      protein: 35,
-      carbs: 75,
-      fat: 25,
-      notes: '午餐热量偏高',
-    },
-  ];
+  useEffect(() => {
+    loadMeals();
+  }, []);
+
+  async function loadMeals() {
+    try {
+      const doctorsRes: any = await api.getDoctors();
+      const doctors = doctorsRes.data || [];
+
+      const patientIds = new Set<string>();
+      for (const doc of doctors) {
+        try {
+          const authRes: any = await api.getDoctorAuthorizations(doc.id);
+          const auths = authRes.data || [];
+          for (const auth of auths) {
+            if (auth.status === 'active') patientIds.add(auth.patientId);
+          }
+        } catch { /* skip */ }
+      }
+
+      const allRecords: any[] = [];
+      for (const pid of patientIds) {
+        try {
+          const mealsRes: any = await api.getMeals(pid);
+          const meals = mealsRes.data || [];
+          for (const meal of meals) {
+            const foods = Array.isArray(meal.foods)
+              ? meal.foods
+              : JSON.parse(meal.foods || '[]');
+            allRecords.push({
+              id: meal.id,
+              patientName: pid,
+              date: (meal.mealDate || meal.createdAt || '').split('T')[0],
+              mealType: meal.mealType,
+              foods: foods.map((f: any) => ({
+                name: f.name,
+                amount: `${f.amount}${f.unit || ''}`,
+                calories: f.calories || 0,
+              })),
+              calories: meal.calories || foods.reduce((s: number, f: any) => s + (f.calories || 0), 0),
+              protein: foods.reduce((s: number, f: any) => s + (f.protein || 0), 0),
+              carbs: foods.reduce((s: number, f: any) => s + (f.carbs || 0), 0),
+              fat: foods.reduce((s: number, f: any) => s + (f.fat || 0), 0),
+              notes: meal.notes,
+            });
+          }
+        } catch { /* skip patient with no meals */ }
+      }
+
+      setRecords(allRecords);
+    } catch (err) {
+      console.error('Failed to load meals:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const today = new Date().toISOString().split('T')[0];
 
   const stats = {
-    total: mockMealRecords.length,
-    todayRecords: mockMealRecords.filter(r => r.date === '2024-03-06').length,
-    totalCalories: mockMealRecords.reduce((sum, r) => sum + r.calories, 0),
-    avgCalories: Math.round(mockMealRecords.reduce((sum, r) => sum + r.calories, 0) / mockMealRecords.length),
+    total: records.length,
+    todayRecords: records.filter(r => r.date === today).length,
+    totalCalories: records.reduce((sum, r) => sum + r.calories, 0),
+    avgCalories: records.length > 0
+      ? Math.round(records.reduce((sum, r) => sum + r.calories, 0) / records.length)
+      : 0,
   };
 
   const getCalorieLevel = (calories: number) => {
-    if (calories < 300) return { label: '低热量', color: '#10b981', bg: '#d1fae5' };
-    if (calories < 500) return { label: '中等热量', color: '#3b82f6', bg: '#bfdbfe' };
-    return { label: '高热量', color: '#f97316', bg: '#fee2e2' };
+    if (calories < 300) return { label: '低热量', color: '#10b981', bg: '#d1fae5', border: '#6ee7b7' };
+    if (calories < 500) return { label: '中等热量', color: '#3b82f6', bg: '#bfdbfe', border: '#93c5fd' };
+    return { label: '高热量', color: '#f97316', bg: '#fee2e2', border: '#fca5a5' };
   };
 
   const getMealTypeIcon = (type: string) => {
-    const icons = {
+    const icons: Record<string, string> = {
       breakfast: '🌅',
       lunch: '☀️',
       dinner: '🌙',
       snack: '🍪',
     };
-    return icons[type] || breakfast;
+    return icons[type] || '🍽️';
   };
 
-  const filteredRecords = mockMealRecords.filter(record => {
-    const matchesDate = dateFilter === 'all' || (dateFilter === 'today' && record.date === '2024-03-06');
+  const filteredRecords = records.filter(record => {
+    let matchesDate = true;
+    if (dateFilter === 'today') {
+      matchesDate = record.date === today;
+    } else if (dateFilter === 'week') {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      matchesDate = record.date >= weekAgo.toISOString().split('T')[0];
+    } else if (dateFilter === 'month') {
+      const monthAgo = new Date();
+      monthAgo.setDate(monthAgo.getDate() - 30);
+      matchesDate = record.date >= monthAgo.toISOString().split('T')[0];
+    }
     const matchesType = mealTypeFilter === 'all' || record.mealType === mealTypeFilter;
     const matchesSearch = searchTerm === '' || record.patientName.includes(searchTerm);
     return matchesDate && matchesType && matchesSearch;
@@ -138,7 +130,7 @@ export function MealRecord() {
           { label: '今日记录', value: stats.todayRecords, icon: '📅', color: '#3b82f6', bgLight: '#bfdbfe' },
           { label: '平均热量', value: `${stats.avgCalories} kcal`, icon: '🔥', color: '#f97316', bgLight: '#fee2e2' },
           { label: '总摄入热量', value: `${stats.totalCalories} kcal`, icon: '🍽️', color: '#ef4444', bgLight: '#fee2e2' },
-        ].map((stat, idx) => (
+        ].map((stat) => (
           <div
             key={stat.label}
             style={{
@@ -153,7 +145,7 @@ export function MealRecord() {
               <div>
                 <p style={{ color: '#64748b', fontSize: '14px', fontWeight: 500, margin: 0 }}>{stat.label}</p>
                 <p style={{ fontSize: '36px', fontWeight: 'bold', color: '#1e293b', marginTop: '8px', marginBottom: 0 }}>
-                  {stat.value}
+                  {loading ? '...' : stat.value}
                 </p>
               </div>
               <div
@@ -327,7 +319,7 @@ export function MealRecord() {
 
                   <div style={{ marginTop: '12px' }}>
                     <p style={{ color: '#64748b', fontSize: '14px', marginBottom: 8 }}>
-                      食物：{record.foods.map((f) => f.name).join('、')}
+                      食物：{record.foods.map((f: any) => f.name).join('、')}
                     </p>
                   </div>
                   {record.notes && (

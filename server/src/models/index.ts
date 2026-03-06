@@ -10,6 +10,14 @@ import { AuthorizationModel } from './Authorization';
 import { MealRecordModel } from './MealRecord';
 import { HealthReportModel } from './HealthReport';
 import { AccessLogModel } from './AccessLog';
+import {
+  PatientHealthConditionModel,
+  PatientMedicationModel,
+  PatientPreferenceModel,
+  PatientMedicalOrderModel,
+  DietAlertModel,
+  ConversationLogModel,
+} from './PatientProfile';
 
 export function initModels(db: Database.Database) {
   return {
@@ -20,9 +28,29 @@ export function initModels(db: Database.Database) {
     mealRecord: new MealRecordModel(db),
     healthReport: new HealthReportModel(db),
     accessLog: new AccessLogModel(db),
+    healthCondition: new PatientHealthConditionModel(db),
+    medication: new PatientMedicationModel(db),
+    preference: new PatientPreferenceModel(db),
+    medicalOrder: new PatientMedicalOrderModel(db),
+    dietAlert: new DietAlertModel(db),
+    conversationLog: new ConversationLogModel(db),
   };
 }
 
 export type Models = ReturnType<typeof initModels>;
 
-export { HospitalModel, DoctorModel, PatientModel, AuthorizationModel, MealRecordModel, HealthReportModel, AccessLogModel };
+export {
+  HospitalModel,
+  DoctorModel,
+  PatientModel,
+  AuthorizationModel,
+  MealRecordModel,
+  HealthReportModel,
+  AccessLogModel,
+  PatientHealthConditionModel,
+  PatientMedicationModel,
+  PatientPreferenceModel,
+  PatientMedicalOrderModel,
+  DietAlertModel,
+  ConversationLogModel,
+};

@@ -196,6 +196,47 @@ export class HospitalController {
   });
 
   /**
+   * 获取医院仪表盘统计数据
+   */
+  public getStats = asyncHandler(async (req: Request, res: Response) => {
+    const hospitalId = req.params.id;
+
+    const hospital = this.models.hospital.findById(hospitalId);
+    if (!hospital) {
+      throw new AppError('医院不存在', 404);
+    }
+
+    const totalDoctors = this.models.doctor.count({ hospitalId } as any);
+    const activeAuthorizations = this.models.authorization.count({ status: 'active' } as any);
+    const totalMealRecords = this.models.mealRecord.count();
+    const totalAccessLogs = this.models.accessLog.count();
+
+    const doctorsInHospital = this.models.doctor.findMany({ hospitalId } as any);
+    const doctorIds = doctorsInHospital.map((d: any) => d.id);
+
+    let totalPatients = 0;
+    if (doctorIds.length > 0) {
+      const placeholders = doctorIds.map(() => '?').join(',');
+      const sql = `SELECT COUNT(DISTINCT patient_id) as count FROM doctor_authorizations WHERE doctor_id IN (${placeholders}) AND status = 'active'`;
+      const result = (this.models.authorization as any).db.prepare(sql).get(...doctorIds) as any;
+      totalPatients = result?.count || 0;
+    }
+
+    const response: ApiResponse = {
+      success: true,
+      data: {
+        totalDoctors,
+        totalPatients,
+        activeAuthorizations,
+        totalMealRecords,
+        totalAccessLogs,
+      },
+    };
+
+    res.json(response);
+  });
+
+  /**
    * 升级套餐
    */
   public upgradePlan = asyncHandler(async (req: Request, res: Response) => {

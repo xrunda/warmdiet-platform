@@ -2,9 +2,11 @@
  * 授权管理 - 纯 CSS 版本
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { api } from '../../services/api';
 
 export function AuthorizationList() {
+  const [auths, setAuths] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -14,26 +16,73 @@ export function AuthorizationList() {
       pending: { label: '待审批', icon: '⏳', color: '#f59e0b', bg: '#fef3c7', border: '#fcd34d' },
       approved: { label: '已授权', icon: '✅', color: '#10b981', bg: '#d1fae5', border: '#34d399' },
       rejected: { label: '已拒绝', icon: '❌', color: '#ef4444', bg: '#fee2e2', border: '#fecaca' },
+      revoked: { label: '已撤销', icon: '🚫', color: '#ef4444', bg: '#fee2e2', border: '#fecaca' },
       expired: { label: '已过期', icon: '⏰', color: '#6b7280', bg: '#f3f4f6', border: '#e2e8f0' },
     };
     return config[status as keyof typeof config] || config.pending;
   };
 
-  const mockAuths = [
-    { id: '1', patient: '张三', doctor: '王医生', status: 'pending', scope: ['健康档案', '饮食记录'], date: '2024-03-05' },
-    { id: '2', patient: '李四', doctor: '王医生', status: 'approved', scope: ['健康档案'], date: '2024-03-01' },
-    { id: '3', patient: '王五', doctor: '王医生', status: 'rejected', scope: ['健康档案'], date: '2024-02-25' },
-    { id: '4', patient: '赵六', doctor: '张医生', status: 'approved', scope: ['健康档案', '饮食记录'], date: '2024-03-04' },
-  ];
+  useEffect(() => {
+    loadAuths();
+  }, []);
+
+  async function loadAuths() {
+    try {
+      const doctorsRes: any = await api.getDoctors();
+      const doctors = doctorsRes.data || [];
+
+      const allAuths: any[] = [];
+      for (const doc of doctors) {
+        try {
+          const authRes: any = await api.getDoctorAuthorizations(doc.id);
+          const docAuths = authRes.data || [];
+          for (const auth of docAuths) {
+            let scopeLabels: string[] = [];
+            try {
+              const types = typeof auth.authorizationType === 'string'
+                ? JSON.parse(auth.authorizationType)
+                : auth.authorizationType;
+              if (Array.isArray(types)) {
+                scopeLabels = types.map((t: string) => {
+                  if (t === 'meal_records') return '饮食记录';
+                  if (t === 'health_reports') return '健康报告';
+                  if (t === 'chat_logs') return '对话记录';
+                  return t;
+                });
+              }
+            } catch {
+              scopeLabels = [String(auth.authorizationType || '未知')];
+            }
+
+            const mappedStatus = auth.status === 'active' ? 'approved' : auth.status;
+            allAuths.push({
+              id: auth.id,
+              patient: auth.patientId,
+              doctor: doc.name,
+              status: mappedStatus,
+              scope: scopeLabels,
+              date: (auth.authorizedAt || auth.createdAt || '').split('T')[0],
+            });
+          }
+        } catch { /* skip doctor with no authorizations */ }
+      }
+
+      setAuths(allAuths);
+    } catch (err) {
+      console.error('Failed to load authorizations:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const stats = {
-    total: mockAuths.length,
-    pending: mockAuths.filter(a => a.status === 'pending').length,
-    approved: mockAuths.filter(a => a.status === 'approved').length,
-    rejected: mockAuths.filter(a => a.status === 'rejected').length,
+    total: auths.length,
+    pending: auths.filter(a => a.status === 'pending').length,
+    approved: auths.filter(a => a.status === 'approved').length,
+    rejected: auths.filter(a => a.status === 'rejected' || a.status === 'revoked').length,
   };
 
-  const filteredAuths = mockAuths.filter(auth => {
+  const filteredAuths = auths.filter(auth => {
     const matchesStatus = statusFilter === 'all' || auth.status === statusFilter;
     const matchesSearch = searchTerm === '' || auth.patient.toLowerCase().includes(searchTerm.toLowerCase()) || auth.doctor.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
@@ -54,8 +103,8 @@ export function AuthorizationList() {
           { label: '总授权数', value: stats.total, icon: '📋', color: '#64748b', bgLight: '#f1f5f9' },
           { label: '待审批', value: stats.pending, icon: '⏳', color: '#f59e0b', bgLight: '#fef3c7' },
           { label: '已授权', value: stats.approved, icon: '✅', color: '#10b981', bgLight: '#d1fae5' },
-          { label: '已拒绝', value: stats.rejected, icon: '❌', color: '#ef4444', bgLight: '#fee2e2' },
-        ].map((stat, idx) => (
+          { label: '已拒绝/撤销', value: stats.rejected, icon: '❌', color: '#ef4444', bgLight: '#fee2e2' },
+        ].map((stat) => (
           <div
             key={stat.label}
             style={{
@@ -129,6 +178,7 @@ export function AuthorizationList() {
             <option value="pending">待审批</option>
             <option value="approved">已授权</option>
             <option value="rejected">已拒绝</option>
+            <option value="revoked">已撤销</option>
             <option value="expired">已过期</option>
           </select>
 

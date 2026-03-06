@@ -58,6 +58,13 @@ router.put('/:id', authenticateHospital[0], authenticateHospital[1], (req, res, 
 router.get('/:id/subscription', authenticateHospital[0], authenticateHospital[1], (req, res, next) => getModels().controller.getSubscription(req, res, next));
 
 /**
+ * @route   GET /api/hospitals/:id/stats
+ * @desc    获取医院仪表盘统计数据
+ * @access  Private (Hospital)
+ */
+router.get('/:id/stats', authenticateHospital[0], authenticateHospital[1], (req, res, next) => getModels().controller.getStats(req, res, next));
+
+/**
  * @route   POST /api/hospitals/:id/upgrade
  * @desc    升级套餐
  * @access  Private (Hospital)

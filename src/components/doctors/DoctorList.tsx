@@ -9,6 +9,9 @@ interface Doctor {
   id: string;
   name: string;
   department: string;
+  licenseNumber?: string;
+  email?: string;
+  phone?: string;
   accountStatus: string;
 }
 
@@ -19,8 +22,7 @@ export function DoctorList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');
-
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const departments = [
     { id: 'all', name: '全部科室' },
@@ -30,6 +32,7 @@ export function DoctorList() {
     { id: '妇科', name: '妇科' },
     { id: '中医科', name: '中医科' },
     { id: '口腔科', name: '口腔科' },
+    { id: '营养科', name: '营养科' },
   ];
 
   useEffect(() => {
@@ -73,10 +76,71 @@ export function DoctorList() {
     setFilteredDoctors(filtered);
   };
 
+  const handleAddDoctor = async () => {
+    const name = window.prompt('请输入医生姓名：');
+    if (!name) return;
+
+    const department = window.prompt('请输入科室（如：内科、外科、营养科）：');
+    if (!department) return;
+
+    const licenseNumber = window.prompt('请输入执业证号：');
+    if (!licenseNumber) return;
+
+    const email = window.prompt('请输入邮箱（可选）：') || undefined;
+    const phone = window.prompt('请输入手机号（可选）：') || undefined;
+
+    try {
+      setActionLoading('add');
+      const res: any = await api.createDoctor({ name, department, licenseNumber, email, phone });
+      if (res.success) {
+        await loadDoctors();
+        alert('添加成功！');
+      } else {
+        alert('添加失败：' + (res.message || '未知错误'));
+      }
+    } catch (err: any) {
+      alert('添加失败：' + (err.message || '网络错误'));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteDoctor = async (doctor: Doctor) => {
+    if (!window.confirm(`确认删除医生「${doctor.name}」吗？此操作不可撤销。`)) return;
+
+    try {
+      setActionLoading(doctor.id);
+      await api.deleteDoctor(doctor.id);
+      await loadDoctors();
+    } catch (err: any) {
+      alert('删除失败：' + (err.message || '网络错误'));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleToggleStatus = async (doctor: Doctor) => {
+    const newStatus = doctor.accountStatus === 'active' ? 'suspended' : 'active';
+    const actionLabel = newStatus === 'suspended' ? '暂停' : '激活';
+
+    if (!window.confirm(`确认${actionLabel}医生「${doctor.name}」吗？`)) return;
+
+    try {
+      setActionLoading(doctor.id);
+      await api.toggleDoctorStatus(doctor.id, newStatus);
+      await loadDoctors();
+    } catch (err: any) {
+      alert(`${actionLabel}失败：` + (err.message || '网络错误'));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const statusMap = {
       active: { label: '活跃', color: '#dcfce7', text: '#16a34a' },
       inactive: { label: '已暂停', color: '#fee2e2', text: '#dc2626' },
+      suspended: { label: '已暂停', color: '#fee2e2', text: '#dc2626' },
       pending: { label: '待审核', color: '#fef3c7', text: '#d97706' },
     };
     const statusInfo = statusMap[status as keyof typeof statusMap] || statusMap.active;
@@ -92,16 +156,20 @@ export function DoctorList() {
             管理您的医生团队 ({doctors.length} 位医生)
           </p>
         </div>
-        <button style={{
-          padding: '10px 20px',
-          background: 'linear-gradient(135deg, #10b981, #06b6d4)',
-          color: 'white',
-          border: 'none',
-          borderRadius: '8px',
-          fontWeight: 500,
-          cursor: 'pointer'
-        }}>
-          + 添加医生
+        <button
+          onClick={handleAddDoctor}
+          disabled={actionLoading === 'add'}
+          style={{
+            padding: '10px 20px',
+            background: actionLoading === 'add' ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #06b6d4)',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            fontWeight: 500,
+            cursor: actionLoading === 'add' ? 'not-allowed' : 'pointer'
+          }}
+        >
+          {actionLoading === 'add' ? '添加中...' : '+ 添加医生'}
         </button>
       </div>
 
@@ -165,6 +233,7 @@ export function DoctorList() {
               <option value="all">全部状态</option>
               <option value="active">活跃</option>
               <option value="inactive">已暂停</option>
+              <option value="suspended">已暂停</option>
               <option value="pending">待审核</option>
             </select>
           </div>
@@ -216,8 +285,9 @@ export function DoctorList() {
               </tr>
             </thead>
             <tbody>
-              {filteredDoctors.map((doctor, idx) => {
+              {filteredDoctors.map((doctor) => {
                 const statusBadge = getStatusBadge(doctor.accountStatus);
+                const isActioning = actionLoading === doctor.id;
                 return (
                   <tr key={doctor.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '16px', color: '#1e293b', fontWeight: 500 }}>{doctor.name}</td>
@@ -235,8 +305,35 @@ export function DoctorList() {
                       </span>
                     </td>
                     <td style={{ padding: '16px', textAlign: 'right' }}>
-                      <button style={{ color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', marginRight: '12px', fontSize: '14px' }}>编辑</button>
-                      <button style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }}>删除</button>
+                      <button
+                        onClick={() => handleToggleStatus(doctor)}
+                        disabled={isActioning}
+                        style={{
+                          color: doctor.accountStatus === 'active' ? '#f59e0b' : '#10b981',
+                          background: 'none',
+                          border: 'none',
+                          cursor: isActioning ? 'not-allowed' : 'pointer',
+                          marginRight: '12px',
+                          fontSize: '14px',
+                          opacity: isActioning ? 0.5 : 1,
+                        }}
+                      >
+                        {doctor.accountStatus === 'active' ? '暂停' : '激活'}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteDoctor(doctor)}
+                        disabled={isActioning}
+                        style={{
+                          color: '#ef4444',
+                          background: 'none',
+                          border: 'none',
+                          cursor: isActioning ? 'not-allowed' : 'pointer',
+                          fontSize: '14px',
+                          opacity: isActioning ? 0.5 : 1,
+                        }}
+                      >
+                        {isActioning ? '处理中...' : '删除'}
+                      </button>
                     </td>
                   </tr>
                 );

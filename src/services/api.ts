@@ -353,6 +353,13 @@ export class ApiService {
   public async getLatestReport(patientId: string) {
     return this.request(`/reports/patient/${patientId}/latest`);
   }
+
+  /**
+   * 获取医院统计数据
+   */
+  public async getHospitalStats(id: string) {
+    return this.request(`/hospitals/${id}/stats`);
+  }
 }
 
 // 导出单例

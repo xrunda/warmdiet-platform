@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { api } from '../../services/api';
 
 type HealthMetrics = {
   bmi: number;
@@ -28,97 +29,16 @@ type MetricScore = {
   icon: string;
 };
 
-const MOCK_REPORTS: HealthReportItem[] = [
-  {
-    id: '1',
-    patientName: '张三',
-    reportDate: '2024-03-06',
-    period: '本周',
-    summary: '整体健康状况良好，建议继续保持健康的生活方式。',
-    metrics: {
-      bmi: 23.5,
-      bloodPressure: { systolic: 120, diastolic: 80 },
-      bloodSugar: 5.5,
-      cholesterol: 4.8,
-      heartRate: 72,
-      sleepDuration: 7.5,
-      exerciseTime: 4.5,
-      waterIntake: 2.0
-    },
-    recommendations: [
-      '保持每周至少 150 分钟的中等强度运动。',
-      '每天保证 7–8 小时的睡眠时间。',
-      '继续均衡饮食，增加蔬菜和水果摄入量。'
-    ],
-    riskFactors: []
-  },
-  {
-    id: '2',
-    patientName: '李四',
-    reportDate: '2024-03-05',
-    period: '本周',
-    summary: '血压略高，建议控制盐分摄入并增加运动量。',
-    metrics: {
-      bmi: 26.8,
-      bloodPressure: { systolic: 135, diastolic: 88 },
-      bloodSugar: 5.8,
-      cholesterol: 5.2,
-      heartRate: 78,
-      sleepDuration: 6.5,
-      exerciseTime: 2.0,
-      waterIntake: 1.5
-    },
-    recommendations: [
-      '将每日盐分摄入控制在 6 克以下。',
-      '每周至少进行 150 分钟有氧运动。',
-      '增加睡眠时间至 7–8 小时。',
-      '减少油炸和高脂食物摄入。'
-    ],
-    riskFactors: ['轻度高血压']
-  },
-  {
-    id: '3',
-    patientName: '王五',
-    reportDate: '2024-03-04',
-    period: '本周',
-    summary: '各项指标均在正常范围内，继续保持良好的生活习惯。',
-    metrics: {
-      bmi: 22.1,
-      bloodPressure: { systolic: 118, diastolic: 76 },
-      bloodSugar: 5.2,
-      cholesterol: 4.5,
-      heartRate: 68,
-      sleepDuration: 8.0,
-      exerciseTime: 6.0,
-      waterIntake: 2.5
-    },
-    recommendations: [
-      '继续保持规律作息时间。',
-      '维持均衡饮食结构。',
-      '保持每周稳定的运动频率。'
-    ],
-    riskFactors: []
-  },
-  {
-    id: '4',
-    patientName: '赵六',
-    reportDate: '2024-02-28',
-    period: '本月',
-    summary: '整体健康状况良好，各项指标均在正常范围内。',
-    metrics: {
-      bmi: 24.5,
-      bloodPressure: { systolic: 125, diastolic: 82 },
-      bloodSugar: 5.6,
-      cholesterol: 5.1,
-      heartRate: 70,
-      sleepDuration: 7.0,
-      exerciseTime: 3.5,
-      waterIntake: 2.0
-    },
-    recommendations: ['继续保持当前生活方式。', '注意定期体检。'],
-    riskFactors: []
-  }
-];
+const DEFAULT_METRICS: HealthMetrics = {
+  bmi: 23.5,
+  bloodPressure: { systolic: 120, diastolic: 80 },
+  bloodSugar: 5.5,
+  cholesterol: 4.8,
+  heartRate: 72,
+  sleepDuration: 7.5,
+  exerciseTime: 4.5,
+  waterIntake: 2.0,
+};
 
 function getMetricScores(report: HealthReportItem): MetricScore[] {
   const m = report.metrics;
@@ -183,26 +103,109 @@ function getHealthStatus(report: HealthReportItem) {
 }
 
 export function HealthReport() {
+  const [reports, setReports] = useState<HealthReportItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedReport, setSelectedReport] = useState<HealthReportItem | null>(null);
 
+  useEffect(() => {
+    loadReports();
+  }, []);
+
+  async function loadReports() {
+    try {
+      const doctorsRes: any = await api.getDoctors();
+      const doctors = doctorsRes.data || [];
+
+      const patientIds = new Set<string>();
+      for (const doc of doctors) {
+        try {
+          const authRes: any = await api.getDoctorAuthorizations(doc.id);
+          const auths = authRes.data || [];
+          for (const auth of auths) {
+            if (auth.status === 'active') patientIds.add(auth.patientId);
+          }
+        } catch { /* skip */ }
+      }
+
+      const allReports: HealthReportItem[] = [];
+      for (const pid of patientIds) {
+        try {
+          const reportsRes: any = await api.getReports(pid);
+          const patientReports = reportsRes.data || [];
+          for (const report of patientReports) {
+            let recommendations: string[] = [];
+            try {
+              recommendations = typeof report.recommendations === 'string'
+                ? JSON.parse(report.recommendations)
+                : report.recommendations || [];
+            } catch {
+              recommendations = report.recommendations ? [String(report.recommendations)] : [];
+            }
+
+            let trends: any = {};
+            try {
+              trends = typeof report.trends === 'string'
+                ? JSON.parse(report.trends)
+                : report.trends || {};
+            } catch { /* ignore */ }
+
+            const riskFactors: string[] = [];
+            if (report.nutritionScore != null && report.nutritionScore < 70) {
+              riskFactors.push('营养评分偏低');
+            }
+
+            const reportDate = (report.reportDate || report.createdAt || '').split('T')[0];
+            const startDate = report.startDate ? report.startDate.split('T')[0] : '';
+            const endDate = report.endDate ? report.endDate.split('T')[0] : '';
+            const daysDiff = startDate && endDate
+              ? Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000)
+              : 7;
+
+            allReports.push({
+              id: report.id,
+              patientName: pid,
+              reportDate,
+              period: daysDiff <= 7 ? '本周' : '本月',
+              summary: recommendations[0] || `营养评分: ${report.nutritionScore ?? '暂无'}`,
+              metrics: {
+                ...DEFAULT_METRICS,
+                ...(trends.bmi != null ? { bmi: trends.bmi } : {}),
+              },
+              recommendations: recommendations.length > 0
+                ? recommendations
+                : ['暂无具体建议，请继续保持良好的生活习惯。'],
+              riskFactors,
+            });
+          }
+        } catch { /* skip patient with no reports */ }
+      }
+
+      setReports(allReports);
+    } catch (err) {
+      console.error('Failed to load reports:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const filteredReports = useMemo(
     () =>
-      MOCK_REPORTS.filter(
+      reports.filter(
         (r) =>
           !searchTerm.trim() || r.patientName.includes(searchTerm.trim())
       ),
-    [searchTerm]
+    [searchTerm, reports]
   );
 
   const stats = useMemo(
     () => ({
-      total: MOCK_REPORTS.length,
-      thisWeek: MOCK_REPORTS.filter((r) => r.period === '本周').length,
-      healthy: MOCK_REPORTS.filter((r) => r.riskFactors.length === 0).length,
-      needsAttention: MOCK_REPORTS.filter((r) => r.riskFactors.length > 0).length
+      total: reports.length,
+      thisWeek: reports.filter((r) => r.period === '本周').length,
+      healthy: reports.filter((r) => r.riskFactors.length === 0).length,
+      needsAttention: reports.filter((r) => r.riskFactors.length > 0).length
     }),
-    []
+    [reports]
   );
 
   const handleCloseModal = () => setSelectedReport(null);
@@ -285,7 +288,7 @@ export function HealthReport() {
                   marginBottom: 0
                 }}
               >
-                {stat.value}
+                {loading ? '...' : stat.value}
               </p>
             </div>
             <div
@@ -335,211 +338,231 @@ export function HealthReport() {
         />
       </div>
 
+      {/* 加载中 */}
+      {loading && (
+        <div style={{ padding: '64px', textAlign: 'center', color: '#94a3b8' }}>加载中...</div>
+      )}
+
+      {/* 空状态 */}
+      {!loading && filteredReports.length === 0 && (
+        <div style={{ padding: '64px', textAlign: 'center', color: '#94a3b8', backgroundColor: '#ffffff', borderRadius: 16, border: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
+          <h3 style={{ color: '#1e293b', fontSize: '18px', fontWeight: 600, marginBottom: '8px' }}>
+            暂无健康报告
+          </h3>
+          <p style={{ color: '#64748b' }}>
+            授权患者的健康报告将显示在这里
+          </p>
+        </div>
+      )}
+
       {/* 报告卡片 */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
-          gap: 20
-        }}
-      >
-        {filteredReports.map((report) => {
-          const healthStatus = getHealthStatus(report);
-          const avgScore = getAverageScore(report);
-          return (
-            <div
-              key={report.id}
-              style={{
-                backgroundColor: '#ffffff',
-                borderRadius: 16,
-                padding: 20,
-                boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
-                border: '1px solid #e2e8f0',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 12
-              }}
-            >
+      {!loading && filteredReports.length > 0 && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
+            gap: 20
+          }}
+        >
+          {filteredReports.map((report) => {
+            const healthStatus = getHealthStatus(report);
+            const avgScore = getAverageScore(report);
+            return (
               <div
+                key={report.id}
                 style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: 16,
+                  padding: 20,
+                  boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
+                  border: '1px solid #e2e8f0',
                   display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  borderBottom: '1px solid #e5e7eb',
-                  paddingBottom: 10
+                  flexDirection: 'column',
+                  gap: 12
                 }}
               >
-                <div>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 16,
-                      fontWeight: 600,
-                      color: '#1e293b'
-                    }}
-                  >
-                    {report.patientName}
-                  </p>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 12,
-                      color: '#64748b',
-                      marginTop: 4
-                    }}
-                  >
-                    {report.reportDate} · {report.period}
-                  </p>
-                </div>
-                <span
+                <div
                   style={{
-                    padding: '4px 10px',
-                    borderRadius: 999,
-                    fontSize: 12,
-                    backgroundColor: healthStatus.bg,
-                    color: healthStatus.color,
-                    fontWeight: 600
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    borderBottom: '1px solid #e5e7eb',
+                    paddingBottom: 10
                   }}
                 >
-                  {healthStatus.label}
-                </span>
-              </div>
-
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 14,
-                  color: '#64748b'
-                }}
-              >
-                {report.summary}
-              </p>
-
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-                  gap: 8
-                }}
-              >
-                {[
-                  {
-                    label: 'BMI',
-                    value: report.metrics.bmi,
-                    unit: '',
-                    icon: '⚖️'
-                  },
-                  {
-                    label: '血压',
-                    value: `${report.metrics.bloodPressure.systolic}/${report.metrics.bloodPressure.diastolic}`,
-                    unit: '',
-                    icon: '💓'
-                  },
-                  {
-                    label: '血糖',
-                    value: report.metrics.bloodSugar,
-                    unit: '',
-                    icon: '🩸'
-                  },
-                  {
-                    label: '胆固醇',
-                    value: report.metrics.cholesterol,
-                    unit: '',
-                    icon: '🥚'
-                  }
-                ].map((metric) => (
-                  <div
-                    key={metric.label}
-                    style={{
-                      textAlign: 'center',
-                      padding: 8,
-                      backgroundColor: '#f8fafc',
-                      borderRadius: 8
-                    }}
-                  >
-                    <div style={{ fontSize: 22, marginBottom: 2 }}>{metric.icon}</div>
+                  <div>
                     <p
                       style={{
                         margin: 0,
-                        fontSize: 12,
-                        color: '#64748b'
-                      }}
-                    >
-                      {metric.label}
-                    </p>
-                    <p
-                      style={{
-                        margin: 0,
-                        marginTop: 4,
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: 600,
                         color: '#1e293b'
                       }}
                     >
-                      {metric.value}
-                      {metric.unit}
+                      {report.patientName}
+                    </p>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 12,
+                        color: '#64748b',
+                        marginTop: 4
+                      }}
+                    >
+                      {report.reportDate} · {report.period}
                     </p>
                   </div>
-                ))}
-              </div>
+                  <span
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 999,
+                      fontSize: 12,
+                      backgroundColor: healthStatus.bg,
+                      color: healthStatus.color,
+                      fontWeight: 600
+                    }}
+                  >
+                    {healthStatus.label}
+                  </span>
+                </div>
 
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginTop: 4
-                }}
-              >
                 <p
                   style={{
                     margin: 0,
                     fontSize: 14,
-                    color: '#94a3b8'
+                    color: '#64748b'
                   }}
                 >
-                  健康评分{' '}
-                  <span
-                    style={{
-                      fontSize: 20,
-                      fontWeight: 700,
-                      color: '#1e293b'
-                    }}
-                  >
-                    {avgScore}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 12,
-                      color: '#64748b',
-                      marginLeft: 4
-                    }}
-                  >
-                    / 100
-                  </span>
+                  {report.summary}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setSelectedReport(report)}
+
+                <div
                   style={{
-                    padding: '8px 14px',
-                    borderRadius: 999,
-                    border: 'none',
-                    backgroundImage:
-                      'linear-gradient(135deg, #10b981, #06b6d4)',
-                    color: '#ffffff',
-                    fontSize: 14,
-                    fontWeight: 500,
-                    cursor: 'pointer'
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+                    gap: 8
                   }}
                 >
-                  查看详情
-                </button>
+                  {[
+                    {
+                      label: 'BMI',
+                      value: report.metrics.bmi,
+                      unit: '',
+                      icon: '⚖️'
+                    },
+                    {
+                      label: '血压',
+                      value: `${report.metrics.bloodPressure.systolic}/${report.metrics.bloodPressure.diastolic}`,
+                      unit: '',
+                      icon: '💓'
+                    },
+                    {
+                      label: '血糖',
+                      value: report.metrics.bloodSugar,
+                      unit: '',
+                      icon: '🩸'
+                    },
+                    {
+                      label: '胆固醇',
+                      value: report.metrics.cholesterol,
+                      unit: '',
+                      icon: '🥚'
+                    }
+                  ].map((metric) => (
+                    <div
+                      key={metric.label}
+                      style={{
+                        textAlign: 'center',
+                        padding: 8,
+                        backgroundColor: '#f8fafc',
+                        borderRadius: 8
+                      }}
+                    >
+                      <div style={{ fontSize: 22, marginBottom: 2 }}>{metric.icon}</div>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 12,
+                          color: '#64748b'
+                        }}
+                      >
+                        {metric.label}
+                      </p>
+                      <p
+                        style={{
+                          margin: 0,
+                          marginTop: 4,
+                          fontSize: 18,
+                          fontWeight: 600,
+                          color: '#1e293b'
+                        }}
+                      >
+                        {metric.value}
+                        {metric.unit}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginTop: 4
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 14,
+                      color: '#94a3b8'
+                    }}
+                  >
+                    健康评分{' '}
+                    <span
+                      style={{
+                        fontSize: 20,
+                        fontWeight: 700,
+                        color: '#1e293b'
+                      }}
+                    >
+                      {avgScore}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: '#64748b',
+                        marginLeft: 4
+                      }}
+                    >
+                      / 100
+                    </span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedReport(report)}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: 999,
+                      border: 'none',
+                      backgroundImage:
+                        'linear-gradient(135deg, #10b981, #06b6d4)',
+                      color: '#ffffff',
+                      fontSize: 14,
+                      fontWeight: 500,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    查看详情
+                  </button>
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* 报告详情弹窗 */}
       {selectedReport && (
@@ -844,12 +867,16 @@ export function HealthReport() {
                               ? '#dcfce7'
                               : metric.status === '达标'
                               ? '#e0f2fe'
+                              : metric.status === '充足'
+                              ? '#dcfce7'
                               : '#fee2e2',
                           color:
                             metric.status === '正常'
                               ? '#166534'
                               : metric.status === '达标'
                               ? '#075985'
+                              : metric.status === '充足'
+                              ? '#166534'
                               : '#b91c1c'
                         }}
                       >
@@ -878,7 +905,7 @@ export function HealthReport() {
                     color: '#1e293b'
                   }}
                 >
-                  📋 健康建议
+                  健康建议
                 </h4>
                 <ul
                   style={{
@@ -915,7 +942,7 @@ export function HealthReport() {
                       color: '#b91c1c'
                     }}
                   >
-                    ⚠️ 风险因素
+                    风险因素
                   </h4>
                   <ul
                     style={{
@@ -981,4 +1008,3 @@ export function HealthReport() {
     </div>
   );
 }
-

@@ -135,6 +135,7 @@ const AddAuthorizationModal = ({
   const [step, setStep] = useState<'search' | 'confirm' | 'success'>('search');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDoctor, setSelectedDoctor] = useState<DoctorProfile | null>(null);
+  const [filteredDoctors, setFilteredDoctors] = useState<DoctorProfile[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<AuthorizationType[]>(['meal_records']);
   const [dataRange, setDataRange] = useState<DataRange>('recent_30d');
   const [expiryDays, setExpiryDays] = useState<number>(90);
@@ -144,16 +145,16 @@ const AddAuthorizationModal = ({
     if (!searchQuery) return;
     searchDoctors(searchQuery)
       .then((list: any) => {
+        const results = Array.isArray(list) ? list : [];
+        setFilteredDoctors(results);
         setSelectedDoctor(null);
-        // 这里仅在搜索结果中选择一个医生，因此不单独维护 doctors 列表
-        if (Array.isArray(list) && list.length > 0) {
-          setSelectedDoctor(list[0]);
-          setStep('confirm');
+        if (results.length === 1) {
+          setSelectedDoctor(results[0]);
         }
       })
       .catch((err) => {
         console.error('搜索医生失败', err);
-        alert('搜索医生失败，请稍后重试');
+        setFilteredDoctors([]);
       });
   };
 
@@ -177,6 +178,7 @@ const AddAuthorizationModal = ({
     setStep('search');
     setSearchQuery('');
     setSelectedDoctor(null);
+    setFilteredDoctors([]);
     setSelectedTypes(['meal_records']);
     setDataRange('recent_30d');
     setExpiryDays(90);
@@ -222,18 +224,33 @@ const AddAuthorizationModal = ({
           {/* Step 1: Search */}
           {step === 'search' && (
             <div className="space-y-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-hint" />
-                <input
-                  type="text"
-                  placeholder="输入医生姓名或执业证号..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                />
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-hint" />
+                  <input
+                    type="text"
+                    placeholder="输入医生姓名或执业证号..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+                <button
+                  onClick={handleSearch}
+                  disabled={!searchQuery.trim()}
+                  className={cn(
+                    "px-4 py-3 rounded-xl text-sm font-bold shrink-0 transition-all",
+                    searchQuery.trim()
+                      ? "bg-indigo-600 text-white"
+                      : "bg-gray-100 text-gray-400"
+                  )}
+                >
+                  搜索
+                </button>
               </div>
 
-              {searchQuery && filteredDoctors.length > 0 && (
+              {filteredDoctors.length > 0 && (
                 <div className="space-y-2">
                   <div className="text-sm text-text-hint">搜索结果：</div>
                   {filteredDoctors.map((doctor) => (
@@ -274,8 +291,14 @@ const AddAuthorizationModal = ({
                 </div>
               )}
 
+              {searchQuery && filteredDoctors.length === 0 && (
+                <div className="text-center py-6 text-sm text-text-hint">
+                  点击「搜索」查找医生，或检查输入内容
+                </div>
+              )}
+
               <button
-                onClick={handleSearch}
+                onClick={() => selectedDoctor && setStep('confirm')}
                 disabled={!selectedDoctor}
                 className={cn(
                   "w-full py-3 rounded-xl text-sm font-bold transition-all",

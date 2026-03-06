@@ -1,4 +1,12 @@
 import React, { useState } from 'react';
+import {
+  ClipboardList,
+  LayoutDashboard,
+  ShieldCheck,
+  Stethoscope,
+  UtensilsCrossed,
+  type LucideIcon,
+} from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { LoginForm } from './components/hospitals/LoginForm';
 import { HospitalDashboard } from './components/hospitals/Dashboard';
@@ -10,12 +18,19 @@ import { Navigation } from './components/common/Navigation';
 import { ToastProvider } from './components/common/Toast';
 
 // 导航菜单项
-const navItems = [
-  { id: 'dashboard', label: '仪表盘', icon: '📊', component: HospitalDashboard },
-  { id: 'doctors', label: '医生管理', icon: '👨‍⚕️', component: DoctorList },
-  { id: 'authorizations', label: '授权管理', icon: '🔐', component: AuthorizationList },
-  { id: 'meals', label: '餐食记录', icon: '🍽️', component: MealRecord },
-  { id: 'reports', label: '健康报告', icon: '📋', component: HealthReport },
+interface NavItem {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  component: React.ComponentType<any>;
+}
+
+const navItems: NavItem[] = [
+  { id: 'dashboard', label: '仪表盘', icon: LayoutDashboard, component: HospitalDashboard },
+  { id: 'doctors', label: '医生管理', icon: Stethoscope, component: DoctorList },
+  { id: 'authorizations', label: '授权管理', icon: ShieldCheck, component: AuthorizationList },
+  { id: 'meals', label: '餐食记录', icon: UtensilsCrossed, component: MealRecord },
+  { id: 'reports', label: '健康报告', icon: ClipboardList, component: HealthReport },
 ];
 
 function App() {
