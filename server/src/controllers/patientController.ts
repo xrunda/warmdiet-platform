@@ -32,6 +32,11 @@ const medicationSchema = z.object({
   timing: z.string().min(1).max(100),
 });
 
+const medicalOrderSchema = z.object({
+  content: z.string().min(1).max(2000),
+  doctorName: z.string().min(1).max(100),
+});
+
 const preferenceSchema = z.object({
   tastePreferences: z.union([z.string(), z.array(z.string())]),
   likedFoods: z.union([z.string(), z.array(z.string())]),
@@ -207,6 +212,18 @@ export class PatientController {
     res.status(201).json({ success: true, data: medication, message: '用药记录已添加' });
   });
 
+  public updateMedication = asyncHandler(async (req: Request, res: Response) => {
+    const { medId } = req.params;
+    const data = medicationSchema.parse(req.body);
+
+    const medication = this.models.medication.findById(medId);
+    if (!medication) throw new AppError('用药记录不存在', 404);
+
+    const updated = this.models.medication.update(medId, data as any);
+
+    res.json({ success: true, data: updated, message: '用药记录已更新' });
+  });
+
   public removeMedication = asyncHandler(async (req: Request, res: Response) => {
     const { medId } = req.params;
 
@@ -281,13 +298,32 @@ export class PatientController {
 
   public updateMedicalOrder = asyncHandler(async (req: Request, res: Response) => {
     const { orderId } = req.params;
+    const data = medicalOrderSchema.parse(req.body);
 
     const order = this.models.medicalOrder.findById(orderId);
     if (!order) throw new AppError('医嘱记录不存在', 404);
 
-    const updated = this.models.medicalOrder.update(orderId, req.body);
+    const updated = this.models.medicalOrder.update(orderId, data as any);
 
     res.json({ success: true, data: updated, message: '医嘱已更新' });
+  });
+
+  public createMedicalOrder = asyncHandler(async (req: Request, res: Response) => {
+    const patientId = req.params.id;
+    const data = medicalOrderSchema.parse(req.body);
+
+    const patient = this.models.patient.findById(patientId);
+    if (!patient) throw new AppError('患者不存在', 404);
+
+    const order = this.models.medicalOrder.create({
+      patientId,
+      content: data.content,
+      doctorName: data.doctorName,
+      orderDate: new Date().toISOString().split('T')[0],
+      isActive: 1,
+    } as any);
+
+    res.status(201).json({ success: true, data: order, message: '医嘱已添加' });
   });
 
   // --- Diet Alerts ---

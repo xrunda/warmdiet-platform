@@ -71,6 +71,13 @@ router.get('/:id/medications', authenticateDoctorOrPatient[0], authenticateDocto
 router.post('/:id/medications', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.addMedication(req, res, next));
 
 /**
+ * @route   PUT /api/patients/:id/medications/:medId
+ * @desc    更新用药记录
+ * @access  Private (Patient)
+ */
+router.put('/:id/medications/:medId', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.updateMedication(req, res, next));
+
+/**
  * @route   DELETE /api/patients/:id/medications/:medId
  * @desc    移除用药记录
  * @access  Private (Patient)
@@ -97,6 +104,13 @@ router.put('/:id/preferences', authenticatePatient[0], authenticatePatient[1], (
  * @access  Private (Patient / Doctor)
  */
 router.get('/:id/medical-orders', authenticateDoctorOrPatient[0], authenticateDoctorOrPatient[1], (req, res, next) => getModels().controller.getMedicalOrders(req, res, next));
+
+/**
+ * @route   POST /api/patients/:id/medical-orders
+ * @desc    新增医嘱
+ * @access  Private (Patient)
+ */
+router.post('/:id/medical-orders', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.createMedicalOrder(req, res, next));
 
 /**
  * @route   PUT /api/patients/:id/medical-orders/:orderId

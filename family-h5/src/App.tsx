@@ -57,8 +57,13 @@ import {
   fetchPreferences,
   fetchMedicalOrders,
   createMeal,
+  addHealthCondition,
+  removeHealthCondition,
   addMedication as addMedicationApi,
+  updateMedication as updateMedicationApi,
+  removeMedication as removeMedicationApi,
   updatePreferences as updatePreferencesApi,
+  createMedicalOrder as createMedicalOrderApi,
   updateMedicalOrder as updateMedicalOrderApi,
 } from './api';
 
@@ -638,12 +643,30 @@ function WeeklyViewSheet({ open, onClose, trendData }: { open: boolean; onClose:
   );
 }
 
-// --- Add Medication Modal ---
-function AddMedicationSheet({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated?: () => void }) {
+// --- Add / Edit Medication Modal ---
+function AddMedicationSheet({
+  open,
+  onClose,
+  onCreated,
+  medication,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated?: () => void;
+  medication?: { id: string; name: string; dosage: string; frequency?: string; timing: string };
+}) {
   const [medName, setMedName] = useState('');
   const [medDose, setMedDose] = useState('');
   const [medTime, setMedTime] = useState('早餐后');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setMedName(medication?.name || '');
+      setMedDose(medication?.dosage || '');
+      setMedTime(medication?.timing || '早餐后');
+    }
+  }, [open, medication]);
 
   const resetAndClose = () => {
     setMedName('');
@@ -656,18 +679,38 @@ function AddMedicationSheet({ open, onClose, onCreated }: { open: boolean; onClo
     if (!medName.trim() || submitting) return;
     setSubmitting(true);
     try {
-      await addMedicationApi({ name: medName, dosage: medDose, frequency: '', timing: medTime });
+      const payload = { name: medName, dosage: medDose, frequency: medication?.frequency || '每日1次', timing: medTime };
+      if (medication?.id) {
+        await updateMedicationApi(medication.id, payload);
+      } else {
+        await addMedicationApi(payload);
+      }
       onCreated?.();
       resetAndClose();
     } catch (e) {
-      console.error('Failed to add medication:', e);
+      console.error('Failed to save medication:', e);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!medication?.id || submitting) return;
+    if (!window.confirm(`确认删除“${medication.name}”吗？`)) return;
+    setSubmitting(true);
+    try {
+      await removeMedicationApi(medication.id);
+      onCreated?.();
+      resetAndClose();
+    } catch (e) {
+      console.error('Failed to remove medication:', e);
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <BottomSheet open={open} onClose={resetAndClose} title="添加药品">
+    <BottomSheet open={open} onClose={resetAndClose} title={medication ? '编辑药品' : '添加药品'}>
       <div className="p-5 space-y-5">
         <div>
           <label className="text-sm font-semibold text-gray-500 block mb-2">药品名称</label>
@@ -724,7 +767,126 @@ function AddMedicationSheet({ open, onClose, onCreated }: { open: boolean; onClo
               : 'bg-gray-100 text-gray-400'
           )}
         >
-          {submitting ? '保存中...' : '保存药品'}
+          {submitting ? '保存中...' : medication ? '保存修改' : '保存药品'}
+        </button>
+        {medication ? (
+          <button
+            onClick={handleDelete}
+            disabled={submitting}
+            className="w-full py-3 rounded-2xl text-sm font-bold border border-red-100 text-red-500 bg-red-50"
+          >
+            删除药品
+          </button>
+        ) : null}
+      </div>
+    </BottomSheet>
+  );
+}
+
+function AddConditionSheet({
+  open,
+  onClose,
+  type,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  type: 'disease' | 'surgery';
+  onSaved?: () => void;
+}) {
+  const [name, setName] = useState('');
+  const [diagnosedDate, setDiagnosedDate] = useState('');
+  const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setName('');
+      setDiagnosedDate('');
+      setNotes('');
+      setSubmitting(false);
+    }
+  }, [open]);
+
+  const presets =
+    type === 'surgery'
+      ? ['胆囊切除术', '胃息肉切除术', '阑尾切除术', '髋关节置换术']
+      : ['高血压', '高血脂', '糖尿病', '痛风', '冠心病'];
+
+  const handleSave = async () => {
+    if (!name.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      await addHealthCondition({
+        conditionName: name.trim(),
+        conditionType: type,
+        diagnosedDate: diagnosedDate || undefined,
+        notes: notes.trim() || undefined,
+      });
+      onSaved?.();
+      onClose();
+    } catch (e) {
+      console.error('Failed to add condition:', e);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <BottomSheet open={open} onClose={onClose} title={type === 'surgery' ? '添加手术记录' : '增加健康状况'}>
+      <div className="p-5 space-y-5">
+        <div>
+          <label className="text-sm font-semibold text-gray-500 block mb-2">
+            {type === 'surgery' ? '手术名称' : '健康状况'}
+          </label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={type === 'surgery' ? '例如：胆囊切除术' : '例如：高血压'}
+            className="w-full p-4 border border-gray-200 rounded-2xl text-sm text-gray-700 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300"
+          />
+          <div className="flex flex-wrap gap-2 mt-3">
+            {presets.map((item) => (
+              <button
+                key={item}
+                onClick={() => setName(item)}
+                className="px-3 py-1.5 rounded-xl text-xs border border-gray-100 bg-gray-50 text-gray-500 active:bg-gray-100"
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="text-sm font-semibold text-gray-500 block mb-2">发生时间</label>
+          <input
+            type="date"
+            value={diagnosedDate}
+            onChange={(e) => setDiagnosedDate(e.target.value)}
+            className="w-full p-4 border border-gray-200 rounded-2xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300"
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-semibold text-gray-500 block mb-2">备注</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder={type === 'surgery' ? '例如：术后恢复中，需要低脂饮食' : '例如：长期服药控制中'}
+            className="w-full p-4 border border-gray-200 rounded-2xl text-sm text-gray-700 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 resize-none h-24"
+          />
+        </div>
+
+        <button
+          onClick={handleSave}
+          disabled={!name.trim() || submitting}
+          className={cn(
+            'w-full py-4 rounded-2xl text-base font-bold transition-all',
+            name.trim() && !submitting ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 active:scale-[0.98]' : 'bg-gray-100 text-gray-400'
+          )}
+        >
+          {submitting ? '保存中...' : '保存记录'}
         </button>
       </div>
     </BottomSheet>
@@ -866,25 +1028,32 @@ function EditMedicalOrderSheet({
     if (order) {
       setOrderText(order.content || '');
       setDoctor(order.doctorName || '');
+    } else if (open) {
+      setOrderText('');
+      setDoctor('');
     }
-  }, [order]);
+  }, [open, order]);
 
   const handleSave = async () => {
-    if (!order || submitting) return;
+    if (!orderText.trim() || !doctor.trim() || submitting) return;
     setSubmitting(true);
     try {
-      await updateMedicalOrderApi(order.id, { content: orderText, doctorName: doctor });
+      if (order) {
+        await updateMedicalOrderApi(order.id, { content: orderText, doctorName: doctor });
+      } else {
+        await createMedicalOrderApi({ content: orderText, doctorName: doctor });
+      }
       onSaved?.();
       onClose();
     } catch (e) {
-      console.error('Failed to update medical order:', e);
+      console.error('Failed to save medical order:', e);
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="编辑医嘱">
+    <BottomSheet open={open} onClose={onClose} title={order ? '编辑医嘱' : '添加医嘱'}>
       <div className="p-5 space-y-5">
         <div>
           <label className="text-sm font-semibold text-gray-500 block mb-2">医嘱内容</label>
@@ -913,13 +1082,13 @@ function EditMedicalOrderSheet({
 
         <button
           onClick={handleSave}
-          disabled={submitting}
+          disabled={!orderText.trim() || !doctor.trim() || submitting}
           className={cn(
             'w-full py-4 rounded-2xl text-base font-bold shadow-lg shadow-indigo-200 active:scale-[0.98]',
-            submitting ? 'bg-indigo-400 text-white/80' : 'bg-indigo-600 text-white'
+            !orderText.trim() || !doctor.trim() || submitting ? 'bg-indigo-400 text-white/80' : 'bg-indigo-600 text-white'
           )}
         >
-          {submitting ? '保存中...' : '保存医嘱'}
+          {submitting ? '保存中...' : order ? '保存医嘱' : '添加医嘱'}
         </button>
       </div>
     </BottomSheet>
@@ -948,7 +1117,6 @@ const HomeScreen = ({
 
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
   const [selectedAlert, setSelectedAlert] = useState<AlertItem | null>(null);
-  const [showRiskFloat, setShowRiskFloat] = useState(true);
   const [showWeekly, setShowWeekly] = useState(false);
 
   useEffect(() => {
@@ -963,7 +1131,6 @@ const HomeScreen = ({
           (data.trendData || []).map((d: any) => ({ day: formatTrendDay(d.date), score: d.score }))
         );
         setStats(data.stats || { avgScore: 0, maxScore: 0, minScore: 0 });
-        if (!(data.alerts && data.alerts.length > 0)) setShowRiskFloat(false);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -971,6 +1138,14 @@ const HomeScreen = ({
 
   const getMealLabel = (type: string) =>
     type === 'breakfast' ? '早餐' : type === 'lunch' ? '午餐' : '晚餐';
+  const primaryAlert = alerts[0];
+  const remainingAlerts = alerts.slice(1, 3);
+  const riskBadgeText =
+    alerts.length === 0
+      ? '今天状态平稳'
+      : primaryAlert?.level === 'high'
+      ? '今天先看这个'
+      : '今日值得留意';
 
   if (loading) {
     return (
@@ -1031,6 +1206,127 @@ const HomeScreen = ({
       </header>
 
       <div className="p-4 space-y-4 -mt-3">
+        {/* Daily Risk Hook */}
+        <section className="relative overflow-hidden rounded-[28px] border border-[#f1d9a8] bg-[linear-gradient(135deg,#fff7e6_0%,#fff2d9_42%,#fde7c5_100%)] px-5 py-5 shadow-[0_18px_40px_rgba(181,114,24,0.14)]">
+          <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-[#f6c25b]/20 blur-2xl" />
+          <div className="absolute right-5 top-5 h-16 w-16 rounded-full border border-[#efc777] bg-white/35" />
+          <div className="absolute right-10 top-10 h-6 w-6 rounded-full bg-[#f6c25b]/70" />
+
+          <div className="relative z-10">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#f1d9a8] bg-white/70 px-3 py-1 text-[11px] font-bold tracking-[0.18em] text-[#a86110]">
+                  <BellRing className="h-3.5 w-3.5" />
+                  {riskBadgeText}
+                </div>
+                <h3 className="text-[1.55rem] font-black leading-tight text-[#7a3f00]">
+                  {alerts.length > 0 ? '今天这条提醒，建议先看' : '今天适合继续保持好习惯'}
+                </h3>
+                <p className="mt-1 text-sm leading-relaxed text-[#9a6a2a]">
+                  {alerts.length > 0
+                    ? '每天打开 App，先花 10 秒看这张卡，就知道今天饮食最该注意什么。'
+                    : '今天暂无高风险预警，可以继续按现在的节奏吃饭、记录、查看建议。'}
+                </p>
+              </div>
+              <div className="min-w-[82px] rounded-[22px] border border-white/70 bg-white/65 px-3 py-3 text-center shadow-[0_8px_24px_rgba(181,114,24,0.08)]">
+                <p className="text-[11px] font-bold tracking-[0.2em] text-[#b57a18]">今日指数</p>
+                <p className="mt-1 text-3xl font-black text-[#7a3f00]">{healthScore}</p>
+              </div>
+            </div>
+
+            {primaryAlert ? (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-[24px] border border-[#f0c26f] bg-[linear-gradient(135deg,rgba(255,255,255,0.92)_0%,rgba(255,249,236,0.95)_100%)] p-4 shadow-[0_12px_30px_rgba(181,114,24,0.12)]"
+              >
+                <div className="mb-3 flex items-center gap-2">
+                  <div
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold',
+                      primaryAlert.level === 'high'
+                        ? 'bg-[#fff0eb] text-[#c2512f]'
+                        : primaryAlert.level === 'medium'
+                        ? 'bg-[#fff6dc] text-[#b57700]'
+                        : 'bg-[#eef7ff] text-[#1e6fb8]'
+                    )}
+                  >
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    {primaryAlert.title}
+                  </div>
+                  <span className="text-xs font-semibold text-[#b57a18]">
+                    今日共 {alerts.length} 条提醒
+                  </span>
+                </div>
+
+                <p className="text-[1.38rem] font-black leading-snug text-[#8f4b06]">
+                  {primaryAlert.content}
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-[#9b6a2e]">
+                  {primaryAlert.suggestion}
+                </p>
+
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <button
+                    onClick={() => setSelectedAlert(primaryAlert)}
+                    className="flex-1 rounded-2xl bg-[#8f4b06] px-4 py-3 text-sm font-bold text-white shadow-[0_10px_24px_rgba(122,63,0,0.22)] transition active:scale-[0.98]"
+                  >
+                    立即查看原因
+                  </button>
+                  <button
+                    onClick={() => {
+                      const warningMeal = meals.find((meal) => meal.isWarning) || meals[0];
+                      if (warningMeal) setSelectedMeal(warningMeal);
+                    }}
+                    className="flex-1 rounded-2xl border border-[#efc777] bg-white/75 px-4 py-3 text-sm font-bold text-[#8f4b06] transition hover:bg-white"
+                  >
+                    去看今日饮食
+                  </button>
+                </div>
+
+                {remainingAlerts.length > 0 ? (
+                  <div className="mt-4 grid gap-2">
+                    {remainingAlerts.map((alert) => (
+                      <button
+                        key={alert.id}
+                        onClick={() => setSelectedAlert(alert)}
+                        className="flex items-center justify-between rounded-2xl border border-[#f7dfb4] bg-white/60 px-3 py-3 text-left"
+                      >
+                        <div>
+                          <p className="text-sm font-bold text-[#8f4b06]">{alert.content}</p>
+                          <p className="mt-0.5 text-xs text-[#b07a38]">{alert.title}</p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-[#c89a4d]" />
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </motion.div>
+            ) : (
+              <div className="rounded-[24px] border border-[#f0dfb8] bg-white/70 p-4">
+                <p className="text-base font-bold text-[#8f4b06]">今天没有新的饮食风险预警。</p>
+                <p className="mt-1 text-sm text-[#9b6a2e]">
+                  可以去看看今日饮食记录，或者直接查看本周趋势，保持当前节奏。
+                </p>
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() => setShowWeekly(true)}
+                    className="rounded-2xl bg-[#8f4b06] px-4 py-3 text-sm font-bold text-white"
+                  >
+                    看本周趋势
+                  </button>
+                  <button
+                    onClick={() => onTabChange('report')}
+                    className="rounded-2xl border border-[#efc777] bg-white/75 px-4 py-3 text-sm font-bold text-[#8f4b06]"
+                  >
+                    查看报告
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
         {/* Today's Diet */}
         <section className="bg-white rounded-[22px] p-5">
           <div className={cn('mb-4', elderMode ? 'space-y-3' : 'flex justify-between items-center')}>
@@ -1090,55 +1386,6 @@ const HomeScreen = ({
             </div>
           )}
         </section>
-
-        {/* Diet Warning */}
-        {alerts.length > 0 && (
-          <section className="bg-white rounded-[22px] p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <AlertTriangle className="w-5 h-5 text-red-500" />
-              <h3 className="text-lg font-bold text-gray-900">饮食预警</h3>
-            </div>
-            <div className="space-y-3">
-              {alerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className={cn(
-                    'p-4 rounded-2xl border',
-                    alert.level === 'high'
-                      ? 'bg-red-50/70 border-red-100'
-                      : alert.level === 'medium'
-                      ? 'bg-amber-50/70 border-amber-100'
-                      : 'bg-blue-50/70 border-blue-100'
-                  )}
-                >
-                  <div className="flex items-center gap-2 mb-1.5">
-                    {alert.level === 'high' ? (
-                      <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
-                    ) : alert.level === 'medium' ? (
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-                    ) : (
-                      <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-                    )}
-                    <span className={cn(
-                      'text-sm font-bold',
-                      alert.level === 'high' ? 'text-red-600' : alert.level === 'medium' ? 'text-amber-600' : 'text-blue-600'
-                    )}>
-                      {alert.title}
-                    </span>
-                  </div>
-                  <p className="text-sm font-medium text-gray-800">{alert.content}</p>
-                  <p className="text-sm text-gray-500 mt-1">{alert.suggestion}</p>
-                  <div className="flex justify-end gap-3 mt-3">
-                    <button onClick={() => setShowRiskFloat(false)} className="text-sm text-gray-400">忽略</button>
-                    <button onClick={() => setSelectedAlert(alert)} className="text-sm text-indigo-600 font-bold">
-                      查看详情
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
 
         {/* Weekly Trend */}
         <section className="bg-white rounded-[22px] p-5">
@@ -1214,35 +1461,6 @@ const HomeScreen = ({
           )}
         </section>
       </div>
-
-      {/* Risk float */}
-      <AnimatePresence>
-        {showRiskFloat && alerts.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            className={cn('fixed left-4 right-4 z-40', elderMode ? 'bottom-32' : 'bottom-24')}
-          >
-            <div className="rounded-2xl border border-amber-200 bg-amber-50/95 backdrop-blur p-3.5 shadow-lg shadow-amber-100/50">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-2.5">
-                  <BellRing className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-sm font-bold text-amber-900">今日风险提醒</p>
-                    <p className="text-sm text-amber-700 mt-1 leading-relaxed">
-                      {alerts[0]?.content || '请注意今日饮食健康'}
-                    </p>
-                  </div>
-                </div>
-                <button onClick={() => setShowRiskFloat(false)} className="p-1 rounded-full text-amber-400 hover:bg-amber-100">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Meal Detail Bottom Sheet */}
       <BottomSheet open={!!selectedMeal} onClose={() => setSelectedMeal(null)} title={selectedMeal ? `${getMealLabel(selectedMeal.type)} 详情` : ''}>
@@ -1537,6 +1755,9 @@ const SettingsScreen = ({
 
   const [isSpeakerBound, setIsSpeakerBound] = useState(true);
   const [showAddMed, setShowAddMed] = useState(false);
+  const [editingMedication, setEditingMedication] = useState<any>(null);
+  const [showAddCondition, setShowAddCondition] = useState(false);
+  const [showAddSurgery, setShowAddSurgery] = useState(false);
   const [showEditPrefs, setShowEditPrefs] = useState(false);
   const [showEditOrder, setShowEditOrder] = useState(false);
 
@@ -1561,6 +1782,18 @@ const SettingsScreen = ({
   useEffect(() => { loadData(); }, []);
 
   const activeOrder = medicalOrders[0];
+  const diseaseConditions = conditions.filter((c: any) => (c.conditionType || c.condition_type) !== 'surgery');
+  const surgeryConditions = conditions.filter((c: any) => (c.conditionType || c.condition_type) === 'surgery');
+
+  const handleRemoveCondition = async (item: any) => {
+    if (!window.confirm(`确认删除“${item.conditionName || item.condition_name}”吗？`)) return;
+    try {
+      await removeHealthCondition(String(item.id));
+      loadData();
+    } catch (e) {
+      console.error('Failed to remove condition:', e);
+    }
+  };
 
   if (loading) {
     return (
@@ -1660,33 +1893,47 @@ const SettingsScreen = ({
             <div>
               <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">健康状况</label>
               <div className="flex flex-wrap gap-2">
-                {conditions.length > 0 ? conditions.map((c: any) => (
-                  <span
+                {diseaseConditions.length > 0 ? diseaseConditions.map((c: any) => (
+                  <button
                     key={c.id}
+                    onClick={() => handleRemoveCondition(c)}
                     className="px-3 py-1.5 rounded-xl text-sm font-medium border border-indigo-400 bg-indigo-50 text-indigo-700"
                   >
-                    {c.conditionName || c.condition_name}
-                  </span>
+                    {c.conditionName || c.condition_name} <span className="ml-1 text-indigo-400">×</span>
+                  </button>
                 )) : (
                   <span className="text-sm text-gray-400">暂无记录</span>
                 )}
-                <button className="px-3 py-1.5 rounded-xl text-sm border border-dashed border-gray-300 text-gray-400">+ 其他</button>
+                <button
+                  onClick={() => setShowAddCondition(true)}
+                  className="px-3 py-1.5 rounded-xl text-sm border border-dashed border-gray-300 text-gray-400"
+                >
+                  + 其他
+                </button>
               </div>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">手术史</label>
               <div className="space-y-2">
-                {conditions.filter((c: any) => (c.conditionType || c.condition_type) === 'surgery').map((c: any) => (
+                {surgeryConditions.map((c: any) => (
                   <div key={c.id} className="flex items-center justify-between bg-rose-50/60 p-3 rounded-xl border border-rose-100">
                     <div className="flex items-center gap-2">
                       <History className="w-4 h-4 text-rose-500" />
                       <span className="text-sm font-bold text-rose-700">{c.conditionName || c.condition_name}</span>
                     </div>
-                    <X className="w-4 h-4 text-rose-300" />
+                    <button onClick={() => handleRemoveCondition(c)}>
+                      <X className="w-4 h-4 text-rose-300" />
+                    </button>
                   </div>
                 ))}
-                <button className="w-full py-2.5 border border-dashed border-gray-200 rounded-xl text-sm text-gray-400 flex items-center justify-center gap-1">
+                {surgeryConditions.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-2">暂无手术记录</p>
+                ) : null}
+                <button
+                  onClick={() => setShowAddSurgery(true)}
+                  className="w-full py-2.5 border border-dashed border-gray-200 rounded-xl text-sm text-gray-400 flex items-center justify-center gap-1"
+                >
                   <Plus className="w-3 h-3" /> 添加手术记录
                 </button>
               </div>
@@ -1706,8 +1953,11 @@ const SettingsScreen = ({
                 <div>
                   <p className="text-sm font-bold text-gray-800">{med.name}</p>
                   <p className="text-sm text-gray-500 mt-1">{med.dosage} · {med.timing}</p>
+                  <p className="text-xs text-gray-400 mt-1">{med.frequency || '每日1次'}</p>
                 </div>
-                <Edit2 className="w-4 h-4 text-orange-400" />
+                <button onClick={() => { setEditingMedication(med); setShowAddMed(true); }}>
+                  <Edit2 className="w-4 h-4 text-orange-400" />
+                </button>
               </div>
             ))}
             {medications.length === 0 && (
@@ -1801,7 +2051,20 @@ const SettingsScreen = ({
         </button>
       </main>
 
-      <AddMedicationSheet open={showAddMed} onClose={() => setShowAddMed(false)} onCreated={loadData} />
+      <AddConditionSheet open={showAddCondition} onClose={() => setShowAddCondition(false)} type="disease" onSaved={loadData} />
+      <AddConditionSheet open={showAddSurgery} onClose={() => setShowAddSurgery(false)} type="surgery" onSaved={loadData} />
+      <AddMedicationSheet
+        open={showAddMed}
+        onClose={() => { setShowAddMed(false); setEditingMedication(null); }}
+        onCreated={loadData}
+        medication={editingMedication ? {
+          id: String(editingMedication.id),
+          name: editingMedication.name,
+          dosage: editingMedication.dosage,
+          frequency: editingMedication.frequency,
+          timing: editingMedication.timing,
+        } : undefined}
+      />
       <EditPreferencesSheet open={showEditPrefs} onClose={() => setShowEditPrefs(false)} initialData={preferences} onSaved={loadData} />
       <EditMedicalOrderSheet
         open={showEditOrder}

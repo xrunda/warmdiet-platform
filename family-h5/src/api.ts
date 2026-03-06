@@ -131,6 +131,11 @@ export async function addMedication(data: { name: string; dosage: string; freque
   return request<any>(`/patients/${patientId}/medications`, { method: 'POST', body: data });
 }
 
+export async function updateMedication(medId: string, data: { name: string; dosage: string; frequency: string; timing: string }) {
+  const { patientId } = await getDemoToken();
+  return request<any>(`/patients/${patientId}/medications/${medId}`, { method: 'PUT', body: data });
+}
+
 export async function removeMedication(medId: string) {
   const { patientId } = await getDemoToken();
   return request<any>(`/patients/${patientId}/medications/${medId}`, { method: 'DELETE' });
@@ -153,6 +158,11 @@ export async function updatePreferences(data: { tastePreferences: string[]; like
 export async function fetchMedicalOrders() {
   const { patientId } = await getDemoToken();
   return request<any[]>(`/patients/${patientId}/medical-orders`);
+}
+
+export async function createMedicalOrder(data: { content: string; doctorName: string }) {
+  const { patientId } = await getDemoToken();
+  return request<any>(`/patients/${patientId}/medical-orders`, { method: 'POST', body: data });
 }
 
 export async function updateMedicalOrder(orderId: string, data: { content: string; doctorName: string }) {

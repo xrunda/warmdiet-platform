@@ -29,7 +29,7 @@ export abstract class BaseModel<T> {
     const id = this.generateId();
     const now = new Date().toISOString();
 
-    const fields = ['id', 'created_at', 'updated_at', ...Object.keys(data)];
+    const fields = ['id', 'created_at', 'updated_at', ...Object.keys(data).map(key => this.toSnakeCase(key))];
     const values = [id, now, now, ...Object.values(data)];
 
     const placeholders = values.map(() => '?').join(', ');
