@@ -109,52 +109,49 @@ npm install
 创建 `.env.local` 文件（参考 `.env.local.example`）：
 
 ```env
-VITE_API_URL=http://localhost:3001/api
+VITE_API_URL=http://localhost:4000/api
 ```
 
-### 运行开发服务器
+### 一键启动（推荐）
+
+项目提供了一个脚本，可以一次性启动 **后端 + 医院端前端 + 家属端 H5**：
 
 ```bash
-npm run dev
+npm run dev:all
 ```
 
-访问 http://localhost:3000
+该命令会自动：
+
+- 释放端口 `4000 / 4001 / 4100`（`npm run kill-ports`）
+- 并行启动：
+  - 后端 API：`http://localhost:4000`
+  - 医院端前端：`http://localhost:4001`
+  - 家属端 H5：`http://localhost:4100`
+
+### 分别启动（按需）
+
+- 仅启动医院端前端：
+
+  ```bash
+  npm run dev         # 端口 4001
+  ```
+
+- 仅启动后端服务：
+
+  ```bash
+  npm run dev:server  # 端口 4000
+  ```
+
+- 仅启动家属端 H5：
+
+  ```bash
+  npm run dev:family  # 端口 4100
+  ```
 
 ### 构建生产版本
 
 ```bash
 npm run build
-```
-
----
-
-## 🌐 部署
-
-### 前端部署到 Vercel
-
-详细文档请查看：[docs/VERCEL_DEPLOYMENT.md](./docs/VERCEL_DEPLOYMENT.md)
-
-#### 快速部署（3 步）
-
-1. **连接 GitHub 仓库**
-   - 登录 [Vercel](https://vercel.com)
-   - 导入 `xrunda/warmdiet-platform` 仓库
-
-2. **配置环境变量**
-   - `VITE_API_URL`: 你的后端 API 地址
-
-3. **点击 Deploy**
-
-部署完成后，Vercel 会提供一个 URL（如 `https://warmdiet-frontend.vercel.app`）。
-
-#### 自动部署
-
-推送代码到 GitHub，Vercel 会自动触发部署：
-
-```bash
-git add .
-git commit -m "feat: new feature"
-git push origin main
 ```
 
 ---

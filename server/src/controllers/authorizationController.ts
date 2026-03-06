@@ -104,6 +104,18 @@ export class AuthorizationController {
     const authorizations = this.models.authorization.findByPatientId(patientId);
 
     const detailed = authorizations.map((auth) => {
+      // 数据库中 authorization_type 存的是 JSON 字符串，这里做兼容转换
+      let authorizationType: AuthorizationType[];
+      if (Array.isArray((auth as any).authorizationType)) {
+        authorizationType = (auth as any).authorizationType as AuthorizationType[];
+      } else {
+        try {
+          authorizationType = JSON.parse((auth as any).authorizationType || '[]') as AuthorizationType[];
+        } catch {
+          authorizationType = [];
+        }
+      }
+
       const doctor = this.models.doctor.findById(auth.doctorId);
       const hospital = doctor ? this.models.hospital.findById(doctor.hospitalId) : undefined;
 
@@ -115,7 +127,7 @@ export class AuthorizationController {
         department: doctor?.department || '',
         licenseNumber: doctor?.licenseNumber || '',
         patientId: auth.patientId,
-        authorizationType: auth.authorizationType,
+        authorizationType,
         authorizedAt: auth.authorizedAt,
         expiresAt: auth.expiresAt,
         status: auth.status,

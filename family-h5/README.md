@@ -17,10 +17,25 @@
 ```bash
 cd family-h5
 npm install         # 或 pnpm/yarn
-npm run dev         # 或你原来的启动命令
+npm run dev         # 家属端 H5，默认端口：4100
 ```
 
-> 目前根目录不会主动干预 `family-h5` 的构建配置，完全保持你原项目的结构和脚本。
+3. **推荐：在仓库根目录一键启动三端服务**
+
+在项目根目录执行：
+
+```bash
+npm install          # 已执行过可跳过
+npm run dev:all      # 一键启动：后端 + 医院端前端 + 家属端 H5
+```
+
+其中端口约定为：
+
+- 后端 API：`http://localhost:4000`
+- 医院端前端（B 端）：`http://localhost:4001`
+- 家属端 H5（本目录）：`http://localhost:4100`
+
+> `dev:all` 内部会先执行 `npm run kill-ports` 自动释放 4000/4001/4100 端口，再并行启动三个服务。
 
 ## 与后端的集成建议
 
