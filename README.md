@@ -182,4 +182,4 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ---
 
-**WarmDiet Team** © 2024
+**WarmDiet Team** © 2026
