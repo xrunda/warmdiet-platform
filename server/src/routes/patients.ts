@@ -71,6 +71,13 @@ router.get('/:id/medications', authenticateDoctorOrPatient[0], authenticateDocto
 router.post('/:id/medications', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.addMedication(req, res, next));
 
 /**
+ * @route   POST /api/patients/:id/medications/recognize-image
+ * @desc    识别药品包装图片
+ * @access  Private (Patient)
+ */
+router.post('/:id/medications/recognize-image', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.recognizeMedicationImage(req, res, next));
+
+/**
  * @route   PUT /api/patients/:id/medications/:medId
  * @desc    更新用药记录
  * @access  Private (Patient)
@@ -113,11 +120,25 @@ router.get('/:id/medical-orders', authenticateDoctorOrPatient[0], authenticateDo
 router.post('/:id/medical-orders', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.createMedicalOrder(req, res, next));
 
 /**
+ * @route   POST /api/patients/:id/medical-orders/scan
+ * @desc    扫描纸质医嘱并生成记录
+ * @access  Private (Patient)
+ */
+router.post('/:id/medical-orders/scan', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.scanMedicalOrder(req, res, next));
+
+/**
  * @route   PUT /api/patients/:id/medical-orders/:orderId
  * @desc    更新医嘱
  * @access  Private (Patient)
  */
 router.put('/:id/medical-orders/:orderId', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.updateMedicalOrder(req, res, next));
+
+/**
+ * @route   PUT /api/patients/:id/medical-orders/:orderId/scan
+ * @desc    重新扫描纸质医嘱并更新记录
+ * @access  Private (Patient)
+ */
+router.put('/:id/medical-orders/:orderId/scan', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.rescanMedicalOrder(req, res, next));
 
 /**
  * @route   GET /api/patients/:id/diet-alerts

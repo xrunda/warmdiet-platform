@@ -49,6 +49,7 @@ import { AuthorizationManagement } from './AuthorizationManagement';
 import {
   fetchDashboard,
   fetchLatestHealthReport,
+  fetchTomorrowMealGuide,
   fetchConversationLogs,
   fetchConversationDates,
   fetchPatientProfile,
@@ -60,11 +61,13 @@ import {
   addHealthCondition,
   removeHealthCondition,
   addMedication as addMedicationApi,
+  recognizeMedicationImage,
   updateMedication as updateMedicationApi,
   removeMedication as removeMedicationApi,
   updatePreferences as updatePreferencesApi,
   createMedicalOrder as createMedicalOrderApi,
   updateMedicalOrder as updateMedicalOrderApi,
+  scanMedicalOrderImage,
 } from './api';
 
 type AlertItem = {
@@ -73,6 +76,13 @@ type AlertItem = {
   title: string;
   content: string;
   suggestion: string;
+};
+
+type TomorrowMealOption = {
+  menu: string;
+  reason: string;
+  type: '早餐' | '午餐' | '晚餐';
+  time: string;
 };
 
 function mapApiMealToMeal(apiMeal: any): Meal {
@@ -100,6 +110,15 @@ function formatTrendDay(dateStr: string): string {
 function formatDateLabel(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
   return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('读取图片失败'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function LoadingSpinner() {
@@ -198,6 +217,40 @@ function CenterDialog({
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+function ImagePreviewDialog({
+  open,
+  onClose,
+  title,
+  image,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  image?: string | null;
+}) {
+  return (
+    <CenterDialog open={open} onClose={onClose}>
+      <div className="p-5 bg-white">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-bold text-gray-900">{title}</h3>
+          <button onClick={onClose} className="p-2 -mr-2 text-gray-400">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        {image ? (
+          <div className="rounded-[20px] overflow-hidden border border-gray-100 bg-gray-50">
+            <img src={image} alt={title} className="w-full max-h-[70vh] object-contain bg-white" />
+          </div>
+        ) : (
+          <div className="rounded-[20px] border border-dashed border-gray-200 bg-gray-50 py-14 text-center text-sm text-gray-400">
+            暂无原图
+          </div>
+        )}
+      </div>
+    </CenterDialog>
   );
 }
 
@@ -653,33 +706,79 @@ function AddMedicationSheet({
   open: boolean;
   onClose: () => void;
   onCreated?: () => void;
-  medication?: { id: string; name: string; dosage: string; frequency?: string; timing: string };
+  medication?: { id: string; name: string; dosage: string; frequency?: string; timing: string; packageImage?: string; ocrText?: string };
 }) {
   const [medName, setMedName] = useState('');
   const [medDose, setMedDose] = useState('');
+  const [medFrequency, setMedFrequency] = useState('每日1次');
   const [medTime, setMedTime] = useState('早餐后');
+  const [packageImage, setPackageImage] = useState('');
+  const [ocrText, setOcrText] = useState('');
+  const [recognizing, setRecognizing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
       setMedName(medication?.name || '');
       setMedDose(medication?.dosage || '');
+      setMedFrequency(medication?.frequency || '每日1次');
       setMedTime(medication?.timing || '早餐后');
+      setPackageImage(medication?.packageImage || '');
+      setOcrText(medication?.ocrText || '');
     }
   }, [open, medication]);
 
   const resetAndClose = () => {
     setMedName('');
     setMedDose('');
+    setMedFrequency('每日1次');
     setMedTime('早餐后');
+    setPackageImage('');
+    setOcrText('');
+    setRecognizing(false);
     onClose();
+  };
+
+  const handleChooseImage = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setRecognizing(true);
+      const imageData = await fileToDataUrl(file);
+      const result = await recognizeMedicationImage(imageData);
+      setMedName(result.name || '');
+      setMedDose(result.dosage || '');
+      setMedFrequency(result.frequency || '请遵医嘱');
+      setMedTime(result.timing || '请遵医嘱');
+      setPackageImage(result.packageImage || imageData);
+      setOcrText(result.ocrText || '');
+    } catch (e) {
+      console.error('Failed to recognize medication image:', e);
+      window.alert('药品图片识别失败，请重试');
+    } finally {
+      setRecognizing(false);
+      event.target.value = '';
+    }
   };
 
   const handleSave = async () => {
     if (!medName.trim() || submitting) return;
     setSubmitting(true);
     try {
-      const payload = { name: medName, dosage: medDose, frequency: medication?.frequency || '每日1次', timing: medTime };
+      const payload = {
+        name: medName.trim(),
+        dosage: medDose.trim() || '请遵医嘱',
+        frequency: medFrequency.trim() || '请遵医嘱',
+        timing: medTime.trim() || '请遵医嘱',
+        packageImage: packageImage || undefined,
+        ocrText: ocrText || undefined,
+      };
       if (medication?.id) {
         await updateMedicationApi(medication.id, payload);
       } else {
@@ -712,6 +811,44 @@ function AddMedicationSheet({
   return (
     <BottomSheet open={open} onClose={resetAndClose} title={medication ? '编辑药品' : '添加药品'}>
       <div className="p-5 space-y-5">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+        <div className="rounded-[24px] border border-orange-100 bg-[linear-gradient(135deg,rgba(255,247,237,0.96),rgba(255,255,255,1))] p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-gray-900">拍药盒识别</p>
+              <p className="text-xs text-gray-500 mt-1">拍摄药品包装，系统自动提取药名、剂量、频次与服用时机。</p>
+            </div>
+            <button
+              onClick={handleChooseImage}
+              disabled={recognizing || submitting}
+              className={cn(
+                'px-4 py-2 rounded-2xl text-sm font-bold transition-all',
+                recognizing ? 'bg-orange-200 text-white' : 'bg-orange-500 text-white shadow-lg shadow-orange-100'
+              )}
+            >
+              {recognizing ? '识别中...' : packageImage ? '重新拍摄' : '上传识别'}
+            </button>
+          </div>
+          {packageImage ? (
+            <div className="mt-4 rounded-[20px] overflow-hidden border border-orange-100 bg-white">
+              <img src={packageImage} alt="药品包装" className="w-full h-44 object-cover" />
+            </div>
+          ) : null}
+          {ocrText ? (
+            <div className="mt-3 rounded-2xl bg-white/80 border border-orange-100 px-4 py-3">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-orange-400">OCR 摘要</p>
+              <p className="text-sm text-gray-600 mt-1 leading-relaxed">{ocrText}</p>
+            </div>
+          ) : null}
+        </div>
+
         <div>
           <label className="text-sm font-semibold text-gray-500 block mb-2">药品名称</label>
           <input
@@ -734,7 +871,17 @@ function AddMedicationSheet({
           <input
             value={medDose}
             onChange={(e) => setMedDose(e.target.value)}
-            placeholder="例如：每日1次，每次1片"
+            placeholder="例如：5mg/片，每次1片"
+            className="w-full p-4 border border-gray-200 rounded-2xl text-sm text-gray-700 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300"
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-semibold text-gray-500 block mb-2">用药频次</label>
+          <input
+            value={medFrequency}
+            onChange={(e) => setMedFrequency(e.target.value)}
+            placeholder="例如：每日1次"
             className="w-full p-4 border border-gray-200 rounded-2xl text-sm text-gray-700 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300"
           />
         </div>
@@ -742,7 +889,7 @@ function AddMedicationSheet({
         <div>
           <label className="text-sm font-semibold text-gray-500 block mb-2">用药时间</label>
           <div className="grid grid-cols-3 gap-3">
-            {['早餐后', '午餐后', '晚餐后', '睡前', '空腹', '饭前'].map((t) => (
+            {['早餐后', '午餐后', '晚餐后', '睡前', '空腹', '饭前', '请遵医嘱'].map((t) => (
               <button
                 key={t}
                 onClick={() => setMedTime(t)}
@@ -1017,78 +1164,167 @@ function EditMedicalOrderSheet({
 }: {
   open: boolean;
   onClose: () => void;
-  order?: { id: string; content: string; doctorName: string };
+  order?: {
+    id: string;
+    content: string;
+    doctorName: string;
+    hospitalName?: string;
+    visitDate?: string;
+    originalImage?: string;
+  };
   onSaved?: () => void;
 }) {
-  const [orderText, setOrderText] = useState('');
-  const [doctor, setDoctor] = useState('');
+  const [preview, setPreview] = useState<any>(null);
+  const [processing, setProcessing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (order) {
-      setOrderText(order.content || '');
-      setDoctor(order.doctorName || '');
-    } else if (open) {
-      setOrderText('');
-      setDoctor('');
+    if (!open) {
+      setPreview(null);
+      setProcessing(false);
+      setSubmitting(false);
+      return;
     }
-  }, [open, order]);
+
+    if (order) {
+      setPreview({
+        content: order.content || '',
+        doctorName: order.doctorName || '',
+        hospitalName: order.hospitalName || '',
+        visitDate: order.visitDate || '',
+        originalImage: order.originalImage || '',
+      });
+    } else {
+      setPreview(null);
+    }
+  }, [open, order?.id]);
+
+  const handlePickImage = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setProcessing(true);
+      const imageData = await fileToDataUrl(file);
+      const result = await scanMedicalOrderImage(imageData, order?.id);
+      setPreview(result);
+    } catch (e) {
+      console.error('Failed to scan medical order:', e);
+      window.alert('纸质医嘱识别失败，请重试');
+    } finally {
+      setProcessing(false);
+      event.target.value = '';
+    }
+  };
 
   const handleSave = async () => {
-    if (!orderText.trim() || !doctor.trim() || submitting) return;
+    if (!preview || submitting) return;
     setSubmitting(true);
     try {
-      if (order) {
-        await updateMedicalOrderApi(order.id, { content: orderText, doctorName: doctor });
+      const payload = {
+        content: preview.content || '未识别到清晰医嘱内容',
+        doctorName: preview.doctorName || '待确认医生',
+        hospitalName: preview.hospitalName || '待确认医院',
+        visitDate: preview.visitDate || new Date().toISOString().slice(0, 10),
+        originalImage: preview.originalImage || undefined,
+        rawOcrText: preview.rawOcrText || undefined,
+      };
+      if (order?.id) {
+        await updateMedicalOrderApi(order.id, payload);
       } else {
-        await createMedicalOrderApi({ content: orderText, doctorName: doctor });
+        await createMedicalOrderApi(payload);
       }
       onSaved?.();
       onClose();
     } catch (e) {
       console.error('Failed to save medical order:', e);
+      window.alert('医嘱保存失败，请重试');
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={order ? '编辑医嘱' : '添加医嘱'}>
+    <BottomSheet open={open} onClose={onClose} title={order ? '重拍医嘱' : '拍照添加医嘱'}>
       <div className="p-5 space-y-5">
-        <div>
-          <label className="text-sm font-semibold text-gray-500 block mb-2">医嘱内容</label>
-          <textarea
-            value={orderText}
-            onChange={(e) => setOrderText(e.target.value)}
-            className="w-full p-4 border border-gray-200 rounded-2xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 resize-none h-40 leading-relaxed"
-          />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+
+        <div className="rounded-[24px] border border-emerald-100 bg-[linear-gradient(135deg,rgba(236,253,245,0.98),rgba(255,255,255,1))] p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-gray-900">仅支持拍纸质医嘱</p>
+              <p className="text-xs text-gray-500 mt-1">系统会自动识别医嘱内容、主治医生、医院和就诊时间，不支持手动录入。</p>
+            </div>
+            <button
+              onClick={handlePickImage}
+              disabled={processing}
+              className={cn(
+                'px-4 py-2 rounded-2xl text-sm font-bold transition-all',
+                processing ? 'bg-emerald-200 text-white' : 'bg-emerald-500 text-white shadow-lg shadow-emerald-100'
+              )}
+            >
+              {processing ? '识别中...' : preview?.originalImage ? '重新拍摄' : '上传识别'}
+            </button>
+          </div>
+          {preview?.originalImage ? (
+            <div className="mt-4 rounded-[20px] overflow-hidden border border-emerald-100 bg-white">
+              <img src={preview.originalImage} alt="纸质医嘱" className="w-full h-44 object-cover" />
+            </div>
+          ) : null}
         </div>
 
-        <div>
-          <label className="text-sm font-semibold text-gray-500 block mb-2">来源医生</label>
-          <input
-            value={doctor}
-            onChange={(e) => setDoctor(e.target.value)}
-            className="w-full p-4 border border-gray-200 rounded-2xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300"
-          />
+        <div className="rounded-[24px] border border-gray-100 bg-gray-50/80 p-4 space-y-4">
+          <div>
+            <label className="text-sm font-semibold text-gray-500 block mb-2">识别出的医嘱内容</label>
+            <div className="min-h-28 rounded-2xl border border-gray-200 bg-white p-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+              {preview?.content || '上传纸质医嘱后，这里会展示识别结果。'}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3">
+            <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
+              <p className="text-xs font-bold text-gray-400 mb-1">主治医生</p>
+              <p className="text-sm font-semibold text-gray-800">{preview?.doctorName || '待识别'}</p>
+            </div>
+            <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
+              <p className="text-xs font-bold text-gray-400 mb-1">医院</p>
+              <p className="text-sm font-semibold text-gray-800">{preview?.hospitalName || '待识别'}</p>
+            </div>
+            <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
+              <p className="text-xs font-bold text-gray-400 mb-1">就诊时间</p>
+              <p className="text-sm font-semibold text-gray-800">{preview?.visitDate || '待识别'}</p>
+            </div>
+          </div>
         </div>
 
         <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100">
           <div className="flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-            <p className="text-sm text-amber-800">修改医嘱信息后，AI 饮食建议将根据新的医嘱内容进行调整。</p>
+            <p className="text-sm text-amber-800">识别结果需要您确认后才会回填保存；每次重新拍照都会覆盖当前预览结果。</p>
           </div>
         </div>
 
         <button
           onClick={handleSave}
-          disabled={!orderText.trim() || !doctor.trim() || submitting}
+          disabled={!preview || submitting}
           className={cn(
             'w-full py-4 rounded-2xl text-base font-bold shadow-lg shadow-indigo-200 active:scale-[0.98]',
-            !orderText.trim() || !doctor.trim() || submitting ? 'bg-indigo-400 text-white/80' : 'bg-indigo-600 text-white'
+            !preview || submitting ? 'bg-indigo-400 text-white/80' : 'bg-indigo-600 text-white'
           )}
         >
-          {submitting ? '保存中...' : order ? '保存医嘱' : '添加医嘱'}
+          {submitting ? '保存中...' : order ? '确认并更新医嘱' : '确认回填医嘱'}
         </button>
       </div>
     </BottomSheet>
@@ -1760,6 +1996,8 @@ const SettingsScreen = ({
   const [showAddSurgery, setShowAddSurgery] = useState(false);
   const [showEditPrefs, setShowEditPrefs] = useState(false);
   const [showEditOrder, setShowEditOrder] = useState(false);
+  const [previewTitle, setPreviewTitle] = useState('');
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const loadData = () => {
     Promise.all([
@@ -1793,6 +2031,12 @@ const SettingsScreen = ({
     } catch (e) {
       console.error('Failed to remove condition:', e);
     }
+  };
+
+  const openImagePreview = (title: string, image?: string | null) => {
+    if (!image) return;
+    setPreviewTitle(title);
+    setPreviewImage(image);
   };
 
   if (loading) {
@@ -1954,6 +2198,14 @@ const SettingsScreen = ({
                   <p className="text-sm font-bold text-gray-800">{med.name}</p>
                   <p className="text-sm text-gray-500 mt-1">{med.dosage} · {med.timing}</p>
                   <p className="text-xs text-gray-400 mt-1">{med.frequency || '每日1次'}</p>
+                  {med.packageImage || med.package_image ? (
+                    <button
+                      onClick={() => openImagePreview(`${med.name} 原图`, med.packageImage || med.package_image)}
+                      className="mt-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-orange-600 border border-orange-100"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> 查看原图
+                    </button>
+                  ) : null}
                 </div>
                 <button onClick={() => { setEditingMedication(med); setShowAddMed(true); }}>
                   <Edit2 className="w-4 h-4 text-orange-400" />
@@ -1984,8 +2236,27 @@ const SettingsScreen = ({
                 <p className="text-sm text-emerald-800 leading-relaxed">
                   "{activeOrder.content}"
                 </p>
+                <div className="mt-3 grid grid-cols-1 gap-2">
+                  <div className="rounded-2xl bg-white/80 border border-emerald-100 px-4 py-3">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-400">主治医生</p>
+                    <p className="text-sm font-semibold text-emerald-700 mt-1">{activeOrder.doctorName || activeOrder.doctor_name || '待识别'}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/80 border border-emerald-100 px-4 py-3">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-400">医院 / 就诊时间</p>
+                    <p className="text-sm font-semibold text-emerald-700 mt-1">
+                      {activeOrder.hospitalName || activeOrder.hospital_name || '待识别医院'}
+                      {' · '}
+                      {activeOrder.visitDate || activeOrder.visit_date || activeOrder.orderDate || activeOrder.order_date || '待识别日期'}
+                    </p>
+                  </div>
+                </div>
                 <div className="flex justify-between items-center mt-3 pt-3 border-t border-emerald-100/50">
-                  <span className="text-sm text-emerald-600 font-bold">来源：主治医生 {activeOrder.doctorName || activeOrder.doctor_name}</span>
+                  <button
+                    onClick={() => openImagePreview('医嘱原件', activeOrder.originalImage || activeOrder.original_image)}
+                    className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-emerald-600 border border-emerald-100"
+                  >
+                    <Eye className="w-3.5 h-3.5" /> 查看医嘱原件
+                  </button>
                   <span className="text-xs text-gray-400">
                     更新于 {new Date(activeOrder.updatedAt || activeOrder.updated_at || activeOrder.createdAt || activeOrder.created_at).toLocaleDateString('zh-CN')}
                   </span>
@@ -2063,14 +2334,29 @@ const SettingsScreen = ({
           dosage: editingMedication.dosage,
           frequency: editingMedication.frequency,
           timing: editingMedication.timing,
+          packageImage: editingMedication.packageImage || editingMedication.package_image,
+          ocrText: editingMedication.ocrText || editingMedication.ocr_text,
         } : undefined}
       />
       <EditPreferencesSheet open={showEditPrefs} onClose={() => setShowEditPrefs(false)} initialData={preferences} onSaved={loadData} />
       <EditMedicalOrderSheet
         open={showEditOrder}
         onClose={() => setShowEditOrder(false)}
-        order={activeOrder ? { id: String(activeOrder.id), content: activeOrder.content, doctorName: activeOrder.doctorName || activeOrder.doctor_name || '' } : undefined}
+        order={activeOrder ? {
+          id: String(activeOrder.id),
+          content: activeOrder.content,
+          doctorName: activeOrder.doctorName || activeOrder.doctor_name || '',
+          hospitalName: activeOrder.hospitalName || activeOrder.hospital_name || '',
+          visitDate: activeOrder.visitDate || activeOrder.visit_date || '',
+          originalImage: activeOrder.originalImage || activeOrder.original_image || '',
+        } : undefined}
         onSaved={loadData}
+      />
+      <ImagePreviewDialog
+        open={Boolean(previewImage)}
+        onClose={() => setPreviewImage(null)}
+        title={previewTitle}
+        image={previewImage}
       />
     </div>
   );
@@ -2082,6 +2368,9 @@ const ReportScreen = () => {
   const [loading, setLoading] = useState(true);
   const [report, setReport] = useState<any>(null);
   const [reportType, setReportType] = useState<'daily' | 'weekly'>('daily');
+  const [tomorrowGuide, setTomorrowGuide] = useState<TomorrowMealOption[]>([]);
+  const [guideLoading, setGuideLoading] = useState(false);
+  const [guideActionKey, setGuideActionKey] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLatestHealthReport()
@@ -2103,6 +2392,59 @@ const ReportScreen = () => {
     { label: '脂肪', value: 29, target: '20-25', status: '偏高', color: 'bg-red-500', progress: 90, advice: '建议：减少高脂肉类' },
     { label: '膳食纤维', value: 5, target: '20-25', status: '缺乏', color: 'bg-red-400', progress: 20, advice: '建议：增加蔬菜摄入' },
   ];
+
+  useEffect(() => {
+    let cancelled = false;
+    setGuideLoading(true);
+    fetchTomorrowMealGuide({ mode: 'set', nonce: Date.now() })
+      .then((result: any) => {
+        if (!cancelled) {
+          setTomorrowGuide(result.plan || []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTomorrowGuide([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setGuideLoading(false);
+          setGuideActionKey(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleRefreshGuideSet = async () => {
+    setGuideActionKey('set');
+    setGuideLoading(true);
+    try {
+      const result: any = await fetchTomorrowMealGuide({ mode: 'set', nonce: Date.now() });
+      setTomorrowGuide(result.plan || []);
+    } catch (e) {
+      console.error('Failed to refresh meal guide set:', e);
+    } finally {
+      setGuideLoading(false);
+      setGuideActionKey(null);
+    }
+  };
+
+  const handleRefreshSingleMeal = async (mealType: '早餐' | '午餐' | '晚餐') => {
+    setGuideActionKey(mealType);
+    try {
+      const result: any = await fetchTomorrowMealGuide({ mode: 'single', mealType, nonce: Date.now() });
+      setTomorrowGuide((prev) =>
+        prev.map((item) => (item.type === mealType ? result : item))
+      );
+    } catch (e) {
+      console.error(`Failed to refresh ${mealType} guide:`, e);
+    } finally {
+      setGuideActionKey(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -2278,24 +2620,38 @@ const ReportScreen = () => {
               <FileText className="w-5 h-5 text-indigo-600" />
               <h3 className="text-base font-bold text-gray-900">明日用餐指引</h3>
             </div>
-            <button className="text-sm text-indigo-600 font-medium">换一套</button>
+            <button
+              onClick={handleRefreshGuideSet}
+              disabled={guideLoading}
+              className="text-sm text-indigo-600 font-medium"
+            >
+              {guideActionKey === 'set' ? '生成中...' : '换一套'}
+            </button>
           </div>
-          <div className="space-y-3">
-            {[
-              { type: '早餐', time: '08:00', menu: '粥 + 蒸蛋 + 小青菜', reason: '补充蛋白质和膳食纤维' },
-              { type: '午餐', time: '12:00', menu: '面条 + 清蒸鱼 + 豆腐', reason: '优质蛋白，低脂健康' },
-              { type: '晚餐', time: '19:00', menu: '米饭 + 蔬菜汤', reason: '清淡易消化' },
-            ].map((item, i) => (
-              <div key={i} className="bg-gray-50 p-4 rounded-2xl border border-gray-100/80 hover:border-indigo-100 transition-all">
+          {guideLoading && tomorrowGuide.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">正在生成明日用餐建议...</p>
+          ) : tomorrowGuide.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">暂时还没有可用建议</p>
+          ) : (
+            <div className="space-y-3">
+              {tomorrowGuide.map((item, i) => (
+                <div key={`${item.type}-${i}`} className="bg-gray-50 p-4 rounded-2xl border border-gray-100/80 hover:border-indigo-100 transition-all">
                 <div className="flex justify-between items-center mb-1.5">
                   <span className="text-sm font-bold text-gray-900">{item.type} ({item.time})</span>
-                  <button className="text-xs text-indigo-600 font-medium">换一个</button>
+                  <button
+                    onClick={() => handleRefreshSingleMeal(item.type)}
+                    disabled={guideActionKey === item.type || guideLoading}
+                    className="text-xs text-indigo-600 font-medium"
+                  >
+                    {guideActionKey === item.type ? '生成中...' : '换一个'}
+                  </button>
                 </div>
                 <p className="text-sm text-indigo-700 font-bold">{item.menu}</p>
                 <p className="text-xs text-gray-400 mt-1">理由：{item.reason}</p>
               </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Weekly Trend */}

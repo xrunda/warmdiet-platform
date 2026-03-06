@@ -64,6 +64,7 @@ class DatabaseConfig {
 
     // 执行 SQL 脚本
     this.db!.exec(schema);
+    this.runMigrations();
 
     console.log('✅ Tables created successfully');
 
@@ -92,6 +93,30 @@ class DatabaseConfig {
     const seeds = fs.readFileSync(seedsPath, 'utf-8');
     this.db!.exec(seeds);
     console.log('✅ Seed data inserted successfully');
+  }
+
+  /**
+   * 兼容历史数据库的轻量字段迁移
+   */
+  private runMigrations(): void {
+    this.ensureColumn('patient_medications', 'package_image', 'TEXT');
+    this.ensureColumn('patient_medications', 'ocr_text', 'TEXT');
+    this.ensureColumn('patient_medications', 'image_uploaded_at', 'TEXT');
+
+    this.ensureColumn('patient_medical_orders', 'hospital_name', 'TEXT');
+    this.ensureColumn('patient_medical_orders', 'visit_date', 'TEXT');
+    this.ensureColumn('patient_medical_orders', 'original_image', 'TEXT');
+    this.ensureColumn('patient_medical_orders', 'raw_ocr_text', 'TEXT');
+  }
+
+  private ensureColumn(tableName: string, columnName: string, definition: string): void {
+    const columns = this.db!.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
+    if (columns.some((column) => column.name === columnName)) {
+      return;
+    }
+
+    this.db!.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+    console.log(`✅ Migrated ${tableName}.${columnName}`);
   }
 
   /**

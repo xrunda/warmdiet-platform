@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { models } from '../models';
 import { authService } from '../services/authService';
+import { ocrService } from '../services/ocrService';
 import { ApiResponse } from '../types';
 import { logger } from '../utils/logger';
 
@@ -30,11 +31,21 @@ const medicationSchema = z.object({
   dosage: z.string().min(1).max(100),
   frequency: z.string().min(1).max(100),
   timing: z.string().min(1).max(100),
+  packageImage: z.string().optional(),
+  ocrText: z.string().optional(),
 });
 
 const medicalOrderSchema = z.object({
   content: z.string().min(1).max(2000),
   doctorName: z.string().min(1).max(100),
+  hospitalName: z.string().max(100).optional(),
+  visitDate: z.string().optional(),
+  originalImage: z.string().optional(),
+  rawOcrText: z.string().optional(),
+});
+
+const imagePayloadSchema = z.object({
+  imageData: z.string().refine((value) => value.startsWith('data:image/'), '请上传图片文件'),
 });
 
 const preferenceSchema = z.object({
@@ -206,6 +217,7 @@ export class PatientController {
     const medication = this.models.medication.create({
       ...data,
       patientId,
+      imageUploadedAt: data.packageImage ? new Date().toISOString() : undefined,
       isActive: 1,
     } as any);
 
@@ -219,9 +231,31 @@ export class PatientController {
     const medication = this.models.medication.findById(medId);
     if (!medication) throw new AppError('用药记录不存在', 404);
 
-    const updated = this.models.medication.update(medId, data as any);
+    const updated = this.models.medication.update(medId, {
+      ...data,
+      imageUploadedAt: data.packageImage ? new Date().toISOString() : undefined,
+    } as any);
 
     res.json({ success: true, data: updated, message: '用药记录已更新' });
+  });
+
+  public recognizeMedicationImage = asyncHandler(async (req: Request, res: Response) => {
+    const patientId = req.params.id;
+    const { imageData } = imagePayloadSchema.parse(req.body);
+
+    const patient = this.models.patient.findById(patientId);
+    if (!patient) throw new AppError('患者不存在', 404);
+
+    const result = await ocrService.recognizeMedication(imageData);
+
+    res.json({
+      success: true,
+      data: {
+        ...result,
+        packageImage: imageData,
+      },
+      message: '药品包装识别成功',
+    });
   });
 
   public removeMedication = asyncHandler(async (req: Request, res: Response) => {
@@ -303,7 +337,10 @@ export class PatientController {
     const order = this.models.medicalOrder.findById(orderId);
     if (!order) throw new AppError('医嘱记录不存在', 404);
 
-    const updated = this.models.medicalOrder.update(orderId, data as any);
+    const updated = this.models.medicalOrder.update(orderId, {
+      ...data,
+      orderDate: data.visitDate || new Date().toISOString().split('T')[0],
+    } as any);
 
     res.json({ success: true, data: updated, message: '医嘱已更新' });
   });
@@ -319,11 +356,58 @@ export class PatientController {
       patientId,
       content: data.content,
       doctorName: data.doctorName,
-      orderDate: new Date().toISOString().split('T')[0],
+      hospitalName: data.hospitalName,
+      visitDate: data.visitDate,
+      originalImage: data.originalImage,
+      rawOcrText: data.rawOcrText,
+      orderDate: data.visitDate || new Date().toISOString().split('T')[0],
       isActive: 1,
     } as any);
 
     res.status(201).json({ success: true, data: order, message: '医嘱已添加' });
+  });
+
+  public scanMedicalOrder = asyncHandler(async (req: Request, res: Response) => {
+    const patientId = req.params.id;
+    const { imageData } = imagePayloadSchema.parse(req.body);
+
+    const patient = this.models.patient.findById(patientId);
+    if (!patient) throw new AppError('患者不存在', 404);
+
+    const result = await ocrService.recognizeMedicalOrder(imageData);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        ...result,
+        originalImage: imageData,
+      },
+      message: '纸质医嘱识别完成，请确认后保存',
+    });
+  });
+
+  public rescanMedicalOrder = asyncHandler(async (req: Request, res: Response) => {
+    const patientId = req.params.id;
+    const { orderId } = req.params;
+    const { imageData } = imagePayloadSchema.parse(req.body);
+
+    const patient = this.models.patient.findById(patientId);
+    if (!patient) throw new AppError('患者不存在', 404);
+
+    const order = this.models.medicalOrder.findById(orderId);
+    if (!order) throw new AppError('医嘱记录不存在', 404);
+
+    const result = await ocrService.recognizeMedicalOrder(imageData);
+
+    res.json({
+      success: true,
+      data: {
+        ...result,
+        id: order.id,
+        originalImage: imageData,
+      },
+      message: '纸质医嘱重新识别完成，请确认后保存',
+    });
   });
 
   // --- Diet Alerts ---

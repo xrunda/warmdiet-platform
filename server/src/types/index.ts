@@ -160,6 +160,9 @@ export interface PatientMedication {
   dosage: string;
   frequency: string;
   timing: string;
+  packageImage?: string;
+  ocrText?: string;
+  imageUploadedAt?: string;
   isActive: number;
   createdAt: string;
   updatedAt: string;
@@ -183,6 +186,10 @@ export interface PatientMedicalOrder {
   content: string;
   doctorName: string;
   orderDate: string;
+  hospitalName?: string;
+  visitDate?: string;
+  originalImage?: string;
+  rawOcrText?: string;
   isActive: number;
   createdAt: string;
   updatedAt: string;

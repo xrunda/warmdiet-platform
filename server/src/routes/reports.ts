@@ -44,6 +44,13 @@ router.get('/patient/:patientId', authenticateDoctorOrPatient[0], authenticateDo
 router.get('/patient/:patientId/latest', authenticateDoctorOrPatient[0], authenticateDoctorOrPatient[1], (req, res, next) => getModels().controller.getLatestReport(req, res, next));
 
 /**
+ * @route   POST /api/patients/:patientId/reports/tomorrow-guide
+ * @desc    获取明日用餐指引建议
+ * @access  Private (Patient, Doctor)
+ */
+router.post('/patient/:patientId/tomorrow-guide', authenticateDoctorOrPatient[0], authenticateDoctorOrPatient[1], (req, res, next) => getModels().controller.getTomorrowGuide(req, res, next));
+
+/**
  * @route   GET /api/patients/:patientId/reports/:reportId
  * @desc    获取单份报告
  * @access  Private (Patient, Doctor)

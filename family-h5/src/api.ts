@@ -90,6 +90,18 @@ export async function fetchLatestHealthReport() {
   return request<any>(`/reports/patient/${patientId}/latest`);
 }
 
+export async function fetchTomorrowMealGuide(payload?: {
+  mode?: 'set' | 'single';
+  mealType?: '早餐' | '午餐' | '晚餐';
+  nonce?: number;
+}) {
+  const { patientId } = await getDemoToken();
+  return request<any>(`/reports/patient/${patientId}/tomorrow-guide`, {
+    method: 'POST',
+    body: payload || { mode: 'set' },
+  });
+}
+
 // ===== Patient Profile =====
 
 export async function fetchPatientProfile() {
@@ -126,14 +138,22 @@ export async function fetchMedications() {
   return request<any[]>(`/patients/${patientId}/medications`);
 }
 
-export async function addMedication(data: { name: string; dosage: string; frequency: string; timing: string }) {
+export async function addMedication(data: { name: string; dosage: string; frequency: string; timing: string; packageImage?: string; ocrText?: string }) {
   const { patientId } = await getDemoToken();
   return request<any>(`/patients/${patientId}/medications`, { method: 'POST', body: data });
 }
 
-export async function updateMedication(medId: string, data: { name: string; dosage: string; frequency: string; timing: string }) {
+export async function updateMedication(medId: string, data: { name: string; dosage: string; frequency: string; timing: string; packageImage?: string; ocrText?: string }) {
   const { patientId } = await getDemoToken();
   return request<any>(`/patients/${patientId}/medications/${medId}`, { method: 'PUT', body: data });
+}
+
+export async function recognizeMedicationImage(imageData: string) {
+  const { patientId } = await getDemoToken();
+  return request<any>(`/patients/${patientId}/medications/recognize-image`, {
+    method: 'POST',
+    body: { imageData },
+  });
 }
 
 export async function removeMedication(medId: string) {
@@ -160,14 +180,39 @@ export async function fetchMedicalOrders() {
   return request<any[]>(`/patients/${patientId}/medical-orders`);
 }
 
-export async function createMedicalOrder(data: { content: string; doctorName: string }) {
+export async function createMedicalOrder(data: {
+  content: string;
+  doctorName: string;
+  hospitalName?: string;
+  visitDate?: string;
+  originalImage?: string;
+  rawOcrText?: string;
+}) {
   const { patientId } = await getDemoToken();
   return request<any>(`/patients/${patientId}/medical-orders`, { method: 'POST', body: data });
 }
 
-export async function updateMedicalOrder(orderId: string, data: { content: string; doctorName: string }) {
+export async function updateMedicalOrder(orderId: string, data: {
+  content: string;
+  doctorName: string;
+  hospitalName?: string;
+  visitDate?: string;
+  originalImage?: string;
+  rawOcrText?: string;
+}) {
   const { patientId } = await getDemoToken();
   return request<any>(`/patients/${patientId}/medical-orders/${orderId}`, { method: 'PUT', body: data });
+}
+
+export async function scanMedicalOrderImage(imageData: string, orderId?: string) {
+  const { patientId } = await getDemoToken();
+  return request<any>(
+    orderId ? `/patients/${patientId}/medical-orders/${orderId}/scan` : `/patients/${patientId}/medical-orders/scan`,
+    {
+      method: orderId ? 'PUT' : 'POST',
+      body: { imageData },
+    }
+  );
 }
 
 // ===== Diet Alerts =====

@@ -33,8 +33,8 @@ export function createApp(): Application {
   }));
 
   // 请求解析
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  app.use(express.json({ limit: '12mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '12mb' }));
 
   // 日志中间件
   app.use(getLoggerMiddleware());
