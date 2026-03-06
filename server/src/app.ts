@@ -9,11 +9,13 @@ import morgan from 'morgan';
 import { config } from './config/env';
 import { getLoggerMiddleware } from './middleware/requestLogger';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { dataSanitizer } from './middleware/sanitizer';
 import hospitalRoutes from './routes/hospitals';
 import doctorRoutes from './routes/doctors';
 import authorizationRoutes from './routes/authorizations';
 import mealRoutes from './routes/meals';
 import reportRoutes from './routes/reports';
+import accessLogRoutes from './routes/accessLogs';
 
 export function createApp(): Application {
   const app = express();
@@ -34,6 +36,9 @@ export function createApp(): Application {
   // 日志中间件
   app.use(getLoggerMiddleware());
 
+  // 数据脱敏中间件（对医生请求自动脱敏）
+  app.use(dataSanitizer);
+
   // 健康检查
   app.get('/health', (req, res) => {
     res.json({
@@ -49,8 +54,8 @@ export function createApp(): Application {
   app.use('/api/authorizations', authorizationRoutes);
   app.use('/api/meals', mealRoutes);
   app.use('/api/reports', reportRoutes);
+  app.use('/api/access-logs', accessLogRoutes);
   // app.use('/api/patients', patientRoutes);
-  // app.use('/api/access-logs', accessLogRoutes);
 
   // 404 处理
   app.use(notFoundHandler);

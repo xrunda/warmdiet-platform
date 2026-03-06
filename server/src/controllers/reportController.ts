@@ -6,6 +6,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { models } from '../models';
+import { AccessLogController } from './accessLogController';
 import { ApiResponse } from '../types';
 import { logger } from '../utils/logger';
 
@@ -119,6 +120,17 @@ export class ReportController {
     const report = this.models.healthReport.findById(reportId);
     if (!report || report.patientId !== patientId) {
       throw new AppError('报告不存在', 404);
+    }
+
+    // 如果是医生访问，记录日志
+    if (req.user?.type === 'doctor') {
+      AccessLogController.logAccess(
+        this.models,
+        req.user.userId,
+        patientId,
+        req.user.hospitalId,
+        'health_report'
+      );
     }
 
     const response: ApiResponse = {

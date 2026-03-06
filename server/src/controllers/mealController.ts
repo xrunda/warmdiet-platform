@@ -6,6 +6,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { models } from '../models';
+import { AccessLogController } from './accessLogController';
 import { ApiResponse, MealType } from '../types';
 import { logger } from '../utils/logger';
 
@@ -87,6 +88,17 @@ export class MealController {
       });
     }
 
+    // 如果是医生访问，记录日志
+    if (req.user?.type === 'doctor') {
+      AccessLogController.logAccess(
+        this.models,
+        req.user.userId,
+        patientId,
+        req.user.hospitalId,
+        'meal_records'
+      );
+    }
+
     const response: ApiResponse = {
       success: true,
       data: meals.map(meal => ({
@@ -107,6 +119,17 @@ export class MealController {
     const meal = this.models.mealRecord.findById(mealId);
     if (!meal || meal.patientId !== patientId) {
       throw new AppError('餐食记录不存在', 404);
+    }
+
+    // 如果是医生访问，记录日志
+    if (req.user?.type === 'doctor') {
+      AccessLogController.logAccess(
+        this.models,
+        req.user.userId,
+        patientId,
+        req.user.hospitalId,
+        'meal_record'
+      );
     }
 
     const response: ApiResponse = {

@@ -9,6 +9,7 @@ import { PatientModel } from './Patient';
 import { AuthorizationModel } from './Authorization';
 import { MealRecordModel } from './MealRecord';
 import { HealthReportModel } from './HealthReport';
+import { AccessLogModel } from './AccessLog';
 
 export function initModels(db: Database.Database) {
   return {
@@ -18,9 +19,10 @@ export function initModels(db: Database.Database) {
     authorization: new AuthorizationModel(db),
     mealRecord: new MealRecordModel(db),
     healthReport: new HealthReportModel(db),
+    accessLog: new AccessLogModel(db),
   };
 }
 
 export type Models = ReturnType<typeof initModels>;
 
-export { HospitalModel, DoctorModel, PatientModel, AuthorizationModel, MealRecordModel, HealthReportModel };
+export { HospitalModel, DoctorModel, PatientModel, AuthorizationModel, MealRecordModel, HealthReportModel, AccessLogModel };
