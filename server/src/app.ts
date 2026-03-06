@@ -12,6 +12,8 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import hospitalRoutes from './routes/hospitals';
 import doctorRoutes from './routes/doctors';
 import authorizationRoutes from './routes/authorizations';
+import mealRoutes from './routes/meals';
+import reportRoutes from './routes/reports';
 
 export function createApp(): Application {
   const app = express();
@@ -45,9 +47,9 @@ export function createApp(): Application {
   app.use('/api/hospitals', hospitalRoutes);
   app.use('/api/doctors', doctorRoutes);
   app.use('/api/authorizations', authorizationRoutes);
+  app.use('/api/meals', mealRoutes);
+  app.use('/api/reports', reportRoutes);
   // app.use('/api/patients', patientRoutes);
-  // app.use('/api/meals', mealRoutes);
-  // app.use('/api/reports', reportRoutes);
   // app.use('/api/access-logs', accessLogRoutes);
 
   // 404 处理
