@@ -9,6 +9,9 @@ import morgan from 'morgan';
 import { config } from './config/env';
 import { getLoggerMiddleware } from './middleware/requestLogger';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import hospitalRoutes from './routes/hospitals';
+import doctorRoutes from './routes/doctors';
+import authorizationRoutes from './routes/authorizations';
 
 export function createApp(): Application {
   const app = express();
@@ -38,11 +41,11 @@ export function createApp(): Application {
     });
   });
 
-  // API 路由（待添加）
-  // app.use('/api/hospitals', hospitalRoutes);
-  // app.use('/api/doctors', doctorRoutes);
+  // API 路由
+  app.use('/api/hospitals', hospitalRoutes);
+  app.use('/api/doctors', doctorRoutes);
+  app.use('/api/authorizations', authorizationRoutes);
   // app.use('/api/patients', patientRoutes);
-  // app.use('/api/authorizations', authorizationRoutes);
   // app.use('/api/meals', mealRoutes);
   // app.use('/api/reports', reportRoutes);
   // app.use('/api/access-logs', accessLogRoutes);
