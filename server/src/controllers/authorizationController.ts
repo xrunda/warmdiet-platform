@@ -156,6 +156,19 @@ export class AuthorizationController {
    */
   public getDoctorAuthorizations = asyncHandler(async (req: Request, res: Response) => {
     const doctorId = req.params.doctorId;
+    const doctor = this.models.doctor.findById(doctorId);
+
+    if (!doctor) {
+      throw new AppError('医生不存在', 404);
+    }
+
+    if (req.user?.type === 'doctor' && req.user.userId !== doctorId) {
+      throw new AppError('无权查看其他医生的授权记录', 403);
+    }
+
+    if (req.user?.type === 'hospital' && req.user.hospitalId !== doctor.hospitalId) {
+      throw new AppError('无权查看其他医院医生的授权记录', 403);
+    }
 
     const authorizations = this.models.authorization.findByDoctorId(doctorId);
 

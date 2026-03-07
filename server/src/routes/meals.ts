@@ -4,7 +4,7 @@
 
 import { Router } from 'express';
 import { createMealController } from '../controllers/mealController';
-import { authenticatePatient, authenticateDoctorOrPatient } from '../middleware/auth';
+import { authenticatePatient, authenticateDoctorOrHospitalOrPatient } from '../middleware/auth';
 import { initModels } from '../models';
 import { databaseConfig } from '../config/database';
 
@@ -34,14 +34,14 @@ router.post('/patient/:patientId', authenticatePatient[0], authenticatePatient[1
  * @desc    获取患者的餐食记录
  * @access  Private (Patient, Doctor)
  */
-router.get('/patient/:patientId', authenticateDoctorOrPatient[0], authenticateDoctorOrPatient[1], (req, res, next) => getModels().controller.getMeals(req, res, next));
+router.get('/patient/:patientId', authenticateDoctorOrHospitalOrPatient[0], authenticateDoctorOrHospitalOrPatient[1], (req, res, next) => getModels().controller.getMeals(req, res, next));
 
 /**
  * @route   GET /api/patients/:patientId/meals/:mealId
  * @desc    获取单条餐食记录
  * @access  Private (Patient, Doctor)
  */
-router.get('/patient/:patientId/:mealId', authenticateDoctorOrPatient[0], authenticateDoctorOrPatient[1], (req, res, next) => getModels().controller.getMeal(req, res, next));
+router.get('/patient/:patientId/:mealId', authenticateDoctorOrHospitalOrPatient[0], authenticateDoctorOrHospitalOrPatient[1], (req, res, next) => getModels().controller.getMeal(req, res, next));
 
 /**
  * @route   PUT /api/patients/:patientId/meals/:mealId
@@ -62,6 +62,6 @@ router.delete('/patient/:patientId/:mealId', authenticatePatient[0], authenticat
  * @desc    获取营养统计
  * @access  Private (Patient, Doctor)
  */
-router.get('/patient/:patientId/stats', authenticateDoctorOrPatient[0], authenticateDoctorOrPatient[1], (req, res, next) => getModels().controller.getNutritionStats(req, res, next));
+router.get('/patient/:patientId/stats', authenticateDoctorOrHospitalOrPatient[0], authenticateDoctorOrHospitalOrPatient[1], (req, res, next) => getModels().controller.getNutritionStats(req, res, next));
 
 export default router;

@@ -4,7 +4,7 @@
 
 import { Router } from 'express';
 import { createAuthorizationController } from '../controllers/authorizationController';
-import { authenticatePatient, authenticateDoctor } from '../middleware/auth';
+import { authenticatePatient, authenticateDoctor, authenticateDoctorOrHospital } from '../middleware/auth';
 import { initModels } from '../models';
 import { databaseConfig } from '../config/database';
 
@@ -53,7 +53,7 @@ router.get(
  * @desc    获取医生的授权列表
  * @access  Private (Doctor)
  */
-router.get('/doctor/:doctorId', authenticateDoctor[0], authenticateDoctor[1], (req, res, next) => getModels().controller.getDoctorAuthorizations(req, res, next));
+router.get('/doctor/:doctorId', authenticateDoctorOrHospital[0], authenticateDoctorOrHospital[1], (req, res, next) => getModels().controller.getDoctorAuthorizations(req, res, next));
 
 /**
  * @route   GET /api/authorizations/:id

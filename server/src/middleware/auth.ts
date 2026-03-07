@@ -100,3 +100,8 @@ export const authenticateDoctorOrHospital = [authenticate, checkUserType('doctor
  * 用于既允许医生也允许患者访问的场景（例如共同查看餐食记录）
  */
 export const authenticateDoctorOrPatient = [authenticate, checkUserType('doctor', 'patient')];
+
+/**
+ * 医院、医生或患者认证中间件
+ */
+export const authenticateDoctorOrHospitalOrPatient = [authenticate, checkUserType('doctor', 'hospital', 'patient')];

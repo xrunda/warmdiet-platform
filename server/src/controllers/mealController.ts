@@ -36,6 +36,49 @@ export class MealController {
     this.models = models;
   }
 
+  private ensureReadAccess(req: Request, patientId: string): void {
+    const patient = this.models.patient.findById(patientId);
+    if (!patient) {
+      throw new AppError('患者不存在', 404);
+    }
+
+    if (req.user?.type === 'patient') {
+      if (req.user.userId !== patientId) {
+        throw new AppError('无权访问此资源', 403);
+      }
+      return;
+    }
+
+    if (req.user?.type === 'doctor') {
+      if (!this.models.authorization.hasAccess(req.user.userId, patientId, 'meal_records')) {
+        throw new AppError('无权访问此资源', 403);
+      }
+      return;
+    }
+
+    if (req.user?.type === 'hospital') {
+      const authorizations = this.models.authorization.findActiveByPatientId(patientId);
+      const hasHospitalAccess = authorizations.some((auth) => {
+        const doctor = this.models.doctor.findById(auth.doctorId);
+        const authTypes = Array.isArray((auth as any).authorizationType)
+          ? (auth as any).authorizationType
+          : (() => {
+              try {
+                return JSON.parse((auth as any).authorizationType || '[]');
+              } catch {
+                return [];
+              }
+            })();
+
+        return doctor?.hospitalId === req.user?.hospitalId && authTypes.includes('meal_records');
+      });
+
+      if (!hasHospitalAccess) {
+        throw new AppError('无权访问此资源', 403);
+      }
+    }
+  }
+
   /**
    * 添加餐食记录
    */
@@ -71,6 +114,8 @@ export class MealController {
   public getMeals = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.patientId;
     const { page, limit, startDate, endDate } = req.query;
+
+    this.ensureReadAccess(req, patientId);
 
     let meals;
 
@@ -115,6 +160,8 @@ export class MealController {
    */
   public getMeal = asyncHandler(async (req: Request, res: Response) => {
     const { patientId, mealId } = req.params;
+
+    this.ensureReadAccess(req, patientId);
 
     const meal = this.models.mealRecord.findById(mealId);
     if (!meal || meal.patientId !== patientId) {
@@ -203,6 +250,8 @@ export class MealController {
   public getNutritionStats = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.patientId;
     const { days } = req.query;
+
+    this.ensureReadAccess(req, patientId);
 
     const daysNum = days ? Number(days) : 7;
 

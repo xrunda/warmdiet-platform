@@ -71,6 +71,49 @@ export class ReportController {
     this.models = models;
   }
 
+  private ensureReadAccess(req: Request, patientId: string): void {
+    const patient = this.models.patient.findById(patientId);
+    if (!patient) {
+      throw new AppError('患者不存在', 404);
+    }
+
+    if (req.user?.type === 'patient') {
+      if (req.user.userId !== patientId) {
+        throw new AppError('无权访问此资源', 403);
+      }
+      return;
+    }
+
+    if (req.user?.type === 'doctor') {
+      if (!this.models.authorization.hasAccess(req.user.userId, patientId, 'health_reports')) {
+        throw new AppError('无权访问此资源', 403);
+      }
+      return;
+    }
+
+    if (req.user?.type === 'hospital') {
+      const authorizations = this.models.authorization.findActiveByPatientId(patientId);
+      const hasHospitalAccess = authorizations.some((auth) => {
+        const doctor = this.models.doctor.findById(auth.doctorId);
+        const authTypes = Array.isArray((auth as any).authorizationType)
+          ? (auth as any).authorizationType
+          : (() => {
+              try {
+                return JSON.parse((auth as any).authorizationType || '[]');
+              } catch {
+                return [];
+              }
+            })();
+
+        return doctor?.hospitalId === req.user?.hospitalId && authTypes.includes('health_reports');
+      });
+
+      if (!hasHospitalAccess) {
+        throw new AppError('无权访问此资源', 403);
+      }
+    }
+  }
+
   /**
    * 生成健康报告
    */
@@ -145,6 +188,8 @@ export class ReportController {
   public getReports = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.patientId;
 
+    this.ensureReadAccess(req, patientId);
+
     const reports = this.models.healthReport.findByPatientId(patientId);
 
     const response: ApiResponse = {
@@ -164,6 +209,8 @@ export class ReportController {
    */
   public getReport = asyncHandler(async (req: Request, res: Response) => {
     const { patientId, reportId } = req.params;
+
+    this.ensureReadAccess(req, patientId);
 
     const report = this.models.healthReport.findById(reportId);
     if (!report || report.patientId !== patientId) {
@@ -198,6 +245,8 @@ export class ReportController {
    */
   public getLatestReport = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.patientId;
+
+    this.ensureReadAccess(req, patientId);
 
     const report = this.models.healthReport.findLatest(patientId);
 
