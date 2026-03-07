@@ -27,14 +27,14 @@ function getModels() {
  * @desc    添加医生
  * @access  Private (Hospital)
  */
-router.post('/', authenticateHospital[0], authenticateHospital[1], (req, res, next) => getModels().controller.createDoctor(req, res, next));
+router.post('/', authenticateHospital, (req, res, next) => getModels().controller.createDoctor(req, res, next));
 
 /**
  * @route   GET /api/doctors
  * @desc    获取医生列表（医院）
  * @access  Private (Hospital)
  */
-router.get('/', authenticateHospital[0], authenticateHospital[1], (req, res, next) => getModels().controller.getDoctors(req, res, next));
+router.get('/', authenticateHospital, (req, res, next) => getModels().controller.getDoctors(req, res, next));
 
 /**
  * @route   GET /api/doctors/search
@@ -48,27 +48,27 @@ router.get('/search', (req, res, next) => getModels().controller.searchDoctors(r
  * @desc    获取医生信息
  * @access  Private
  */
-router.get('/:id', authenticateDoctor[0], authenticateDoctor[1], (req, res, next) => getModels().controller.getDoctor(req, res, next));
+router.get('/:id', authenticateDoctor, (req, res, next) => getModels().controller.getDoctor(req, res, next));
 
 /**
  * @route   PUT /api/doctors/:id
  * @desc    更新医生信息
  * @access  Private (Hospital)
  */
-router.put('/:id', authenticateHospital[0], authenticateHospital[1], (req, res, next) => getModels().controller.updateDoctor(req, res, next));
+router.put('/:id', authenticateHospital, (req, res, next) => getModels().controller.updateDoctor(req, res, next));
 
 /**
  * @route   DELETE /api/doctors/:id
  * @desc    删除医生
  * @access  Private (Hospital)
  */
-router.delete('/:id', authenticateHospital[0], authenticateHospital[1], (req, res, next) => getModels().controller.deleteDoctor(req, res, next));
+router.delete('/:id', authenticateHospital, (req, res, next) => getModels().controller.deleteDoctor(req, res, next));
 
 /**
  * @route   PATCH /api/doctors/:id/status
  * @desc    激活/暂停医生账号
  * @access  Private (Hospital)
  */
-router.patch('/:id/status', authenticateHospital[0], authenticateHospital[1], (req, res, next) => getModels().controller.toggleDoctorStatus(req, res, next));
+router.patch('/:id/status', authenticateHospital, (req, res, next) => getModels().controller.toggleDoctorStatus(req, res, next));
 
 export default router;

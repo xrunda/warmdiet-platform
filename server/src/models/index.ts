@@ -15,6 +15,7 @@ import {
   PatientMedicationModel,
   PatientPreferenceModel,
   PatientMedicalOrderModel,
+  PatientVitalMeasurementModel,
   DietAlertModel,
   ConversationLogModel,
 } from './PatientProfile';
@@ -32,6 +33,7 @@ export function initModels(db: Database.Database) {
     medication: new PatientMedicationModel(db),
     preference: new PatientPreferenceModel(db),
     medicalOrder: new PatientMedicalOrderModel(db),
+    vitalMeasurement: new PatientVitalMeasurementModel(db),
     dietAlert: new DietAlertModel(db),
     conversationLog: new ConversationLogModel(db),
   };
@@ -51,6 +53,7 @@ export {
   PatientMedicationModel,
   PatientPreferenceModel,
   PatientMedicalOrderModel,
+  PatientVitalMeasurementModel,
   DietAlertModel,
   ConversationLogModel,
 };

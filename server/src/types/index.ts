@@ -195,6 +195,29 @@ export interface PatientMedicalOrder {
   updatedAt: string;
 }
 
+export type VitalMetricType = 'blood_pressure' | 'blood_glucose';
+export type GlucoseContext = 'fasting' | 'post_meal' | 'random' | 'before_sleep' | 'unknown';
+export type VitalSourceType = 'xiaoai_voice' | 'manual' | 'device_import';
+
+export interface PatientVitalMeasurement {
+  id: string;
+  patientId: string;
+  metricType: VitalMetricType;
+  systolicValue?: number;
+  diastolicValue?: number;
+  glucoseValue?: number;
+  glucoseContext: GlucoseContext;
+  unit: string;
+  measuredAt: string;
+  measurementDate: string;
+  sourceType: VitalSourceType;
+  sourceLogId?: string;
+  sourceText?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // 饮食预警
 export interface DietAlert {
   id: string;

@@ -218,6 +218,33 @@ CREATE TABLE IF NOT EXISTS patient_medical_orders (
 
 CREATE INDEX IF NOT EXISTS idx_order_patient ON patient_medical_orders(patient_id);
 
+-- 患者附属健康指标表（血压/血糖）
+CREATE TABLE IF NOT EXISTS patient_vital_measurements (
+  id TEXT PRIMARY KEY,
+  patient_id TEXT NOT NULL,
+  metric_type TEXT NOT NULL CHECK(metric_type IN ('blood_pressure', 'blood_glucose')),
+  systolic_value INTEGER,
+  diastolic_value INTEGER,
+  glucose_value REAL,
+  glucose_context TEXT NOT NULL DEFAULT 'unknown' CHECK(glucose_context IN ('fasting', 'post_meal', 'random', 'before_sleep', 'unknown')),
+  unit TEXT NOT NULL,
+  measured_at TEXT NOT NULL,
+  measurement_date TEXT NOT NULL,
+  source_type TEXT NOT NULL DEFAULT 'xiaoai_voice' CHECK(source_type IN ('xiaoai_voice', 'manual', 'device_import')),
+  source_log_id TEXT,
+  source_text TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (patient_id) REFERENCES patient_accounts(id),
+  FOREIGN KEY (source_log_id) REFERENCES conversation_logs(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_vital_patient ON patient_vital_measurements(patient_id);
+CREATE INDEX IF NOT EXISTS idx_vital_type ON patient_vital_measurements(metric_type);
+CREATE INDEX IF NOT EXISTS idx_vital_date ON patient_vital_measurements(measurement_date);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_vital_source_metric ON patient_vital_measurements(source_log_id, metric_type);
+
 -- 饮食预警表
 CREATE TABLE IF NOT EXISTS diet_alerts (
   id TEXT PRIMARY KEY,

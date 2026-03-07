@@ -4,7 +4,7 @@
 
 import Database from 'better-sqlite3';
 import { BaseModel } from './BaseModel';
-import { PatientHealthCondition, PatientMedication, PatientPreference, PatientMedicalOrder, DietAlert, ConversationLog } from '../types';
+import { PatientHealthCondition, PatientMedication, PatientPreference, PatientMedicalOrder, PatientVitalMeasurement, DietAlert, ConversationLog } from '../types';
 
 export class PatientHealthConditionModel extends BaseModel<PatientHealthCondition> {
   constructor(db: Database.Database) {
@@ -51,6 +51,52 @@ export class PatientMedicalOrderModel extends BaseModel<PatientMedicalOrder> {
   }
 }
 
+export class PatientVitalMeasurementModel extends BaseModel<PatientVitalMeasurement> {
+  constructor(db: Database.Database) {
+    super(db, 'patient_vital_measurements');
+  }
+
+  public findByPatientId(patientId: string, days = 7, metricType?: string): PatientVitalMeasurement[] {
+    const params: any[] = [patientId];
+    let sql = `
+      SELECT * FROM patient_vital_measurements
+      WHERE patient_id = ?
+      AND measurement_date >= date('now', ?)
+    `;
+
+    params.push(`-${days} days`);
+
+    if (metricType) {
+      sql += ' AND metric_type = ?';
+      params.push(metricType);
+    }
+
+    sql += ' ORDER BY measured_at DESC, created_at DESC';
+    return this.query(sql, params);
+  }
+
+  public findLatestByPatientId(patientId: string): PatientVitalMeasurement[] {
+    const sql = `
+      SELECT * FROM patient_vital_measurements
+      WHERE id IN (
+        SELECT id FROM (
+          SELECT id,
+                 ROW_NUMBER() OVER (PARTITION BY metric_type ORDER BY measured_at DESC, created_at DESC) AS rn
+          FROM patient_vital_measurements
+          WHERE patient_id = ?
+        )
+        WHERE rn = 1
+      )
+      ORDER BY measured_at DESC
+    `;
+    return this.query(sql, [patientId]);
+  }
+
+  public findBySourceLog(metricType: string, sourceLogId: string): PatientVitalMeasurement | undefined {
+    return this.findOne({ metricType: metricType as any, sourceLogId } as any);
+  }
+}
+
 export class DietAlertModel extends BaseModel<DietAlert> {
   constructor(db: Database.Database) {
     super(db, 'diet_alerts');
@@ -80,5 +126,15 @@ export class ConversationLogModel extends BaseModel<ConversationLog> {
     const sql = `SELECT DISTINCT log_date FROM conversation_logs WHERE patient_id = ? ORDER BY log_date DESC LIMIT 30`;
     const rows = this.db.prepare(sql).all(patientId) as any[];
     return rows.map(r => r.log_date);
+  }
+
+  public findRecentUserLogs(patientId: string, limit = 60): ConversationLog[] {
+    const sql = `
+      SELECT * FROM conversation_logs
+      WHERE patient_id = ? AND role = 'user'
+      ORDER BY log_date DESC, timestamp DESC
+      LIMIT ?
+    `;
+    return this.query(sql, [patientId, limit]);
   }
 }

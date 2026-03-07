@@ -1,19 +1,17 @@
 import React, { useState } from 'react';
 import {
   ClipboardList,
-  LayoutDashboard,
+  Clock,
   ShieldCheck,
-  Stethoscope,
-  UtensilsCrossed,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { LoginForm } from './components/hospitals/LoginForm';
-import { HospitalDashboard } from './components/hospitals/Dashboard';
-import { DoctorList } from './components/doctors/DoctorList';
+import { DoctorDashboard } from './components/doctors/DoctorDashboard';
 import { AuthorizationList } from './components/authorization/AuthorizationList';
-import { MealRecord } from './components/meals/MealRecord';
-import { HealthReport } from './components/reports/HealthReport';
+import { PatientRecords } from './components/patients/PatientRecords';
+import { FollowUpPlan } from './components/doctors/FollowUpPlan';
 import { Navigation } from './components/common/Navigation';
 import { ToastProvider } from './components/common/Toast';
 
@@ -26,11 +24,10 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { id: 'dashboard', label: '仪表盘', icon: LayoutDashboard, component: HospitalDashboard },
-  { id: 'doctors', label: '医生管理', icon: Stethoscope, component: DoctorList },
-  { id: 'authorizations', label: '授权管理', icon: ShieldCheck, component: AuthorizationList },
-  { id: 'meals', label: '餐食记录', icon: UtensilsCrossed, component: MealRecord },
-  { id: 'reports', label: '健康报告', icon: ClipboardList, component: HealthReport },
+  { id: 'dashboard', label: '工作台', icon: ClipboardList, component: DoctorDashboard },
+  { id: 'authorizations', label: '我的患者', icon: ShieldCheck, component: AuthorizationList },
+  { id: 'patients', label: '患者记录', icon: Users, component: PatientRecords },
+  { id: 'followup', label: '随访计划', icon: Clock, component: FollowUpPlan },
 ];
 
 function App() {

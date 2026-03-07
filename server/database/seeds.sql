@@ -217,7 +217,22 @@ INSERT INTO conversation_logs (id, patient_id, role, content, timestamp, log_dat
   ('conv_011', 'patient_test_001', 'user', '中午吃了清蒸鱼和米饭，还有炒菠菜。', '12:30', '2026-03-05', NULL),
   ('conv_012', 'patient_test_001', 'assistant', '午餐搭配非常好！清蒸鱼提供优质蛋白，菠菜补充铁和维生素，很适合您的恢复期饮食。', '12:30', '2026-03-05', NULL),
   ('conv_013', 'patient_test_001', 'user', '晚上煮了杂粮粥，配了点豆腐。', '18:30', '2026-03-05', NULL),
-  ('conv_014', 'patient_test_001', 'assistant', '太棒了，今天三餐都很健康清淡！杂粮粥帮助消化，豆腐补充蛋白质。今日饮食评分预计能到87分以上，继续保持！', '18:30', '2026-03-05', NULL);
+  ('conv_014', 'patient_test_001', 'assistant', '太棒了，今天三餐都很健康清淡！杂粮粥帮助消化，豆腐补充蛋白质。今日饮食评分预计能到87分以上，继续保持！', '18:30', '2026-03-05', NULL),
+  ('conv_015', 'patient_test_001', 'user', '小爱，我刚量了血压128比76，空腹血糖6.2。', '07:20', '2026-03-06', NULL),
+  ('conv_016', 'patient_test_001', 'assistant', '收到，已帮您记下今天早上的血压和血糖。', '07:20', '2026-03-06',
+   '{"type":"metric","title":"健康指标已记录","text":"血压 128/76 mmHg，空腹血糖 6.2 mmol/L，已作为附属指标保存。"}'),
+  ('conv_017', 'patient_test_001', 'user', '小爱，晚饭后我测了血糖，7.8。', '20:15', '2026-03-04', NULL),
+  ('conv_018', 'patient_test_001', 'assistant', '晚饭后血糖 7.8 已记录，继续保持清淡饮食。', '20:15', '2026-03-04',
+   '{"type":"metric","title":"健康指标已记录","text":"餐后血糖 7.8 mmol/L，已同步到附属健康指标。"}');
+
+-- ========== 血压血糖附属指标 ==========
+INSERT INTO patient_vital_measurements (
+  id, patient_id, metric_type, systolic_value, diastolic_value, glucose_value, glucose_context, unit,
+  measured_at, measurement_date, source_type, source_log_id, source_text, notes
+) VALUES
+  ('vital_001', 'patient_test_001', 'blood_pressure', 128, 76, NULL, 'unknown', 'mmHg', '2026-03-06T07:20:00', '2026-03-06', 'xiaoai_voice', 'conv_015', '小爱，我刚量了血压128比76，空腹血糖6.2。', '来自小爱语音'),
+  ('vital_002', 'patient_test_001', 'blood_glucose', NULL, NULL, 6.2, 'fasting', 'mmol/L', '2026-03-06T07:20:00', '2026-03-06', 'xiaoai_voice', 'conv_015', '小爱，我刚量了血压128比76，空腹血糖6.2。', '来自小爱语音'),
+  ('vital_003', 'patient_test_001', 'blood_glucose', NULL, NULL, 7.8, 'post_meal', 'mmol/L', '2026-03-04T20:15:00', '2026-03-04', 'xiaoai_voice', 'conv_017', '小爱，晚饭后我测了血糖，7.8。', '来自小爱语音');
 
 -- ========== 访问日志 ==========
 INSERT INTO access_logs (id, doctor_id, patient_id, hospital_id, data_type, accessed_at) VALUES

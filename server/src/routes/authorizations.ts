@@ -27,14 +27,14 @@ function getModels() {
  * @desc    创建授权
  * @access  Private (Patient)
  */
-router.post('/', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.createAuthorization(req, res, next));
+router.post('/', authenticatePatient, (req, res, next) => getModels().controller.createAuthorization(req, res, next));
 
 /**
  * @route   GET /api/patients/:patientId/authorizations
  * @desc    获取患者的授权列表
  * @access  Private (Patient)
  */
-router.get('/patient/:patientId', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.getPatientAuthorizations(req, res, next));
+router.get('/patient/:patientId', authenticatePatient, (req, res, next) => getModels().controller.getPatientAuthorizations(req, res, next));
 
 /**
  * @route   GET /api/patients/:patientId/authorizations/detailed
@@ -53,35 +53,35 @@ router.get(
  * @desc    获取医生的授权列表
  * @access  Private (Doctor)
  */
-router.get('/doctor/:doctorId', authenticateDoctorOrHospital[0], authenticateDoctorOrHospital[1], (req, res, next) => getModels().controller.getDoctorAuthorizations(req, res, next));
+router.get('/doctor/:doctorId', authenticateDoctorOrHospital, (req, res, next) => getModels().controller.getDoctorAuthorizations(req, res, next));
 
 /**
  * @route   GET /api/authorizations/:id
  * @desc    获取授权详情
  * @access  Private
  */
-router.get('/:id', authenticateDoctor[0], authenticateDoctor[1], (req, res, next) => getModels().controller.getAuthorization(req, res, next));
+router.get('/:id', authenticateDoctor, (req, res, next) => getModels().controller.getAuthorization(req, res, next));
 
 /**
  * @route   PUT /api/authorizations/:id
  * @desc    更新授权
  * @access  Private (Patient)
  */
-router.put('/:id', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.createAuthorization(req, res, next));
+router.put('/:id', authenticatePatient, (req, res, next) => getModels().controller.createAuthorization(req, res, next));
 
 /**
  * @route   DELETE /api/authorizations/:id
  * @desc    撤销授权
  * @access  Private (Patient)
  */
-router.delete('/:id', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.revokeAuthorization(req, res, next));
+router.delete('/:id', authenticatePatient, (req, res, next) => getModels().controller.revokeAuthorization(req, res, next));
 
 /**
  * @route   POST /api/authorizations/:id/extend
  * @desc    延长授权
  * @access  Private (Patient)
  */
-router.post('/:id/extend', authenticatePatient[0], authenticatePatient[1], (req, res, next) => getModels().controller.extendAuthorization(req, res, next));
+router.post('/:id/extend', authenticatePatient, (req, res, next) => getModels().controller.extendAuthorization(req, res, next));
 
 /**
  * @route   GET /api/authorizations/verify

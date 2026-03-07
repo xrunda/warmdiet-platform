@@ -51,6 +51,19 @@ export async function fetchDashboard() {
   return request<any>(`/patients/${patientId}/dashboard`);
 }
 
+export async function fetchLatestVitalMeasurements() {
+  const { patientId } = await getDemoToken();
+  return request<any>(`/patients/${patientId}/vital-measurements/latest`);
+}
+
+export async function fetchVitalMeasurements(params?: { days?: number; type?: 'blood_pressure' | 'blood_glucose' }) {
+  const { patientId } = await getDemoToken();
+  const query = new URLSearchParams();
+  if (params?.days) query.set('days', String(params.days));
+  if (params?.type) query.set('type', params.type);
+  return request<any[]>(`/patients/${patientId}/vital-measurements${query.toString() ? `?${query.toString()}` : ''}`);
+}
+
 // ===== Meals =====
 
 export async function fetchPatientMeals(date?: string) {

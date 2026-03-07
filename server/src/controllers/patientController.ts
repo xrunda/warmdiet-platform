@@ -8,6 +8,7 @@ import { AppError, asyncHandler } from '../middleware/errorHandler';
 import { models } from '../models';
 import { authService } from '../services/authService';
 import { ocrService } from '../services/ocrService';
+import { extractVitalMeasurementsFromText } from '../services/vitalSignParser';
 import { ApiResponse } from '../types';
 import { logger } from '../utils/logger';
 
@@ -48,6 +49,11 @@ const imagePayloadSchema = z.object({
   imageData: z.string().refine((value) => value.startsWith('data:image/'), '请上传图片文件'),
 });
 
+const vitalQuerySchema = z.object({
+  days: z.coerce.number().min(1).max(30).default(7),
+  type: z.enum(['blood_pressure', 'blood_glucose']).optional(),
+});
+
 const preferenceSchema = z.object({
   tastePreferences: z.union([z.string(), z.array(z.string())]),
   likedFoods: z.union([z.string(), z.array(z.string())]),
@@ -59,6 +65,89 @@ export class PatientController {
 
   constructor(models: ReturnType<typeof models>) {
     this.models = models;
+  }
+
+  private ensurePatientExists(patientId: string) {
+    const patient = this.models.patient.findById(patientId);
+    if (!patient) throw new AppError('患者不存在', 404);
+    return patient;
+  }
+
+  private buildMeasuredAt(logDate: string, timestamp: string) {
+    const normalizedTime = /^\d{2}:\d{2}$/.test(timestamp) ? `${timestamp}:00` : timestamp;
+    return `${logDate}T${normalizedTime}`;
+  }
+
+  private normalizeVitalSummaryItem(item: any) {
+    if (!item) return null;
+
+    if (item.metricType === 'blood_pressure') {
+      const isHigh = (item.systolicValue || 0) >= 140 || (item.diastolicValue || 0) >= 90;
+      const isLow = (item.systolicValue || 0) < 90 || (item.diastolicValue || 0) < 60;
+      return {
+        metricType: item.metricType,
+        value: `${item.systolicValue}/${item.diastolicValue}`,
+        systolicValue: item.systolicValue,
+        diastolicValue: item.diastolicValue,
+        unit: item.unit,
+        measuredAt: item.measuredAt,
+        measurementDate: item.measurementDate,
+        sourceType: item.sourceType,
+        status: isHigh ? 'high' : isLow ? 'low' : 'normal',
+      };
+    }
+
+    const highThreshold = item.glucoseContext === 'fasting' ? 7 : item.glucoseContext === 'post_meal' ? 10 : 11.1;
+    return {
+      metricType: item.metricType,
+      value: item.glucoseValue,
+      glucoseValue: item.glucoseValue,
+      glucoseContext: item.glucoseContext,
+      glucoseContextLabel:
+        item.glucoseContext === 'fasting'
+          ? '空腹'
+          : item.glucoseContext === 'post_meal'
+          ? '餐后'
+          : item.glucoseContext === 'before_sleep'
+          ? '睡前'
+          : item.glucoseContext === 'random'
+          ? '随机'
+          : '未标注',
+      unit: item.unit,
+      measuredAt: item.measuredAt,
+      measurementDate: item.measurementDate,
+      sourceType: item.sourceType,
+      status: item.glucoseValue >= highThreshold ? 'high' : item.glucoseValue < 4 ? 'low' : 'normal',
+    };
+  }
+
+  private syncVitalsFromConversationLogs(patientId: string) {
+    const logs = this.models.conversationLog.findRecentUserLogs(patientId, 80);
+
+    for (const log of logs) {
+      const extracted = extractVitalMeasurementsFromText(log.content || '');
+      if (extracted.length === 0) continue;
+
+      for (const measurement of extracted) {
+        const existing = this.models.vitalMeasurement.findBySourceLog(measurement.metricType, log.id);
+        if (existing) continue;
+
+        this.models.vitalMeasurement.create({
+          patientId,
+          metricType: measurement.metricType,
+          systolicValue: measurement.systolicValue,
+          diastolicValue: measurement.diastolicValue,
+          glucoseValue: measurement.glucoseValue,
+          glucoseContext: measurement.glucoseContext,
+          unit: measurement.unit,
+          measuredAt: this.buildMeasuredAt(log.logDate, log.timestamp),
+          measurementDate: log.logDate,
+          sourceType: 'xiaoai_voice',
+          sourceLogId: log.id,
+          sourceText: log.content,
+        } as any);
+      }
+    }
   }
 
   public createPatient = asyncHandler(async (req: Request, res: Response) => {
@@ -86,10 +175,7 @@ export class PatientController {
   public getPatient = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.id;
 
-    const patient = this.models.patient.findById(patientId);
-    if (!patient) {
-      throw new AppError('患者不存在', 404);
-    }
+    const patient = this.ensurePatientExists(patientId);
 
     const response: ApiResponse = {
       success: true,
@@ -102,10 +188,7 @@ export class PatientController {
   public updatePatient = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.id;
 
-    const patient = this.models.patient.findById(patientId);
-    if (!patient) {
-      throw new AppError('患者不存在', 404);
-    }
+    const patient = this.ensurePatientExists(patientId);
 
     const updated = this.models.patient.update(patientId, req.body);
 
@@ -158,9 +241,7 @@ export class PatientController {
 
   public getHealthConditions = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.id;
-
-    const patient = this.models.patient.findById(patientId);
-    if (!patient) throw new AppError('患者不存在', 404);
+    this.ensurePatientExists(patientId);
 
     const conditions = this.models.healthCondition.findByPatientId(patientId);
 
@@ -170,9 +251,7 @@ export class PatientController {
   public addHealthCondition = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.id;
     const data = healthConditionSchema.parse(req.body);
-
-    const patient = this.models.patient.findById(patientId);
-    if (!patient) throw new AppError('患者不存在', 404);
+    this.ensurePatientExists(patientId);
 
     const condition = this.models.healthCondition.create({
       ...data,
@@ -198,9 +277,7 @@ export class PatientController {
 
   public getMedications = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.id;
-
-    const patient = this.models.patient.findById(patientId);
-    if (!patient) throw new AppError('患者不存在', 404);
+    this.ensurePatientExists(patientId);
 
     const medications = this.models.medication.findByPatientId(patientId);
 
@@ -210,9 +287,7 @@ export class PatientController {
   public addMedication = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.id;
     const data = medicationSchema.parse(req.body);
-
-    const patient = this.models.patient.findById(patientId);
-    if (!patient) throw new AppError('患者不存在', 404);
+    this.ensurePatientExists(patientId);
 
     const medication = this.models.medication.create({
       ...data,
@@ -242,9 +317,7 @@ export class PatientController {
   public recognizeMedicationImage = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.id;
     const { imageData } = imagePayloadSchema.parse(req.body);
-
-    const patient = this.models.patient.findById(patientId);
-    if (!patient) throw new AppError('患者不存在', 404);
+    this.ensurePatientExists(patientId);
 
     const result = await ocrService.recognizeMedication(imageData);
 
@@ -273,9 +346,7 @@ export class PatientController {
 
   public getPreferences = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.id;
-
-    const patient = this.models.patient.findById(patientId);
-    if (!patient) throw new AppError('患者不存在', 404);
+    this.ensurePatientExists(patientId);
 
     const pref = this.models.preference.findByPatientId(patientId);
     if (!pref) {
@@ -295,9 +366,7 @@ export class PatientController {
   public updatePreferences = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.id;
     const data = preferenceSchema.parse(req.body);
-
-    const patient = this.models.patient.findById(patientId);
-    if (!patient) throw new AppError('患者不存在', 404);
+    this.ensurePatientExists(patientId);
 
     const storeData = {
       tastePreferences: typeof data.tastePreferences === 'string' ? data.tastePreferences : JSON.stringify(data.tastePreferences),
@@ -321,9 +390,7 @@ export class PatientController {
 
   public getMedicalOrders = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.id;
-
-    const patient = this.models.patient.findById(patientId);
-    if (!patient) throw new AppError('患者不存在', 404);
+    this.ensurePatientExists(patientId);
 
     const orders = this.models.medicalOrder.findByPatientId(patientId);
 
@@ -348,9 +415,7 @@ export class PatientController {
   public createMedicalOrder = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.id;
     const data = medicalOrderSchema.parse(req.body);
-
-    const patient = this.models.patient.findById(patientId);
-    if (!patient) throw new AppError('患者不存在', 404);
+    this.ensurePatientExists(patientId);
 
     const order = this.models.medicalOrder.create({
       patientId,
@@ -370,9 +435,7 @@ export class PatientController {
   public scanMedicalOrder = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.id;
     const { imageData } = imagePayloadSchema.parse(req.body);
-
-    const patient = this.models.patient.findById(patientId);
-    if (!patient) throw new AppError('患者不存在', 404);
+    this.ensurePatientExists(patientId);
 
     const result = await ocrService.recognizeMedicalOrder(imageData);
 
@@ -390,9 +453,7 @@ export class PatientController {
     const patientId = req.params.id;
     const { orderId } = req.params;
     const { imageData } = imagePayloadSchema.parse(req.body);
-
-    const patient = this.models.patient.findById(patientId);
-    if (!patient) throw new AppError('患者不存在', 404);
+    this.ensurePatientExists(patientId);
 
     const order = this.models.medicalOrder.findById(orderId);
     if (!order) throw new AppError('医嘱记录不存在', 404);
@@ -410,14 +471,47 @@ export class PatientController {
     });
   });
 
+  // --- Vital Measurements ---
+
+  public getVitalMeasurements = asyncHandler(async (req: Request, res: Response) => {
+    const patientId = req.params.id;
+    const { days, type } = vitalQuerySchema.parse(req.query);
+
+    this.ensurePatientExists(patientId);
+    this.syncVitalsFromConversationLogs(patientId);
+
+    const records = this.models.vitalMeasurement.findByPatientId(patientId, days, type)
+      .map((item) => this.normalizeVitalSummaryItem(item));
+
+    res.json({ success: true, data: records });
+  });
+
+  public getLatestVitalMeasurements = asyncHandler(async (req: Request, res: Response) => {
+    const patientId = req.params.id;
+
+    this.ensurePatientExists(patientId);
+    this.syncVitalsFromConversationLogs(patientId);
+
+    const latest = this.models.vitalMeasurement.findLatestByPatientId(patientId);
+    const bloodPressure = latest.find((item) => item.metricType === 'blood_pressure');
+    const bloodGlucose = latest.find((item) => item.metricType === 'blood_glucose');
+
+    res.json({
+      success: true,
+      data: {
+        latestBloodPressure: this.normalizeVitalSummaryItem(bloodPressure),
+        latestBloodGlucose: this.normalizeVitalSummaryItem(bloodGlucose),
+        recentCount: latest.length,
+      },
+    });
+  });
+
   // --- Diet Alerts ---
 
   public getDietAlerts = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.id;
     const date = req.query.date as string | undefined;
-
-    const patient = this.models.patient.findById(patientId);
-    if (!patient) throw new AppError('患者不存在', 404);
+    this.ensurePatientExists(patientId);
 
     const alerts = this.models.dietAlert.findByPatientId(patientId, date);
 
@@ -429,11 +523,11 @@ export class PatientController {
   public getConversationLogs = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.id;
     const date = req.query.date as string;
-
-    const patient = this.models.patient.findById(patientId);
-    if (!patient) throw new AppError('患者不存在', 404);
+    this.ensurePatientExists(patientId);
 
     if (!date) throw new AppError('请提供日期参数', 400);
+
+    this.syncVitalsFromConversationLogs(patientId);
 
     const logs = this.models.conversationLog.findByPatientIdAndDate(patientId, date)
       .map(c => ({ ...c, extra: c.extra ? JSON.parse(c.extra) : undefined }));
@@ -443,9 +537,7 @@ export class PatientController {
 
   public getConversationDates = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.id;
-
-    const patient = this.models.patient.findById(patientId);
-    if (!patient) throw new AppError('患者不存在', 404);
+    this.ensurePatientExists(patientId);
 
     const dates = this.models.conversationLog.getAvailableDates(patientId);
 
@@ -456,8 +548,9 @@ export class PatientController {
 
   public getDashboard = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.id;
-    const patient = this.models.patient.findById(patientId);
-    if (!patient) throw new AppError('患者不存在', 404);
+    const patient = this.ensurePatientExists(patientId);
+
+    this.syncVitalsFromConversationLogs(patientId);
 
     const today = new Date().toISOString().split('T')[0];
 
@@ -494,6 +587,10 @@ export class PatientController {
     const conversations = this.models.conversationLog.findByPatientIdAndDate(patientId, today)
       .map(c => ({ ...c, extra: c.extra ? JSON.parse(c.extra) : undefined }));
 
+    const latestVitals = this.models.vitalMeasurement.findLatestByPatientId(patientId);
+    const latestBloodPressure = latestVitals.find((item) => item.metricType === 'blood_pressure');
+    const latestBloodGlucose = latestVitals.find((item) => item.metricType === 'blood_glucose');
+
     const scores = trendData.map(t => t.score);
     const avgScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
     const maxScore = scores.length ? Math.max(...scores) : 0;
@@ -509,6 +606,11 @@ export class PatientController {
         alerts,
         conversations: conversations.slice(-6),
         stats: { avgScore, maxScore, minScore },
+        vitals: {
+          latestBloodPressure: this.normalizeVitalSummaryItem(latestBloodPressure),
+          latestBloodGlucose: this.normalizeVitalSummaryItem(latestBloodGlucose),
+          recentCount: latestVitals.length,
+        },
       },
     });
   });

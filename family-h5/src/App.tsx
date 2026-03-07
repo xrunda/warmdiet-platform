@@ -7,6 +7,7 @@ import {
   Calendar,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -48,6 +49,7 @@ import { Meal, ChatMessage } from './types';
 import { AuthorizationManagement } from './AuthorizationManagement';
 import {
   fetchDashboard,
+  fetchVitalMeasurements,
   fetchLatestHealthReport,
   fetchTomorrowMealGuide,
   fetchConversationLogs,
@@ -85,6 +87,25 @@ type TomorrowMealOption = {
   time: string;
 };
 
+type VitalStatus = 'normal' | 'high' | 'low';
+
+type VitalSummaryItem = {
+  metricType: 'blood_pressure' | 'blood_glucose';
+  value: string | number;
+  unit: string;
+  measuredAt: string;
+  measurementDate: string;
+  sourceType: string;
+  status: VitalStatus;
+  glucoseContextLabel?: string;
+};
+
+type VitalSummary = {
+  latestBloodPressure: VitalSummaryItem | null;
+  latestBloodGlucose: VitalSummaryItem | null;
+  recentCount: number;
+};
+
 function mapApiMealToMeal(apiMeal: any): Meal {
   const foods: any[] = apiMeal.foods || [];
   return {
@@ -110,6 +131,40 @@ function formatTrendDay(dateStr: string): string {
 function formatDateLabel(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
   return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
+function formatMeasuredTime(dateTime?: string) {
+  if (!dateTime) return '暂无记录';
+  const date = new Date(dateTime);
+  if (Number.isNaN(date.getTime())) return dateTime;
+  return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function getVitalTone(status?: VitalStatus) {
+  if (status === 'high') {
+    return {
+      pill: 'bg-[#fff0eb] text-[#c2512f]',
+      card: 'border-[#ffd1c2] bg-[linear-gradient(135deg,#fff8f5_0%,#fff3ef_100%)]',
+      text: 'text-[#9c3d1f]',
+      badge: '偏高',
+    };
+  }
+
+  if (status === 'low') {
+    return {
+      pill: 'bg-[#eef6ff] text-[#2a67a7]',
+      card: 'border-[#cfe4ff] bg-[linear-gradient(135deg,#f8fbff_0%,#eef6ff_100%)]',
+      text: 'text-[#2a67a7]',
+      badge: '偏低',
+    };
+  }
+
+  return {
+    pill: 'bg-[#edf9f1] text-[#1d7a48]',
+    card: 'border-[#caecd7] bg-[linear-gradient(135deg,#fbfffc_0%,#f1faf5_100%)]',
+    text: 'text-[#226847]',
+    badge: '平稳',
+  };
 }
 
 function fileToDataUrl(file: File): Promise<string> {
@@ -1331,6 +1386,250 @@ function EditMedicalOrderSheet({
   );
 }
 
+function VitalSignsSheet({
+  open,
+  onClose,
+  summary,
+}: {
+  open: boolean;
+  onClose: () => void;
+  summary: VitalSummary | null;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [records, setRecords] = useState<VitalSummaryItem[]>([]);
+  const [selectedDays, setSelectedDays] = useState<7 | 14 | 30>(14);
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+  const historyRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setLoading(true);
+    fetchVitalMeasurements({ days: selectedDays })
+      .then((data: VitalSummaryItem[]) => setRecords(data || []))
+      .catch(() => setRecords([]))
+      .finally(() => setLoading(false));
+  }, [open, selectedDays]);
+
+  const latestCards = [summary?.latestBloodPressure, summary?.latestBloodGlucose].filter(Boolean) as VitalSummaryItem[];
+
+  const scrollToHistory = () => {
+    historyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  // 按日期分组记录
+  const groupedRecords = records.reduce((acc, item) => {
+    const date = item.measuredAt?.split('T')[0] || 'unknown';
+    if (!acc[date]) {
+      acc[date] = [];
+    }
+    acc[date].push(item);
+    return acc;
+  }, {} as Record<string, VitalSummaryItem[]>);
+
+  // 按日期倒序排序
+  const sortedDates = Object.keys(groupedRecords).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+
+  const toggleDay = (date: string) => {
+    setExpandedDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(date)) {
+        next.delete(date);
+      } else {
+        next.add(date);
+      }
+      return next;
+    });
+  };
+
+  const formatDateLabel = (dateStr: string): string => {
+    const date = new Date(dateStr + 'T00:00:00');
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (dateStr === today.toISOString().split('T')[0]) {
+      return '今天';
+    }
+    if (dateStr === yesterday.toISOString().split('T')[0]) {
+      return '昨天';
+    }
+    return `${date.getMonth() + 1}月${date.getDate()}日`;
+  };
+
+  const formatTime = (dateTime?: string): string => {
+    if (!dateTime) return '';
+    const date = new Date(dateTime);
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  };
+
+  return (
+    <BottomSheet open={open} onClose={onClose} title="血压血糖">
+      <div className="p-5 space-y-5">
+        <div className="rounded-[24px] border border-slate-100 bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_100%)] p-4">
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm font-bold text-gray-900">附属健康指标</p>
+            <button
+              type="button"
+              onClick={scrollToHistory}
+              className="shrink-0 flex items-center gap-2 rounded-2xl bg-indigo-50 px-4 py-2.5 text-indigo-700 hover:bg-indigo-100 active:scale-[0.98] transition"
+            >
+              <span className="whitespace-nowrap text-xs font-bold">
+                {selectedDays === 7 ? '近一周记录' : selectedDays === 30 ? '近一月记录' : '近两周记录'}
+              </span>
+              <span className="text-lg font-black">{records.length}</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3">
+          {latestCards.length > 0 ? latestCards.map((item) => {
+            const tone = getVitalTone(item.status);
+            const isPressure = item.metricType === 'blood_pressure';
+            return (
+              <div key={item.metricType} className={cn('rounded-[24px] border p-4', tone.card)}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <div className={cn('flex h-10 w-10 items-center justify-center rounded-2xl', isPressure ? 'bg-rose-50 text-rose-500' : 'bg-sky-50 text-sky-500')}>
+                        {isPressure ? <Heart className="h-5 w-5" /> : <Droplets className="h-5 w-5" />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">{isPressure ? '最近一次血压' : '最近一次血糖'}</p>
+                        <p className="text-xs text-gray-500">{formatMeasuredTime(item.measuredAt)}</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex items-end gap-2">
+                      <span className={cn('text-3xl font-black tracking-tight', tone.text)}>{item.value}</span>
+                      <span className="pb-1 text-sm font-semibold text-gray-400">{item.unit}</span>
+                    </div>
+                    {!isPressure ? (
+                      <p className="mt-1 text-xs text-gray-500">测量场景：{item.glucoseContextLabel || '未标注'}</p>
+                    ) : null}
+                  </div>
+                  <span className={cn('rounded-full px-3 py-1 text-xs font-bold', tone.pill)}>{tone.badge}</span>
+                </div>
+              </div>
+            );
+          }) : (
+            <div className="rounded-[24px] border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center">
+              <p className="text-sm font-bold text-gray-700">还没有血压血糖记录</p>
+              <p className="mt-2 text-xs leading-relaxed text-gray-400">老人如果对小爱说“我刚量了血压 128/76，空腹血糖 6.2”，系统会自动帮你留档。</p>
+            </div>
+          )}
+        </div>
+
+        <div ref={historyRef} className="rounded-[24px] border border-gray-100 bg-white p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-sm font-bold text-gray-900">语音上报历史</p>
+            <div className="flex gap-1.5">
+              {[
+                { label: '1周', value: 7 },
+                { label: '2周', value: 14 },
+                { label: '1月', value: 30 },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setSelectedDays(opt.value as 7 | 14 | 30)}
+                  className={cn(
+                    'rounded-xl px-2.5 py-1 text-xs font-bold transition-all',
+                    selectedDays === opt.value
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {loading ? (
+            <p className="py-8 text-center text-sm text-gray-400">加载中...</p>
+          ) : records.length === 0 ? (
+            <p className="py-8 text-center text-sm text-gray-400">最近还没有同步到测量记录</p>
+          ) : (
+            <div className="space-y-2.5">
+              {sortedDates.map((date) => {
+                const dayRecords = groupedRecords[date];
+                const isExpanded = expandedDays.has(date);
+                const bpCount = dayRecords.filter((r) => r.metricType === 'blood_pressure').length;
+                const bgCount = dayRecords.filter((r) => r.metricType === 'blood_glucose').length;
+                const recordCountText = [bpCount > 0 && `血压${bpCount}`, bgCount > 0 && `血糖${bgCount}`]
+                  .filter(Boolean)
+                  .join(' · ');
+
+                return (
+                  <div key={date} className="overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => toggleDay(date)}
+                      className="w-full flex items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-gray-50/90 px-4 py-3 transition-colors hover:bg-gray-100 active:bg-gray-200"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-xs font-medium text-gray-500">{formatDateLabel(date)}</span>
+                        <span className="text-xs text-gray-400">{recordCountText}</span>
+                      </div>
+                      <ChevronDown
+                        className={cn('h-4 w-4 text-gray-400 transition-transform', isExpanded && 'rotate-180')}
+                      />
+                    </button>
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="px-2 pb-2">
+                            {dayRecords.map((item, index) => {
+                              const tone = getVitalTone(item.status);
+                              const isPressure = item.metricType === 'blood_pressure';
+                              return (
+                                <div
+                                  key={`${item.metricType}-${item.measuredAt}-${index}`}
+                                  className="mb-2 rounded-xl border border-gray-100 bg-white px-3 py-2.5"
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <div className={cn('flex h-7 w-7 items-center justify-center rounded-lg', isPressure ? 'bg-rose-50 text-rose-500' : 'bg-sky-50 text-sky-500')}>
+                                        {isPressure ? <Heart className="h-3.5 w-3.5" /> : <Droplets className="h-3.5 w-3.5" />}
+                                      </div>
+                                      <div className="flex flex-col">
+                                        <span className="text-xs font-medium text-gray-600">
+                                          {isPressure ? '血压' : `血糖${item.glucoseContextLabel ? `·${item.glucoseContextLabel}` : ''}`}
+                                        </span>
+                                        <span className="text-[11px] text-gray-400">{formatTime(item.measuredAt)}</span>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className={cn('text-sm font-bold text-gray-900', tone.text)}>
+                                        {item.value}{isPressure ? '' : ` ${item.unit}`}
+                                      </span>
+                                      <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] font-bold', tone.pill)}>
+                                        {tone.badge}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </BottomSheet>
+  );
+}
+
 // ========== SCREENS ==========
 
 const HomeScreen = ({
@@ -1350,10 +1649,12 @@ const HomeScreen = ({
   const [healthScore, setHealthScore] = useState(0);
   const [stats, setStats] = useState({ avgScore: 0, maxScore: 0, minScore: 0 });
   const [patientName, setPatientName] = useState('');
+  const [vitalsSummary, setVitalsSummary] = useState<VitalSummary | null>(null);
 
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
   const [selectedAlert, setSelectedAlert] = useState<AlertItem | null>(null);
   const [showWeekly, setShowWeekly] = useState(false);
+  const [showVitalsSheet, setShowVitalsSheet] = useState(false);
 
   useEffect(() => {
     fetchDashboard()
@@ -1367,6 +1668,7 @@ const HomeScreen = ({
           (data.trendData || []).map((d: any) => ({ day: formatTrendDay(d.date), score: d.score }))
         );
         setStats(data.stats || { avgScore: 0, maxScore: 0, minScore: 0 });
+        setVitalsSummary(data.vitals || null);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -1382,6 +1684,7 @@ const HomeScreen = ({
       : primaryAlert?.level === 'high'
       ? '今天先看这个'
       : '今日值得留意';
+  const vitalCards = [vitalsSummary?.latestBloodPressure, vitalsSummary?.latestBloodGlucose].filter(Boolean) as VitalSummaryItem[];
 
   if (loading) {
     return (
@@ -1559,6 +1862,63 @@ const HomeScreen = ({
                   </button>
                 </div>
               </div>
+            )}
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-[26px] border border-[#d7e7ff] bg-[linear-gradient(135deg,#ffffff_0%,#f6faff_55%,#eef5ff_100%)] p-5 shadow-[0_14px_32px_rgba(67,97,238,0.08)]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-[11px] font-bold tracking-[0.18em] text-[#4f6bb8]">
+              <Heart className="h-3.5 w-3.5" />
+              附属健康指标
+            </div>
+            <button
+              onClick={() => setShowVitalsSheet(true)}
+              className="shrink-0 rounded-2xl border border-white/80 bg-white/85 px-4 py-3 text-sm font-bold text-indigo-700 shadow-[0_10px_24px_rgba(79,70,229,0.08)]"
+            >
+              查看详情
+            </button>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-3">
+            {vitalCards.length > 0 ? vitalCards.map((item) => {
+              const tone = getVitalTone(item.status);
+              const isPressure = item.metricType === 'blood_pressure';
+              return (
+                <button
+                  key={item.metricType}
+                  onClick={() => setShowVitalsSheet(true)}
+                  className={cn('rounded-[22px] border p-4 text-left transition active:scale-[0.99]', tone.card)}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className={cn('flex h-11 w-11 items-center justify-center rounded-2xl', isPressure ? 'bg-rose-50 text-rose-500' : 'bg-sky-50 text-sky-500')}>
+                        {isPressure ? <Heart className="h-5 w-5" /> : <Droplets className="h-5 w-5" />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">{isPressure ? '最近一次血压' : `最近一次血糖${item.glucoseContextLabel ? ` · ${item.glucoseContextLabel}` : ''}`}</p>
+                        <p className="mt-1 text-[1.05rem] font-black text-slate-900">
+                          {item.value}
+                          <span className="ml-1 text-xs font-semibold text-slate-400">{item.unit}</span>
+                        </p>
+                        <p className="mt-1 text-xs text-slate-400">{formatMeasuredTime(item.measuredAt)} · 来自小爱语音</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={cn('rounded-full px-2.5 py-1 text-[11px] font-bold', tone.pill)}>{tone.badge}</span>
+                      <ChevronRight className="h-4 w-4 text-slate-300" />
+                    </div>
+                  </div>
+                </button>
+              );
+            }) : (
+              <button
+                onClick={() => setShowVitalsSheet(true)}
+                className="rounded-[22px] border border-dashed border-[#d7e7ff] bg-white/70 px-4 py-5 text-left"
+              >
+                <p className="text-sm font-bold text-slate-800">暂时还没有血压血糖记录</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-400">等老人通过小爱说出“血压 128/76”或“空腹血糖 6.2”后，这里会自动显示。</p>
+              </button>
             )}
           </div>
         </section>
@@ -1772,6 +2132,7 @@ const HomeScreen = ({
 
       {/* Weekly View */}
       <WeeklyViewSheet open={showWeekly} onClose={() => setShowWeekly(false)} trendData={trendData} />
+      <VitalSignsSheet open={showVitalsSheet} onClose={() => setShowVitalsSheet(false)} summary={vitalsSummary} />
     </div>
   );
 };
@@ -1923,16 +2284,29 @@ const LogScreen = () => {
                     animate={{ opacity: 1, y: 0 }}
                     className={cn(
                       'mt-2 p-3.5 rounded-2xl border w-full shadow-sm',
-                      chat.extra.type === 'alert' ? 'bg-red-50/70 border-red-100' : 'bg-emerald-50/70 border-emerald-100'
+                      chat.extra.type === 'alert'
+                        ? 'bg-red-50/70 border-red-100'
+                        : chat.extra.type === 'metric'
+                        ? 'bg-sky-50/80 border-sky-100'
+                        : 'bg-emerald-50/70 border-emerald-100'
                     )}
                   >
                     <div className="flex items-center gap-2 mb-1.5">
                       {chat.extra.type === 'alert' ? (
                         <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                      ) : chat.extra.type === 'metric' ? (
+                        <Heart className="w-3.5 h-3.5 text-sky-500" />
                       ) : (
                         <Utensils className="w-3.5 h-3.5 text-emerald-600" />
                       )}
-                      <span className={cn('text-sm font-bold', chat.extra.type === 'alert' ? 'text-red-600' : 'text-emerald-700')}>
+                      <span className={cn(
+                        'text-sm font-bold',
+                        chat.extra.type === 'alert'
+                          ? 'text-red-600'
+                          : chat.extra.type === 'metric'
+                          ? 'text-sky-700'
+                          : 'text-emerald-700'
+                      )}>
                         {chat.extra.title}
                       </span>
                     </div>
