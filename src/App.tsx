@@ -1,17 +1,14 @@
 import React, { useState } from 'react';
 import {
   ClipboardList,
-  Clock,
-  ShieldCheck,
   Users,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { LoginForm } from './components/hospitals/LoginForm';
 import { DoctorDashboard } from './components/doctors/DoctorDashboard';
-import { AuthorizationList } from './components/authorization/AuthorizationList';
-import { PatientRecords } from './components/patients/PatientRecords';
-import { FollowUpPlan } from './components/doctors/FollowUpPlan';
+import { PatientList } from './components/patients/PatientList';
+import { PatientDetail } from './components/patients/PatientDetail';
 import { Navigation } from './components/common/Navigation';
 import { ToastProvider } from './components/common/Toast';
 
@@ -25,17 +22,16 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { id: 'dashboard', label: '工作台', icon: ClipboardList, component: DoctorDashboard },
-  { id: 'authorizations', label: '我的患者', icon: ShieldCheck, component: AuthorizationList },
-  { id: 'patients', label: '患者记录', icon: Users, component: PatientRecords },
-  { id: 'followup', label: '随访计划', icon: Clock, component: FollowUpPlan },
+  { id: 'patients', label: '我的患者', icon: Users, component: PatientList },
 ];
 
 function App() {
   const { isAuthenticated, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
 
   // 调试日志
-  console.log('App render:', { isAuthenticated, loading, activeTab });
+  console.log('App render:', { isAuthenticated, loading, activeTab, selectedPatientId });
 
   if (loading) {
     return (
@@ -45,16 +41,50 @@ function App() {
     );
   }
 
+  // 处理患者选择
+  const handleSelectPatient = (patientId: string) => {
+    setSelectedPatientId(patientId);
+  };
+
+  // 处理返回患者列表
+  const handleBackToList = () => {
+    setSelectedPatientId(null);
+  };
+
   return (
     <ToastProvider>
       {!isAuthenticated ? (
         <LoginForm />
+      ) : selectedPatientId ? (
+        <Navigation
+          items={navItems}
+          activeTab={activeTab}
+          onTabChange={(tab) => {
+            setActiveTab(tab);
+            setSelectedPatientId(null);
+          }}
+        >
+          <PatientDetail
+            patientId={selectedPatientId}
+            onBack={handleBackToList}
+          />
+        </Navigation>
       ) : (
         <Navigation
           items={navItems}
           activeTab={activeTab}
           onTabChange={setActiveTab}
-        />
+        >
+          {navItems.find(item => item.id === activeTab)?.component &&
+            (() => {
+              const Component = navItems.find(item => item.id === activeTab)!.component;
+              return activeTab === 'patients' ? (
+                <Component onSelectPatient={handleSelectPatient} />
+              ) : (
+                <Component onTabChange={setActiveTab} />
+              );
+            })()}
+        </Navigation>
       )}
     </ToastProvider>
   );

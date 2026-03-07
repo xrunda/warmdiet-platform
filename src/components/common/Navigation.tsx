@@ -25,9 +25,10 @@ interface NavigationProps {
   items: NavItem[];
   activeTab: string;
   onTabChange: (tab: string) => void;
+  children?: React.ReactNode;
 }
 
-export function Navigation({ items, activeTab, onTabChange }: NavigationProps) {
+export function Navigation({ items, activeTab, onTabChange, children }: NavigationProps) {
   const { user, logout } = useAuth();
 
   const getPlanBadge = (plan: string): { label: string; className: string } => {
@@ -175,7 +176,7 @@ export function Navigation({ items, activeTab, onTabChange }: NavigationProps) {
       <main className="relative min-w-0 overflow-auto">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(34,197,94,0.10),_transparent_18%),radial-gradient(circle_at_top_right,_rgba(6,182,212,0.12),_transparent_24%),linear-gradient(180deg,_#f4f8fb_0%,_#eef4f8_100%)]" />
         <div className="relative min-h-screen">
-          {ActiveComponent ? <ActiveComponent onTabChange={onTabChange} /> : null}
+          {children ?? (ActiveComponent ? <ActiveComponent onTabChange={onTabChange} /> : null)}
         </div>
       </main>
     </div>
