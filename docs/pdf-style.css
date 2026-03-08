@@ -1,0 +1,394 @@
+/* 金鹏科技论坛报告 PDF 样式 - 精美专业 */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap');
+
+@page {
+  size: A4;
+  margin: 2.5cm;
+  @top-left {
+    content: "Diet Management Report";
+    font-size: 9pt;
+    color: #2c5282;
+  }
+  @bottom-right {
+    content: "Page " counter(page);
+    font-size: 9pt;
+    color: #2c5282;
+  }
+  @bottom-left {
+    content: "© 2025 Li Sihui";
+    font-size: 9pt;
+    color: #2c5282;
+  }
+}
+
+body {
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'WenQuanYi Micro Hei', sans-serif;
+  font-size: 12pt;
+  line-height: 1.8;
+  color: #2d3748;
+  max-width: 100%;
+  orphans: 3;
+  widows: 3;
+  text-align: justify;
+}
+
+h1 {
+  font-size: 28pt;
+  font-weight: 700;
+  margin: 1cm 0 1.5cm 0;
+  color: #1a202c;
+  text-align: center;
+  padding-bottom: 20px;
+  border-bottom: 3px solid #3182ce;
+  page-break-after: avoid;
+  line-height: 1.4;
+}
+
+h1::after {
+  content: "";
+  display: block;
+  width: 150px;
+  height: 4px;
+  background: linear-gradient(to right, #3182ce, #63b3ed);
+  margin: 15px auto 0;
+  border-radius: 2px;
+}
+
+h2 {
+  font-size: 18pt;
+  font-weight: 600;
+  margin: 2.5em 0 1em 0;
+  color: #2b6cb0;
+  padding-bottom: 0.4em;
+  border-bottom: 2px solid #e6f0ff;
+  page-break-after: avoid;
+  background: linear-gradient(to right, #e6f0ff, transparent);
+  padding: 8px 15px;
+  border-radius: 4px;
+}
+
+h3, h4 {
+  font-size: 14pt;
+  font-weight: 600;
+  margin: 1.8em 0 0.8em 0;
+  color: #2c5282;
+  page-break-after: avoid;
+}
+
+h5, h6 {
+  font-size: 12pt;
+  font-weight: 600;
+  margin: 1.2em 0 0.5em 0;
+  color: #4a5568;
+  page-break-after: avoid;
+}
+
+p {
+  margin: 0.8em 0;
+  text-align: justify;
+  line-height: 1.8;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+  margin: 1.5em auto;
+  display: block;
+  border: 1px solid #e2e8f0;
+}
+
+/* 图片标题样式 */
+p:has(img) + p,
+p + p strong {
+  font-size: 11pt;
+  color: #4a5568;
+  text-align: center;
+  margin: 0.8em 0;
+  font-style: italic;
+  background-color: #f7fafc;
+  padding: 8px;
+  border-radius: 6px;
+  border-left: 4px solid #63b3ed;
+}
+
+/* 图片网格布局 */
+img-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin: 1.5em 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.8em 0;
+  font-size: 11pt;
+  page-break-inside: auto;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+th, td {
+  border: 1px solid #cbd5e0;
+  padding: 12px 15px;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background: linear-gradient(135deg, #4299e1, #3182ce);
+  font-weight: 600;
+  color: white;
+  text-align: center;
+}
+
+td {
+  background-color: #f8fafc;
+}
+
+strong {
+  font-weight: 600;
+  color: #1a202c;
+}
+
+em {
+  color: #4a5568;
+  font-style: italic;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 2em 0;
+}
+
+ul, ol {
+  margin: 0.8em 0;
+  padding-left: 1.8em;
+}
+
+li {
+  margin: 0.5em 0;
+  line-height: 1.7;
+}
+
+blockquote {
+  margin: 1.8em 0;
+  padding: 1.2em 1.5em;
+  background: linear-gradient(to right, #ebf8ff, #f0fff4);
+  border-left: 5px solid #4299e1;
+  color: #4a5568;
+  font-style: italic;
+  border-radius: 0 8px 8px 0;
+  font-size: 11pt;
+  line-height: 1.7;
+}
+
+code {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  background-color: #f7fafc;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.9em;
+  color: #d53f8c;
+  border: 1px solid #e2e8f0;
+}
+
+pre {
+  background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 1.2em;
+  overflow: auto;
+  margin: 1.2em 0;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+}
+
+pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #2d3748;
+  font-size: 10pt;
+}
+
+/* 作者信息样式 */
+.author-info {
+  text-align: center;
+  margin: 1em 0;
+  font-size: 13pt;
+  color: #4a5568;
+  font-weight: 600;
+}
+
+.school-info {
+  text-align: center;
+  margin: 0.8em 0;
+  font-size: 13pt;
+  font-style: italic;
+  color: #718096;
+}
+
+/* 日期信息 */
+.date-info {
+  text-align: center;
+  margin: 1em 0 2em;
+  font-size: 12pt;
+  color: #718096;
+}
+
+/* 封面页样式 */
+.cover-page {
+  text-align: center;
+  padding: 4cm 2cm;
+  page: cover;
+  background: linear-gradient(135deg, #f0f9ff, #e6fffa);
+}
+
+.cover-page h1 {
+  font-size: 36pt;
+  margin-bottom: 2em;
+  color: #1a202c;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+}
+
+.cover-page .subtitle {
+  font-size: 20pt;
+  font-weight: 500;
+  color: #2b6cb0;
+  margin: 2em 0;
+  line-height: 1.6;
+  font-style: italic;
+}
+
+.cover-page .author {
+  font-size: 16pt;
+  margin: 1.5em 0;
+  color: #2d3748;
+  font-weight: 600;
+}
+
+.cover-page .info {
+  font-size: 13pt;
+  margin: 3em 0 0;
+  color: #4a5568;
+}
+
+/* 章节分隔 */
+.chapter-separator {
+  height: 1px;
+  background: linear-gradient(to right, transparent, #cbd5e0, transparent);
+  margin: 3em 0;
+}
+
+/* 高亮框 */
+.highlight-box {
+  background: linear-gradient(135deg, #e6fffa, #ebf8ff);
+  border: 1px solid #b2f5ea;
+  border-radius: 10px;
+  padding: 1.2em;
+  margin: 1.2em 0;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+/* 页脚 */
+footer {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  text-align: center;
+  padding: 15px 0;
+  font-size: 10pt;
+  color: #718096;
+  border-top: 1px solid #e2e8f0;
+  background: linear-gradient(to bottom, #ffffff, #f8fafc);
+}
+
+/* 页面背景 */
+@page {
+  background: linear-gradient(to bottom, #ffffff, #f8fafc);
+}
+
+/* 代码块主题 */
+pre[class*="language-"] {
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 1.2em;
+  overflow: auto;
+  margin: 1.2em 0;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+}
+
+/* 额外的页眉页脚修复 */
+@page :first {
+  @top-left {
+    content: "";
+  }
+  @bottom-left {
+    content: "";
+  }
+  @bottom-right {
+    content: "";
+  }
+}
+
+@page :left {
+  @top-left {
+    content: "Diet Management Report";
+    font-size: 9pt;
+    color: #2c5282;
+  }
+  @bottom-right {
+    content: "Page " counter(page);
+    font-size: 9pt;
+    color: #2c5282;
+  }
+  @bottom-left {
+    content: "© 2025 Li Sihui";
+    font-size: 9pt;
+    color: #2c5282;
+  }
+}
+
+@page :right {
+  @top-left {
+    content: "Diet Management Report";
+    font-size: 9pt;
+    color: #2c5282;
+  }
+  @bottom-right {
+    content: "Page " counter(page);
+    font-size: 9pt;
+    color: #2c5282;
+  }
+  @bottom-left {
+    content: "© 2025 Li Sihui";
+    font-size: 9pt;
+    color: #2c5282;
+  }
+}
+
+@media print {
+  body { 
+    font-size: 11pt; 
+    color: #000;
+  }
+  
+  h2 { 
+    margin-top: 2em; 
+  }
+  
+  img { 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08); 
+    border: 1px solid #ddd;
+  }
+  
+  @page {
+    margin: 2.5cm;
+  }
+}
