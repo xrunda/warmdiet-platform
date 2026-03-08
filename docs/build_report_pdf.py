@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 DIR = Path(__file__).resolve().parent
-MD_PATH = DIR / "金鹏科技论坛-三餐管家-研究报告.md"
+DEFAULT_MD_PATH = DIR / "金鹏科技论坛-三餐管家-研究报告.md"
 MD_FOR_PDF = DIR / "_report_for_pdf.md"
 
 # 中文数字 -> 阿拉伯数字（仅处理章节）
@@ -21,32 +21,61 @@ def replace_heading(m):
         return f"\n## {MAP[pre]}. {rest}\n"
     return m.group(0)
 
-def create_cover_page():
+def extract_meta(text: str):
+    def pick(pattern, default=""):
+        m = re.search(pattern, text, flags=re.MULTILINE)
+        return m.group(1).strip() if m else default
+
+    title = pick(r"^#\s+(.+)$", "研究报告")
+    subtitle = pick(r"^##\s+(.+)$", "")
+    author = pick(r"\*\*作者：\s*(.+?)\*\*", "")
+    school = pick(r"^\*\*学校：\*\*\s*(.+)$", "")
+    grade = pick(r"\*\*年级：\s*(.+?)\*\*", "")
+    teachers = pick(r"\*\*辅导老师：\s*(.+?)\*\*", "")
+    tech = pick(r"\*\*技术协助：\s*(.+?)\*\*", "")
+    date = pick(r"\*\*完成时间：\s*(.+?)\*\*", "")
+
+    return {
+        "title": title,
+        "subtitle": subtitle,
+        "author": author,
+        "school": school,
+        "grade": grade,
+        "teachers": teachers,
+        "tech": tech,
+        "date": date,
+    }
+
+
+def create_cover_page(meta):
     """创建封面页HTML"""
     return """
     <div class="cover-page">
-        <h1>帮奶奶"管住嘴、记性好"</h1>
-        <div class="subtitle">——我和爸爸开发的"三餐管家"：用AI帮奶奶管理术后饮食和吃药</div>
-        <div class="author">作者：李思慧</div>
-        <div class="school-info">学校：海淀实验二小 五年级</div>
-        <div class="info">辅导老师：xxx、xxx</div>
-        <div class="info">技术协助（爸爸）：李光</div>
-        <div class="date-info">完成时间：2025年12月</div>
+        <h1>{title}</h1>
+        <div class="subtitle">{subtitle}</div>
+        <div class="author">作者：{author}</div>
+        <div class="school-info">学校：{school} {grade}</div>
+        <div class="info">辅导老师：{teachers}</div>
+        <div class="info">技术协助：{tech}</div>
+        <div class="date-info">完成时间：{date}</div>
     </div>
     <div style="page-break-after: always;"></div>
-    """
+    """.format(**meta)
 
 def main():
-    if not MD_PATH.exists():
-        print(f"找不到 {MD_PATH}")
+    md_path = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else DEFAULT_MD_PATH
+
+    if not md_path.exists():
+        print(f"找不到 {md_path}")
         return 1
 
-    text = MD_PATH.read_text(encoding="utf-8")
+    text = md_path.read_text(encoding="utf-8")
     # ## 一、 标题 -> ## 1. 标题（便于后续若用带目录的转换器）
     text = re.sub(r"\n## ([一二三四五六七八九十]+)、\s*(.+?)\n", replace_heading, text)
     
     # 添加封面页和结构化内容
-    cover_page = create_cover_page()
+    meta = extract_meta(text)
+    cover_page = create_cover_page(meta)
     
     # 处理文档内容，确保中文正确显示
     MD_FOR_PDF.write_text(text, encoding="utf-8")
@@ -99,7 +128,11 @@ def main():
 </body>
 </html>"""
 
-    out_pdf = DIR / "金鹏科技论坛-三餐管家-研究报告.pdf"
+    if len(sys.argv) > 2:
+        out_pdf = Path(sys.argv[2]).resolve()
+    else:
+        out_pdf = DIR / f"{md_path.stem}.pdf"
+
     # base_url 设为 docs 目录，这样 md/IMG_xxx 会解析为 docs/md/IMG_xxx
     HTML(string=full, base_url=str(DIR)).write_pdf(str(out_pdf), stylesheets=stylesheets)
     print("已生成 PDF:", out_pdf)

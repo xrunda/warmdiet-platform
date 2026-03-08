@@ -1,28 +1,28 @@
 /* 金鹏科技论坛报告 PDF 样式 - 精美专业 */
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap');
 
 @page {
   size: A4;
   margin: 2.5cm;
   @top-left {
-    content: "Diet Management Report";
+    content: "三餐管家";
     font-size: 9pt;
     color: #2c5282;
+    font-family: "PingFang SC", "Hiragino Sans GB", "Heiti SC", "Microsoft YaHei", sans-serif;
   }
   @bottom-right {
     content: "Page " counter(page);
     font-size: 9pt;
-    color: #2c5282;
+    color: #111924;
   }
   @bottom-left {
-    content: "© 2025 Li Sihui";
+    content: "© 2026 Li Sihui";
     font-size: 9pt;
     color: #2c5282;
   }
 }
 
 body {
-  font-family: 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'WenQuanYi Micro Hei', sans-serif;
+  font-family: "PingFang SC", "Hiragino Sans GB", "Heiti SC", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
   font-size: 12pt;
   line-height: 1.8;
   color: #2d3748;
@@ -339,9 +339,10 @@ pre[class*="language-"] {
 
 @page :left {
   @top-left {
-    content: "Diet Management Report";
+    content: "三餐管家";
     font-size: 9pt;
     color: #2c5282;
+    font-family: "PingFang SC", "Hiragino Sans GB", "Heiti SC", "Microsoft YaHei", sans-serif;
   }
   @bottom-right {
     content: "Page " counter(page);
@@ -349,7 +350,7 @@ pre[class*="language-"] {
     color: #2c5282;
   }
   @bottom-left {
-    content: "© 2025 Li Sihui";
+    content: "© 2026 Li Sihui";
     font-size: 9pt;
     color: #2c5282;
   }
@@ -357,9 +358,10 @@ pre[class*="language-"] {
 
 @page :right {
   @top-left {
-    content: "Diet Management Report";
+    content: "三餐管家";
     font-size: 9pt;
     color: #2c5282;
+    font-family: "PingFang SC", "Hiragino Sans GB", "Heiti SC", "Microsoft YaHei", sans-serif;
   }
   @bottom-right {
     content: "Page " counter(page);
@@ -367,7 +369,7 @@ pre[class*="language-"] {
     color: #2c5282;
   }
   @bottom-left {
-    content: "© 2025 Li Sihui";
+    content: "© 2026 Li Sihui";
     font-size: 9pt;
     color: #2c5282;
   }
