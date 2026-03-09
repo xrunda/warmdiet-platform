@@ -15,7 +15,7 @@
     color: #111924;
   }
   @bottom-left {
-    content: "© 2026 Li Sihui";
+    content: "";
     font-size: 9pt;
     color: #2c5282;
   }
@@ -350,7 +350,7 @@ pre[class*="language-"] {
     color: #2c5282;
   }
   @bottom-left {
-    content: "© 2026 Li Sihui";
+    content: "";
     font-size: 9pt;
     color: #2c5282;
   }
@@ -369,7 +369,7 @@ pre[class*="language-"] {
     color: #2c5282;
   }
   @bottom-left {
-    content: "© 2026 Li Sihui";
+    content: "";
     font-size: 9pt;
     color: #2c5282;
   }

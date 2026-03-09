@@ -28,22 +28,16 @@ def extract_meta(text: str):
 
     title = pick(r"^#\s+(.+)$", "研究报告")
     subtitle = pick(r"^##\s+(.+)$", "")
-    author = pick(r"\*\*作者：\s*(.+?)\*\*", "")
-    school = pick(r"^\*\*学校：\*\*\s*(.+)$", "")
-    grade = pick(r"\*\*年级：\s*(.+?)\*\*", "")
-    teachers = pick(r"\*\*辅导老师：\s*(.+?)\*\*", "")
-    tech = pick(r"\*\*技术协助：\s*(.+?)\*\*", "")
-    date = pick(r"\*\*完成时间：\s*(.+?)\*\*", "")
+    project_name = pick(r"\*\*项目名称：\*\*\s*(.+)$", "三餐管家")
+    group = pick(r"\*\*组别：\*\*\s*(.+)$", "小学高")
+    category = pick(r"\*\*项目类别：\*\*\s*(.+)$", "社会科学")
 
     return {
         "title": title,
         "subtitle": subtitle,
-        "author": author,
-        "school": school,
-        "grade": grade,
-        "teachers": teachers,
-        "tech": tech,
-        "date": date,
+        "project_name": project_name,
+        "group": group,
+        "category": category,
     }
 
 
@@ -51,13 +45,11 @@ def create_cover_page(meta):
     """创建封面页HTML"""
     return """
     <div class="cover-page">
-        <h1>{title}</h1>
-        <div class="subtitle">{subtitle}</div>
-        <div class="author">作者：{author}</div>
-        <div class="school-info">学校：{school} {grade}</div>
-        <div class="info">辅导老师：{teachers}</div>
-        <div class="info">技术协助：{tech}</div>
-        <div class="date-info">完成时间：{date}</div>
+        <h1>{project_name}</h1>
+        <div class="subtitle">{title}</div>
+        <div class="info">组别：{group}</div>
+        <div class="info">项目类别：{category}</div>
+        <div class="date-info">{subtitle}</div>
     </div>
     <div style="page-break-after: always;"></div>
     """.format(**meta)
@@ -133,8 +125,8 @@ def main():
     else:
         out_pdf = DIR / f"{md_path.stem}.pdf"
 
-    # base_url 设为 docs 目录，这样 md/IMG_xxx 会解析为 docs/md/IMG_xxx
-    HTML(string=full, base_url=str(DIR)).write_pdf(str(out_pdf), stylesheets=stylesheets)
+    # base_url 设为当前 Markdown 所在目录，兼容 docs/ 与 docs/0309/ 下的相对图片路径
+    HTML(string=full, base_url=str(md_path.parent)).write_pdf(str(out_pdf), stylesheets=stylesheets)
     print("已生成 PDF:", out_pdf)
     MD_FOR_PDF.unlink(missing_ok=True)
     return 0
