@@ -337,193 +337,70 @@ export function DoctorDashboard({ onTabChange, onSelectPatient }: DoctorDashboar
         })}
       </div>
 
-      <div style={{ display: 'grid', gap: 20, gridTemplateColumns: 'minmax(0, 1.2fr) 380px' }}>
-        {/* 左侧：健康预警 */}
-        <div>
-          <div style={{
-            background: 'white',
-            borderRadius: 28,
-            padding: 24,
-            boxShadow: '0 18px 36px rgba(15,23,42,0.06)',
-            border: '1px solid #e2e8f0',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <BellRing style={{ width: 18, height: 18, color: '#dc2626' }} />
-                  <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.24em', color: '#7f1d1d', textTransform: 'uppercase' }}>
-                    AI Health Alerts
-                  </span>
-                </div>
-                <h3 style={{ fontSize: 20, fontWeight: 600, color: '#1e293b', margin: 0 }}>
-                  今日健康预警
-                </h3>
+      {/* 健康预警 */}
+      <div>
+        <div style={{
+          background: 'white',
+          borderRadius: 28,
+          padding: 24,
+          boxShadow: '0 18px 36px rgba(15,23,42,0.06)',
+          border: '1px solid #e2e8f0',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <BellRing style={{ width: 18, height: 18, color: '#dc2626' }} />
+                <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.24em', color: '#7f1d1d', textTransform: 'uppercase' }}>
+                  AI Health Alerts
+                </span>
               </div>
-              <span style={{
-                padding: '4px 12px',
-                borderRadius: 999,
-                fontSize: 12,
-                fontWeight: 600,
-                backgroundColor: '#fee2e2',
-                color: '#dc2626'
-              }}>
-                {alerts.length} 条
-              </span>
+              <h3 style={{ fontSize: 20, fontWeight: 600, color: '#1e293b', margin: 0 }}>
+                今日健康预警
+              </h3>
             </div>
-
-            <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {alerts.length === 0 ? (
-                <div style={{ padding: '48px', textAlign: 'center', color: '#94a3b8' }}>
-                  <div style={{ fontSize: 48, marginBottom: 16 }}>✓</div>
-                  <p style={{ fontSize: 14, color: '#64748b' }}>今日暂无健康预警</p>
-                </div>
-              ) : (
-                alerts.map((alert) => {
-                  const severity = getSeverityConfig(alert.severity);
-                  const AlertIcon = getAlertIcon(alert.type);
-
-                  return (
-                    <div
-                      key={alert.id}
-                      style={{
-                        padding: 16,
-                        borderRadius: 16,
-                        border: `1px solid ${severity.border}`,
-                        ...severity.bg,
-                        display: 'flex',
-                        gap: 12,
-                        alignItems: 'flexStart',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 8px 24px rgba(15,23,42,0.12)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }}
-                    >
-                      <div style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: 12,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        ...severity.icon
-                      }}>
-                        <AlertIcon style={{ width: 20, height: 20 }} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{alert.patientName}</span>
-                          <span style={{
-                            padding: '2px 8px',
-                            borderRadius: 999,
-                            fontSize: 11,
-                            fontWeight: 600,
-                            ...severity.badge
-                          }}>
-                            {severity.label}
-                          </span>
-                        </div>
-                        <p style={{ fontSize: 14, fontWeight: 600, color: '#475569', margin: 0, marginBottom: 4 }}>
-                          {alert.title}
-                        </p>
-                        <p style={{ fontSize: 13, color: '#64748b', margin: 0, marginBottom: 8 }}>
-                          {alert.description}
-                        </p>
-                        {alert.value && alert.normalRange && (
-                          <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#94a3b8' }}>
-                            <span>当前：{alert.value}</span>
-                            <span>正常范围：{alert.normalRange}</span>
-                          </div>
-                        )}
-                      </div>
-                        <button
-                          style={{
-                            padding: '8px 12px',
-                            borderRadius: 8,
-                            border: 'none',
-                            backgroundColor: 'white',
-                            color: '#0891b2',
-                            fontSize: 13,
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                            flexShrink: 0,
-                          }}
-                onClick={() => {
-                            onSelectPatient?.({
-                              id: alert.patientId,
-                              name: alert.patientName,
-                              latestUpdate: alert.createdAt,
-                              unreadMessages: 0,
-                            });
-                            onTabChange?.('patients');
-                          }}
-                        >
-                          查看
-                        </button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+            <span style={{
+              padding: '4px 12px',
+              borderRadius: 999,
+              fontSize: 12,
+              fontWeight: 600,
+              backgroundColor: '#fee2e2',
+              color: '#dc2626'
+            }}>
+              {alerts.length} 条
+            </span>
           </div>
-        </div>
 
-        {/* 右侧：快捷操作 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div style={{
-            background: 'white',
-            borderRadius: 28,
-            padding: 24,
-            boxShadow: '0 18px 36px rgba(15,23,42,0.06)',
-            border: '1px solid #e2e8f0',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-              <Sparkles style={{ width: 18, height: 18, color: '#0891b2' }} />
-              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.24em', color: '#155e75', textTransform: 'uppercase' }}>
-                Quick Actions
-              </span>
-            </div>
-            <h3 style={{ fontSize: 20, fontWeight: 600, color: '#1e293b', margin: 0 }}>
-              快捷操作
-            </h3>
+          <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {alerts.length === 0 ? (
+              <div style={{ padding: '48px', textAlign: 'center', color: '#94a3b8' }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>✓</div>
+                <p style={{ fontSize: 14, color: '#64748b' }}>今日暂无健康预警</p>
+              </div>
+            ) : (
+              alerts.map((alert) => {
+                const severity = getSeverityConfig(alert.severity);
+                const AlertIcon = getAlertIcon(alert.type);
 
-            <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {quickActions.map((action) => {
-                const Icon = action.Icon;
                 return (
-                  <button
-                    key={action.title}
-                    type="button"
-                    onClick={() => onTabChange?.(action.tabId)}
+                  <div
+                    key={alert.id}
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
                       padding: 16,
-                      borderRadius: 20,
-                      border: '1px solid #e2e8f0',
-                      backgroundColor: '#f8fafc',
+                      borderRadius: 16,
+                      border: `1px solid ${severity.border}`,
+                      ...severity.bg,
+                      display: 'flex',
+                      gap: 12,
+                      alignItems: 'flexStart',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
-                      textAlign: 'left',
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.borderColor = '#a5f3fc';
-                      e.currentTarget.style.backgroundColor = 'white';
-                      e.currentTarget.style.boxShadow = '0 8px 24px rgba(8,145,178,0.08)';
+                      e.currentTarget.style.boxShadow = '0 8px 24px rgba(15,23,42,0.12)';
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.borderColor = '#e2e8f0';
-                      e.currentTarget.style.backgroundColor = '#f8fafc';
                       e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
@@ -535,58 +412,68 @@ export function DoctorDashboard({ onTabChange, onSelectPatient }: DoctorDashboar
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0,
-                      ...action.accent
+                      ...severity.icon
                     }}>
-                      <Icon style={{ width: 20, height: 20, strokeWidth: 2.1 }} />
+                      <AlertIcon style={{ width: 20, height: 20 }} />
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <h4 style={{ fontSize: 15, fontWeight: 600, color: '#1e293b', margin: 0, marginBottom: 2 }}>
-                        {action.title}
-                      </h4>
-                      <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>{action.desc}</p>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{alert.patientName}</span>
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: 999,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          ...severity.badge
+                        }}>
+                          {severity.label}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: 14, fontWeight: 600, color: '#475569', margin: 0, marginBottom: 4 }}>
+                        {alert.title}
+                      </p>
+                      <p style={{ fontSize: 13, color: '#64748b', margin: 0, marginBottom: 8 }}>
+                        {alert.description}
+                      </p>
+                      {alert.value && alert.normalRange && (
+                        <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#94a3b8' }}>
+                          <span>当前：{alert.value}</span>
+                          <span>正常范围：{alert.normalRange}</span>
+                        </div>
+                      )}
                     </div>
-                    <ArrowRight style={{ width: 16, height: 16, color: '#0891b2', flexShrink: 0 }} />
-                  </button>
+                    <button
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: 8,
+                        border: 'none',
+                        backgroundColor: 'white',
+                        color: '#0891b2',
+                        fontSize: 13,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                      }}
+                      onClick={() => {
+                        onSelectPatient?.({
+                          id: alert.patientId,
+                          name: alert.patientName,
+                          latestUpdate: alert.createdAt,
+                          unreadMessages: 0,
+                        });
+                        onTabChange?.('patients');
+                      }}
+                    >
+                      查看
+                    </button>
+                  </div>
                 );
-              })}
-            </div>
-          </div>
-
-          {/* 使用提示 */}
-          <div style={{
-            padding: 20,
-            borderRadius: 24,
-            border: '1px solid #bfdbfe',
-            background: 'linear-gradient(135deg, #eff8ff 0%, #f4fffb 100%)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <div style={{
-                width: 40,
-                height: 40,
-                borderRadius: 12,
-                backgroundColor: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-              }}>
-                <Sparkles style={{ width: 18, height: 18, color: '#0891b2' }} />
-              </div>
-              <div>
-                <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.24em', color: '#155e75', textTransform: 'uppercase', margin: 0 }}>
-                  Tips
-                </p>
-                <h4 style={{ fontSize: 16, fontWeight: 600, color: '#1e293b', margin: 0 }}>
-                  工作提示
-                </h4>
-              </div>
-            </div>
-            <p style={{ fontSize: 13, lineHeight: 1.6, color: '#64748b', margin: 0 }}>
-              首页优先显示健康预警和待办事项，帮助您快速识别需要关注的患者。进入患者记录后可查看详细的历史数据和医嘱情况。
-            </p>
+              })
+            )}
           </div>
         </div>
       </div>
+
 
       <style>{`
         @keyframes dashboardFade {

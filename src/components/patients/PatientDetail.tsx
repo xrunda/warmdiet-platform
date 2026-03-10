@@ -772,35 +772,7 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                 ))}
               </div>
             )}
-
-            <div style={{ marginTop: '32px' }}>
-              <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '12px' }}>
-                健康档案
-              </h3>
-              {healthConditions.length === 0 ? (
-                <div style={{ padding: '24px', borderRadius: 12, background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#64748b' }}>
-                  暂无健康档案信息
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gap: '12px' }}>
-                  {healthConditions.map((cond) => (
-                    <div key={cond.id} style={{
-                      borderRadius: 12,
-                      padding: '16px',
-                      background: '#ffffff',
-                      border: '1px solid #e2e8f0',
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-                        <span style={{ fontSize: '15px', fontWeight: 600, color: '#1e293b' }}>{cond.conditionName || cond.condition_name}</span>
-                        <span style={{ fontSize: 12, color: '#94a3b8' }}>{cond.conditionType === 'disease' ? '疾病' : cond.conditionType === 'surgery' ? '手术' : '过敏'} · {cond.diagnosedDate ? cond.diagnosedDate.split('T')[0] : '未知'}</span>
-                      </div>
-                      <p style={{ margin: 0, fontSize: 13, color: '#475569', whiteSpace: 'pre-wrap' }}>{cond.notes || cond.note || '未填写备注'}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            </div>
+          </div>
         );
 
       case 'healthProfile':
