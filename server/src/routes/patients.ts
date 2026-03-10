@@ -4,7 +4,7 @@
 
 import { Router } from 'express';
 import { createPatientController } from '../controllers/patientController';
-import { authenticatePatient, authenticateDoctorOrPatient } from '../middleware/auth';
+import { authenticatePatient, authenticateDoctorOrPatient, authenticateDoctorOrHospitalOrPatient } from '../middleware/auth';
 import { initModels } from '../models';
 import { databaseConfig } from '../config/database';
 
@@ -150,16 +150,23 @@ router.get('/:id/diet-alerts', authenticateDoctorOrPatient, (req, res, next) => 
 /**
  * @route   GET /api/patients/:id/vital-measurements/latest
  * @desc    获取患者最新血压血糖摘要
- * @access  Private (Patient / Doctor)
+ * @access  Private (Patient / Doctor / Hospital)
  */
-router.get('/:id/vital-measurements/latest', authenticateDoctorOrPatient, (req, res, next) => getModels().controller.getLatestVitalMeasurements(req, res, next));
+router.get('/:id/vital-measurements/latest', authenticateDoctorOrHospitalOrPatient, (req, res, next) => getModels().controller.getLatestVitalMeasurements(req, res, next));
 
 /**
  * @route   GET /api/patients/:id/vital-measurements
  * @desc    获取患者血压血糖记录
- * @access  Private (Patient / Doctor)
+ * @access  Private (Patient / Doctor / Hospital)
  */
-router.get('/:id/vital-measurements', authenticateDoctorOrPatient, (req, res, next) => getModels().controller.getVitalMeasurements(req, res, next));
+router.get('/:id/vital-measurements', authenticateDoctorOrHospitalOrPatient, (req, res, next) => getModels().controller.getVitalMeasurements(req, res, next));
+
+/**
+ * @route   POST /api/patients/:id/vital-measurements
+ * @desc    写入患者血压/血糖记录
+ * @access  Private (Patient)
+ */
+router.post('/:id/vital-measurements', authenticatePatient, (req, res, next) => getModels().controller.createVitalMeasurement(req, res, next));
 
 /**
  * @route   GET /api/patients/:id/conversation-logs
@@ -174,6 +181,13 @@ router.get('/:id/conversation-logs', authenticateDoctorOrPatient, (req, res, nex
  * @access  Private (Patient / Doctor)
  */
 router.get('/:id/conversation-logs/dates', authenticateDoctorOrPatient, (req, res, next) => getModels().controller.getConversationDates(req, res, next));
+
+/**
+ * @route   POST /api/patients/:id/conversation-logs
+ * @desc    追加对话记录（支持自动提取血压血糖）
+ * @access  Private (Patient)
+ */
+router.post('/:id/conversation-logs', authenticatePatient, (req, res, next) => getModels().controller.appendConversationLog(req, res, next));
 
 /**
  * @route   GET /api/patients/:id/dashboard

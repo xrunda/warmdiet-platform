@@ -132,7 +132,24 @@ export function HealthReport() {
       for (const pid of patientIds) {
         try {
           const reportsRes: any = await api.getReports(pid);
+          const vitalsRes: any = await api.getVitalMeasurements(pid, { days: 30 });
           const patientReports = reportsRes.data || [];
+          const vitalItems = vitalsRes.data || [];
+
+          const latestBloodPressure = vitalItems.find((v: any) => v.metricType === 'blood_pressure');
+          const latestBloodGlucose = vitalItems.find((v: any) => v.metricType === 'blood_glucose');
+
+          const bloodPressure = latestBloodPressure
+            ? {
+                systolic: Number(latestBloodPressure.systolicValue || 120),
+                diastolic: Number(latestBloodPressure.diastolicValue || 80),
+              }
+            : DEFAULT_METRICS.bloodPressure;
+
+          const bloodSugar = latestBloodGlucose
+            ? Number(latestBloodGlucose.glucoseValue || DEFAULT_METRICS.bloodSugar)
+            : DEFAULT_METRICS.bloodSugar;
+
           for (const report of patientReports) {
             let recommendations: string[] = [];
             try {
@@ -154,6 +171,12 @@ export function HealthReport() {
             if (report.nutritionScore != null && report.nutritionScore < 70) {
               riskFactors.push('营养评分偏低');
             }
+            if (bloodPressure.systolic >= 140 || bloodPressure.diastolic >= 90) {
+              riskFactors.push('血压偏高');
+            }
+            if (bloodSugar >= 7.0) {
+              riskFactors.push('血糖偏高');
+            }
 
             const reportDate = (report.reportDate || report.createdAt || '').split('T')[0];
             const startDate = report.startDate ? report.startDate.split('T')[0] : '';
@@ -170,6 +193,8 @@ export function HealthReport() {
               summary: recommendations[0] || `营养评分: ${report.nutritionScore ?? '暂无'}`,
               metrics: {
                 ...DEFAULT_METRICS,
+                bloodPressure,
+                bloodSugar,
                 ...(trends.bmi != null ? { bmi: trends.bmi } : {}),
               },
               recommendations: recommendations.length > 0

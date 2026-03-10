@@ -114,7 +114,7 @@ VITE_API_URL=http://localhost:4000/api
 
 ### 一键启动（推荐）
 
-项目提供了一个脚本，可以一次性启动 **后端 + 医院端前端 + 家属端 H5**：
+项目提供了一个脚本，可以一次性启动 **后端 + 医院端前端 + 家属端 H5 + MCP 桥接**：
 
 ```bash
 npm run dev:all
@@ -127,6 +127,75 @@ npm run dev:all
   - 后端 API：`http://localhost:4000`
   - 医院端前端：`http://localhost:4001`
   - 家属端 H5：`http://localhost:4100`
+  - MCP 桥接：`mcp-xiaozhi/mcp_pipe.py server.py`
+
+#### `dev:all` 启动规则（新增）
+
+`npm run dev:all` 内部实际执行：
+
+- `npm run kill-ports`
+- 并行运行 `dev` + `dev:server` + `dev:family` + `dev:mcp`
+
+其中 `dev:mcp` 规则：
+
+- 启动目录：`mcp-xiaozhi/`
+- 若环境变量和 `.env` 中都没有 `MCP_ENDPOINT`，会直接报错退出（避免“看似启动成功但未桥接”）
+- 优先使用 `mcp-xiaozhi/.venv/bin/python`，否则回退到系统 `python`
+
+> 建议在 `mcp-xiaozhi/.env` 中配置：
+>
+> ```env
+> MCP_ENDPOINT=wss://api.xiaozhi.me/mcp/?token=...
+> WARMDIET_API_BASE_URL=http://localhost:4000/api
+> WARMDIET_PATIENT_TOKEN=...
+> WARMDIET_PATIENT_ID=patient_test_001
+> VOICE_SOURCE_TYPE=xiaoai_voice
+> ```
+
+### MCP 链路日志排障（语音说了但没落库）
+
+当你在小智里说“记一条餐食”，但医生端看不到记录，请按日志顺序定位：
+
+1. **桥接层（mcp_pipe.py）**
+   - 关键日志：
+     - `[WS->STDIO] method=...`（小智请求已到本地）
+     - `[STDIO->WS] response id=... error=False`（本地结果已回传）
+   - 若没有 `WS->STDIO`：说明小智没有真正发起工具调用。
+
+2. **工具层（mcp-xiaozhi/server.py）**
+   - 关键日志：
+     - `[TOOL-IN] record_meal ...`
+     - `[TOOL-OK] record_meal ...`
+   - 若只有 `TOOL-IN` 没有 `TOOL-OK`，看 `TOOL-ERR` 内容。
+
+3. **后端 API 层（mcp-xiaozhi/client.py）**
+   - 关键日志：
+     - `[API-REQ] POST /meals/patient/...`
+     - `[API-OK] POST /meals/patient/... status=200`
+   - 若出现 `[API-ERR]`，按错误信息修复 token/参数/鉴权。
+
+4. **数据库核验（最终）**
+   - 可用 sqlite3 直接查 `meal_records` 最新记录，确认是否真正落库。
+
+> 常见根因：
+> - 小智“口头回复已记录”，但实际上没触发工具
+> - `WARMDIET_PATIENT_ID` 与医生端当前查看患者不一致
+> - `WARMDIET_PATIENT_TOKEN` 无权限或过期
+> - MCP 传了 `null` 给后端严格字段（例如 `notes`），触发 Zod 校验失败
+
+#### 已修复：`notes` 为 null 导致餐食写入 500
+
+如果日志里出现类似：
+
+```
+ZodError: notes expected string, received null
+POST /api/meals/patient/:id 500
+```
+
+说明是历史参数格式问题。当前版本的 `mcp-xiaozhi/server.py` 已修复：
+- 对 `notes/timestamp/logDate/sourceText` 这类可选字段，若为空会直接**不传该字段**，避免传 `null`。
+
+如果你本地还看到这个错误，重启 `dev:all`（确保加载最新代码）即可。
 
 ### 分别启动（按需）
 

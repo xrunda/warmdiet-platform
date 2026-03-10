@@ -5,12 +5,13 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
-import { models } from '../models';
+import type { Models } from '../models';
 import { authService } from '../services/authService';
 import { ocrService } from '../services/ocrService';
 import { extractVitalMeasurementsFromText } from '../services/vitalSignParser';
 import { ApiResponse } from '../types';
 import { logger } from '../utils/logger';
+import { config } from '../config/env';
 
 const createPatientSchema = z.object({
   name: z.string().min(2).max(50),
@@ -54,6 +55,28 @@ const vitalQuerySchema = z.object({
   type: z.enum(['blood_pressure', 'blood_glucose']).optional(),
 });
 
+const createVitalMeasurementSchema = z.object({
+  metricType: z.enum(['blood_pressure', 'blood_glucose']),
+  systolicValue: z.number().int().min(40).max(260).optional(),
+  diastolicValue: z.number().int().min(30).max(180).optional(),
+  glucoseValue: z.number().min(1).max(40).optional(),
+  glucoseContext: z.enum(['fasting', 'post_meal', 'random', 'before_sleep', 'unknown']).optional(),
+  unit: z.string().optional(),
+  measuredAt: z.string().optional(),
+  measurementDate: z.string().optional(),
+  sourceType: z.string().optional(),
+  sourceText: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+const appendConversationLogSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string().min(1).max(2000),
+  timestamp: z.string().optional(),
+  logDate: z.string().optional(),
+  extra: z.any().optional(),
+});
+
 const preferenceSchema = z.object({
   tastePreferences: z.union([z.string(), z.array(z.string())]),
   likedFoods: z.union([z.string(), z.array(z.string())]),
@@ -61,9 +84,9 @@ const preferenceSchema = z.object({
 });
 
 export class PatientController {
-  private models: ReturnType<typeof models>;
+  private models: Models;
 
-  constructor(models: ReturnType<typeof models>) {
+  constructor(models: Models) {
     this.models = models;
   }
 
@@ -142,12 +165,24 @@ export class PatientController {
           unit: measurement.unit,
           measuredAt: this.buildMeasuredAt(log.logDate, log.timestamp),
           measurementDate: log.logDate,
-          sourceType: 'xiaoai_voice',
+          sourceType: config.voiceSourceType,
           sourceLogId: log.id,
           sourceText: log.content,
         } as any);
       }
     }
+  }
+
+  private buildDateAndTime(inputTimestamp?: string, inputDate?: string) {
+    const now = new Date();
+    const date = inputDate || now.toISOString().slice(0, 10);
+    const time = inputTimestamp || now.toTimeString().slice(0, 8);
+    const normalizedTime = /^\d{2}:\d{2}$/.test(time) ? `${time}:00` : time;
+    return {
+      date,
+      time: normalizedTime,
+      measuredAt: `${date}T${normalizedTime}`,
+    };
   }
 
   public createPatient = asyncHandler(async (req: Request, res: Response) => {
@@ -544,6 +579,95 @@ export class PatientController {
     res.json({ success: true, data: dates });
   });
 
+  public appendConversationLog = asyncHandler(async (req: Request, res: Response) => {
+    const patientId = req.params.id;
+    const data = appendConversationLogSchema.parse(req.body);
+    this.ensurePatientExists(patientId);
+
+    const dt = this.buildDateAndTime(data.timestamp, data.logDate);
+
+    const created = this.models.conversationLog.create({
+      patientId,
+      role: data.role,
+      content: data.content,
+      timestamp: dt.time,
+      logDate: dt.date,
+      extra: data.extra ? JSON.stringify(data.extra) : undefined,
+    } as any);
+
+    const extracted = extractVitalMeasurementsFromText(data.content || '');
+    const createdMeasurements: any[] = [];
+
+    for (const measurement of extracted) {
+      const existing = this.models.vitalMeasurement.findBySourceLog(measurement.metricType, created.id);
+      if (existing) continue;
+
+      const vital = this.models.vitalMeasurement.create({
+        patientId,
+        metricType: measurement.metricType,
+        systolicValue: measurement.systolicValue,
+        diastolicValue: measurement.diastolicValue,
+        glucoseValue: measurement.glucoseValue,
+        glucoseContext: measurement.glucoseContext,
+        unit: measurement.unit,
+        measuredAt: dt.measuredAt,
+        measurementDate: dt.date,
+        sourceType: config.voiceSourceType,
+        sourceLogId: created.id,
+        sourceText: data.content,
+      } as any);
+
+      createdMeasurements.push(this.normalizeVitalSummaryItem(vital));
+    }
+
+    res.status(201).json({
+      success: true,
+      data: {
+        ...created,
+        extra: created.extra ? JSON.parse(created.extra) : undefined,
+        extractedVitals: createdMeasurements,
+      },
+      message: '对话日志已写入',
+    });
+  });
+
+  public createVitalMeasurement = asyncHandler(async (req: Request, res: Response) => {
+    const patientId = req.params.id;
+    const data = createVitalMeasurementSchema.parse(req.body);
+    this.ensurePatientExists(patientId);
+
+    if (data.metricType === 'blood_pressure' && (data.systolicValue == null || data.diastolicValue == null)) {
+      throw new AppError('血压记录需提供收缩压和舒张压', 400);
+    }
+
+    if (data.metricType === 'blood_glucose' && data.glucoseValue == null) {
+      throw new AppError('血糖记录需提供血糖值', 400);
+    }
+
+    const dt = this.buildDateAndTime(data.measuredAt?.split('T')[1], data.measurementDate || data.measuredAt?.split('T')[0]);
+
+    const created = this.models.vitalMeasurement.create({
+      patientId,
+      metricType: data.metricType,
+      systolicValue: data.systolicValue,
+      diastolicValue: data.diastolicValue,
+      glucoseValue: data.glucoseValue,
+      glucoseContext: data.glucoseContext || 'unknown',
+      unit: data.unit || (data.metricType === 'blood_pressure' ? 'mmHg' : 'mmol/L'),
+      measuredAt: data.measuredAt || dt.measuredAt,
+      measurementDate: data.measurementDate || dt.date,
+      sourceType: (data.sourceType as any) || config.voiceSourceType,
+      sourceText: data.sourceText,
+      notes: data.notes,
+    } as any);
+
+    res.status(201).json({
+      success: true,
+      data: this.normalizeVitalSummaryItem(created),
+      message: '生命体征记录已写入',
+    });
+  });
+
   // --- Dashboard ---
 
   public getDashboard = asyncHandler(async (req: Request, res: Response) => {
@@ -616,6 +740,6 @@ export class PatientController {
   });
 }
 
-export function createPatientController(models: ReturnType<typeof models>) {
+export function createPatientController(models: Models) {
   return new PatientController(models);
 }

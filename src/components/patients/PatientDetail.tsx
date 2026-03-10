@@ -13,6 +13,8 @@ interface PatientDetailProps {
   onBack?: () => void;
 }
 
+type ApiListResponse<T> = { data?: T[] };
+
 type MealRecord = {
   id: string;
   patientId: string;
@@ -26,6 +28,40 @@ type MealRecord = {
   notes?: string;
   createdAt: string;
 };
+
+type DailyMealSummary = {
+  date: string;
+  meals: MealRecord[];
+  totalCalories: number;
+};
+
+function toMealTimestamp(meal: MealRecord) {
+  const dt = `${meal.mealDate || ''} ${((meal as any).mealTime || '00:00')}`.trim();
+  const t = new Date(dt).getTime();
+  if (!Number.isNaN(t)) return t;
+  return new Date(meal.createdAt || 0).getTime();
+}
+
+function normalizeMealFoods(meal: MealRecord): any[] {
+  const raw = (meal as any).foods;
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw || '[]');
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function formatMinute(input?: string) {
+  if (!input) return '--:--';
+  if (/^\d{2}:\d{2}(:\d{2})?$/.test(input)) return input.slice(0, 5);
+  const d = new Date(input);
+  if (Number.isNaN(d.getTime())) return '--:--';
+  return `${`${d.getHours()}`.padStart(2, '0')}:${`${d.getMinutes()}`.padStart(2, '0')}`;
+}
 
 type HealthReport = {
   id: string;
@@ -72,6 +108,15 @@ type VitalMeasurement = {
   measuredAt: string;
 };
 
+type VitalApiItem = {
+  metricType: 'blood_pressure' | 'blood_glucose';
+  systolicValue?: number;
+  diastolicValue?: number;
+  glucoseValue?: number;
+  unit?: string;
+  measuredAt?: string;
+};
+
 type ChatMessage = {
   id: string;
   sender: 'doctor' | 'patient';
@@ -101,6 +146,10 @@ export function PatientDetail({ patientId, onBack }: PatientDetailProps) {
   const [vitals, setVitals] = useState<VitalMeasurement[]>([]);
   const [chats, setChats] = useState<ChatMessage[]>([]);
   const [alerts, setAlerts] = useState<string[]>([]);
+  const [selectedReport, setSelectedReport] = useState<HealthReport | null>(null);
+  const [selectedMealDay, setSelectedMealDay] = useState<DailyMealSummary | null>(null);
+  const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
+  const [generatingReport, setGeneratingReport] = useState(false);
 
   useEffect(() => {
     loadPatientData();
@@ -110,13 +159,59 @@ export function PatientDetail({ patientId, onBack }: PatientDetailProps) {
     setLoading(true);
     try {
       // 并行加载所有数据
-      const [mealsRes, reportsRes] = await Promise.all([
-        api.getMeals(patientId).catch(() => ({ data: [] })),
-        api.getReports(patientId).catch(() => ({ data: [] })),
+      const [mealsRes, reportsRes, vitalsRes] = await Promise.all([
+        (api.getMeals(patientId) as Promise<ApiListResponse<MealRecord>>).catch(() => ({ data: [] })),
+        (api.getReports(patientId) as Promise<ApiListResponse<HealthReport>>).catch(() => ({ data: [] })),
+        (api.getVitalMeasurements(patientId, { days: 30 }) as Promise<ApiListResponse<VitalApiItem>>).catch(() => ({ data: [] })),
       ]);
 
-      setMeals(mealsRes.data || []);
-      setReports(reportsRes.data || []);
+      const normalizedMeals = (mealsRes.data || []).map((meal: any) => ({
+        ...meal,
+        foods: normalizeMealFoods(meal as MealRecord),
+      }));
+      normalizedMeals.sort((a: MealRecord, b: MealRecord) => toMealTimestamp(b) - toMealTimestamp(a));
+      setMeals(normalizedMeals);
+      const normalizedReports = (reportsRes.data || []).map((r: any) => {
+        const recs = Array.isArray(r.recommendations)
+          ? r.recommendations
+          : (() => {
+              try {
+                return JSON.parse(r.recommendations || '[]');
+              } catch {
+                return [];
+              }
+            })();
+        return {
+          ...r,
+          recommendations: recs,
+          summary: r.summary || recs[0] || `AI 日报（${(r.reportDate || '').slice(0, 10)}）`,
+        };
+      });
+      setReports(normalizedReports);
+
+      const normalizedVitals: VitalMeasurement[] = (vitalsRes.data || []).map((v: VitalApiItem, idx: number) => {
+        if (v.metricType === 'blood_pressure') {
+          return {
+            id: `v_bp_${idx}_${v.measuredAt || ''}`,
+            type: 'blood_pressure',
+            systolic: v.systolicValue,
+            diastolic: v.diastolicValue,
+            unit: v.unit || 'mmHg',
+            measuredAt: v.measuredAt || new Date().toISOString(),
+          };
+        }
+
+        return {
+          id: `v_bg_${idx}_${v.measuredAt || ''}`,
+          type: 'blood_sugar',
+          value: v.glucoseValue,
+          unit: v.unit || 'mmol/L',
+          measuredAt: v.measuredAt || new Date().toISOString(),
+        };
+      });
+
+      normalizedVitals.sort((a, b) => new Date(b.measuredAt).getTime() - new Date(a.measuredAt).getTime());
+      setVitals(normalizedVitals);
 
       // 模拟其他数据（实际应该从 API 获取）
       setPatient({
@@ -153,22 +248,7 @@ export function PatientDetail({ patientId, onBack }: PatientDetailProps) {
         },
       ]);
 
-      setVitals([
-        {
-          id: 'v1',
-          type: 'blood_pressure',
-          systolic: 142,
-          diastolic: 92,
-          measuredAt: new Date(Date.now() - 1 * 24 * 3600000).toISOString(),
-        },
-        {
-          id: 'v2',
-          type: 'blood_sugar',
-          value: 7.2,
-          unit: 'mmol/L',
-          measuredAt: new Date(Date.now() - 2 * 24 * 3600000).toISOString(),
-        },
-      ]);
+      // 健康指标改为真实 API 数据，不再使用本地模拟数据
 
       setAlerts([
         '血压偏高，建议复查',
@@ -182,7 +262,7 @@ export function PatientDetail({ patientId, onBack }: PatientDetailProps) {
     }
   }
 
-  const tabs = [
+  const tabs: Array<{ id: TabType; label: string; icon: any; count?: number }> = [
     { id: 'profile', label: '基本信息', icon: User },
     { id: 'meals', label: '餐食记录', icon: UtensilsCrossed, count: meals.length },
     { id: 'reports', label: '健康报告', icon: FileText, count: reports.length },
@@ -191,7 +271,7 @@ export function PatientDetail({ patientId, onBack }: PatientDetailProps) {
     { id: 'vitals', label: '健康指标', icon: Activity, count: vitals.length },
     { id: 'followup', label: '随访计划', icon: CalendarDays },
     { id: 'chat', label: '聊天记录', icon: MessageSquare },
-  ] as const;
+  ];
 
   const renderTabContent = () => {
     if (loading) {
@@ -235,21 +315,31 @@ export function PatientDetail({ patientId, onBack }: PatientDetailProps) {
         );
 
       case 'meals':
+        const mealsByDayMap = new Map<string, DailyMealSummary>();
+        for (const m of meals) {
+          const date = (m.mealDate || m.createdAt || '').split('T')[0];
+          if (!mealsByDayMap.has(date)) mealsByDayMap.set(date, { date, meals: [], totalCalories: 0 });
+          const d = mealsByDayMap.get(date)!;
+          d.meals.push(m);
+          d.totalCalories += Number(m.calories || 0);
+        }
+        const dailyMeals = Array.from(mealsByDayMap.values()).sort((a, b) => b.date.localeCompare(a.date));
+
         return (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
-                餐食记录（{meals.length} 条）
+                餐食记录（{dailyMeals.length} 天 / {meals.length} 条）
               </h3>
             </div>
-            {meals.length === 0 ? (
+            {dailyMeals.length === 0 ? (
               <div style={{ padding: '64px', textAlign: 'center', color: '#94a3b8' }}>
                 暂无餐食记录
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {meals.map((meal) => (
-                  <div key={meal.id} style={{
+                {dailyMeals.map((day) => (
+                  <div key={day.date} style={{
                     background: 'white',
                     borderRadius: '12px',
                     padding: '16px',
@@ -257,22 +347,76 @@ export function PatientDetail({ patientId, onBack }: PatientDetailProps) {
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                       <span style={{ color: '#64748b', fontSize: '13px' }}>
-                        {meal.mealDate} · {meal.mealType}
+                        {day.date}
                       </span>
                       <span style={{ color: '#1e293b', fontSize: '14px', fontWeight: 'bold' }}>
-                        {meal.calories} kcal
+                        {day.totalCalories} kcal
                       </span>
                     </div>
                     <div style={{ color: '#64748b', fontSize: '13px' }}>
-                      蛋白质 {meal.protein}g · 碳水 {meal.carbs}g · 脂肪 {meal.fat}g
+                      当日 {day.meals.length} 条记录 · 食物：{Array.from(new Set(day.meals.flatMap((m) => (m.foods || []).map((f: any) => f?.name).filter(Boolean)))).join('、') || '暂无'}
                     </div>
-                    {meal.notes && (
-                      <div style={{ marginTop: '8px', color: '#94a3b8', fontSize: '12px' }}>
-                        备注：{meal.notes}
-                      </div>
-                    )}
+                    <button
+                      onClick={() => setSelectedMealDay(day)}
+                      style={{ marginTop: 10, border: '1px solid #bae6fd', borderRadius: 8, padding: '6px 10px', background: '#f0f9ff', color: '#0369a1', cursor: 'pointer' }}
+                    >
+                      查看当日三餐详情
+                      <span style={{ fontSize: 11, color: '#64748b', marginLeft: 6 }}>
+                        ({(() => {
+                          const latest = [...day.meals].sort((a, b) => toMealTimestamp(b) - toMealTimestamp(a))[0];
+                          return `最后更新 ${formatMinute((latest as any)?.mealTime || latest?.createdAt)}`;
+                        })()})
+                      </span>
+                    </button>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {selectedMealDay && (
+              <div
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) setSelectedMealDay(null);
+                }}
+                style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(15,23,42,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+              >
+                <div style={{ width: '100%', maxWidth: 860, maxHeight: '88vh', overflow: 'auto', background: '#fff', borderRadius: 16, padding: 20 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <h4 style={{ margin: 0, color: '#1e293b' }}>{selectedMealDay.date} · 三餐明细</h4>
+                    <button onClick={() => setSelectedMealDay(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 18 }}>✕</button>
+                  </div>
+
+                  {['breakfast', 'lunch', 'dinner', 'snack'].map((mt) => {
+                    const labelMap: Record<string, string> = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' };
+                    const list = selectedMealDay.meals.filter((m) => m.mealType === mt);
+                    return (
+                      <div key={mt} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, marginBottom: 10 }}>
+                        <p style={{ margin: 0, marginBottom: 8, fontWeight: 700 }}>{labelMap[mt]}（{list.length}）</p>
+                        {list.length === 0 ? (
+                          <p style={{ margin: 0, color: '#94a3b8', fontSize: 12 }}>无记录</p>
+                        ) : (
+                          list.map((m) => (
+                            <div key={m.id} style={{ background: '#f8fafc', borderRadius: 8, padding: 10, marginBottom: 8 }}>
+                              <p style={{ margin: 0, fontSize: 12, color: '#334155' }}>记录时间：{formatMinute((m as any).mealTime || m.createdAt)}</p>
+                              <p style={{ margin: '4px 0', fontSize: 13, color: '#334155' }}>食物：{(m.foods || []).map((f: any) => f?.name).filter(Boolean).join('、') || '暂无'}</p>
+                              <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>热量 {m.calories} kcal · 蛋白质 {m.protein}g · 碳水 {m.carbs}g · 脂肪 {m.fat}g</p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  <div style={{ marginTop: 8, fontSize: 13, color: '#475569' }}>
+                    当日健康指标：
+                    {(() => {
+                      const dayVitals = vitals.filter((v) => (v.measuredAt || '').slice(0, 10) === selectedMealDay.date);
+                      const bp = dayVitals.find((v) => v.type === 'blood_pressure');
+                      const bg = dayVitals.find((v) => v.type === 'blood_sugar');
+                      return ` 血压 ${bp ? `${bp.systolic}/${bp.diastolic} (${formatMinute(bp.measuredAt)})` : '暂无'}；血糖 ${bg ? `${bg.value} ${bg.unit || 'mmol/L'} (${formatMinute(bg.measuredAt)})` : '暂无'}`;
+                    })()}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -281,15 +425,43 @@ export function PatientDetail({ patientId, onBack }: PatientDetailProps) {
       case 'reports':
         return (
           <div>
-            <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '20px' }}>
-              健康报告（{reports.length} 条）
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
+                健康报告（AI 诊疗辅助，{reports.length} 份）
+              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="date"
+                  value={reportDate}
+                  onChange={(e) => setReportDate(e.target.value)}
+                  style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '6px 8px' }}
+                />
+                <button
+                  disabled={generatingReport}
+                  onClick={async () => {
+                    try {
+                      setGeneratingReport(true);
+                      await api.createReport(patientId, { startDate: reportDate, endDate: reportDate });
+                      await loadPatientData();
+                    } catch (e) {
+                      console.error('生成健康报告失败', e);
+                    } finally {
+                      setGeneratingReport(false);
+                    }
+                  }}
+                  style={{ border: '1px solid #0ea5e9', borderRadius: 8, padding: '6px 10px', background: '#0ea5e9', color: '#fff', cursor: 'pointer' }}
+                >
+                  {generatingReport ? '生成中...' : '手动生成当日报告'}
+                </button>
+              </div>
+            </div>
+
             {reports.length === 0 ? (
               <div style={{ padding: '64px', textAlign: 'center', color: '#94a3b8' }}>
-                暂无健康报告
+                暂无健康报告，请医生手动点击“生成当日报告”
               </div>
             ) : (
-              <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+              <div style={{ display: 'grid', gap: '12px' }}>
                 {reports.map((report) => (
                   <div key={report.id} style={{
                     background: 'white',
@@ -297,38 +469,62 @@ export function PatientDetail({ patientId, onBack }: PatientDetailProps) {
                     padding: '16px',
                     border: '1px solid #e2e8f0',
                   }}>
-                    <div style={{ marginBottom: '12px' }}>
-                      <span style={{ color: '#64748b', fontSize: '13px' }}>
-                        {report.reportDate}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#1e293b', fontSize: '14px', fontWeight: 700 }}>{(report.reportDate || '').slice(0, 10)}</span>
+                      <span style={{ color: '#64748b', fontSize: '12px' }}>报告生成时间：{formatMinute(report.reportDate)}</span>
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 13, color: '#334155', lineHeight: 1.7 }}>
+                      {report.summary || 'AI 报告已生成，可查看详情'}
+                    </div>
+
+                    <button
+                      onClick={() => setSelectedReport(report as any)}
+                      style={{ marginTop: 10, border: '1px solid #bae6fd', borderRadius: 8, padding: '6px 10px', background: '#f0f9ff', color: '#0369a1', cursor: 'pointer' }}
+                    >
+                      查看报告详情
+                      <span style={{ fontSize: 11, color: '#64748b', marginLeft: 6 }}>
+                        ({(() => {
+                          return `最后更新 ${formatMinute(report.reportDate)}`;
+                        })()})
                       </span>
-                    </div>
-                    {report.nutritionScore != null && (
-                      <div style={{ marginBottom: '12px' }}>
-                        <span style={{ color: report.nutritionScore >= 70 ? '#10b981' : '#f97316', fontSize: '24px', fontWeight: 'bold' }}>
-                          {report.nutritionScore}
-                        </span>
-                        <span style={{ color: '#64748b', fontSize: '14px', marginLeft: '8px' }}>
-                          分营养评分
-                        </span>
-                      </div>
-                    )}
-                    <div style={{ color: '#1e293b', fontSize: '14px', lineHeight: '1.6' }}>
-                      {report.summary}
-                    </div>
-                    {report.recommendations && report.recommendations.length > 0 && (
-                      <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
-                        <p style={{ color: '#64748b', fontSize: '12px', margin: 0, marginBottom: '8px' }}>
-                          建议：
-                        </p>
-                        {report.recommendations.map((rec, idx) => (
-                          <p key={idx} style={{ color: '#475569', fontSize: '13px', margin: '0 0 4px 16px' }}>
-                            {idx + 1}. {rec}
-                          </p>
-                        ))}
-                      </div>
-                    )}
+                    </button>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {selectedReport && (
+              <div
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) setSelectedReport(null);
+                }}
+                style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(15,23,42,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+              >
+                <div style={{ width: '100%', maxWidth: 820, maxHeight: '86vh', overflow: 'auto', background: '#fff', borderRadius: 16, padding: 20 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <h4 style={{ margin: 0, color: '#1e293b' }}>
+                      {(selectedReport.reportDate || '').slice(0, 10)} · AI 健康报告
+                    </h4>
+                    <button onClick={() => setSelectedReport(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 18 }}>✕</button>
+                  </div>
+
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 10 }}>
+                    最后更新：{formatMinute(selectedReport.reportDate)}
+                  </div>
+
+                  <div style={{ padding: 12, border: '1px solid #e2e8f0', borderRadius: 10, background: '#f8fafc', fontSize: 14, color: '#334155', lineHeight: 1.7 }}>
+                    {selectedReport.summary || '暂无报告摘要'}
+                  </div>
+
+                  {Array.isArray(selectedReport.recommendations) && selectedReport.recommendations.length > 0 && (
+                    <div style={{ marginTop: 12 }}>
+                      <p style={{ margin: '0 0 6px 0', fontWeight: 700, color: '#1e293b' }}>报告要点</p>
+                      {selectedReport.recommendations.map((r, i) => (
+                        <p key={`${r}-${i}`} style={{ margin: '4px 0', fontSize: 13, color: '#475569' }}>{i + 1}. {r}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

@@ -4,7 +4,7 @@
 
 import { Router } from 'express';
 import { createReportController } from '../controllers/reportController';
-import { authenticatePatient, authenticateDoctorOrHospitalOrPatient } from '../middleware/auth';
+import { authenticateDoctorOrHospitalOrPatient } from '../middleware/auth';
 import { initModels } from '../models';
 import { databaseConfig } from '../config/database';
 
@@ -25,9 +25,9 @@ function getModels() {
 /**
  * @route   POST /api/patients/:patientId/reports
  * @desc    生成健康报告
- * @access  Private (Patient)
+ * @access  Private (Patient, Doctor, Hospital)
  */
-router.post('/patient/:patientId', authenticatePatient, (req, res, next) => getModels().controller.createReport(req, res, next));
+router.post('/patient/:patientId', authenticateDoctorOrHospitalOrPatient, (req, res, next) => getModels().controller.createReport(req, res, next));
 
 /**
  * @route   GET /api/patients/:patientId/reports

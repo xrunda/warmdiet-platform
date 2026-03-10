@@ -348,6 +348,14 @@ export class ApiService {
   }
 
   /**
+   * 获取患者生命体征记录
+   */
+  public async getVitalMeasurements(patientId: string, params?: { days?: number; type?: 'blood_pressure' | 'blood_glucose' }) {
+    const query = new URLSearchParams(params as any).toString();
+    return this.request(`/patients/${patientId}/vital-measurements${query ? `?${query}` : ''}`);
+  }
+
+  /**
    * 获取最新报告
    */
   public async getLatestReport(patientId: string) {

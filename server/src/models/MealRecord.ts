@@ -15,11 +15,20 @@ export class MealRecordModel extends BaseModel<MealRecord> {
    * 获取患者的餐食记录
    */
   public findByPatientId(patientId: string, options?: { limit?: number; offset?: number }): MealRecord[] {
-    return this.findMany({ patientId } as any, {
-      ...options,
-      orderBy: 'meal_date',
-      orderDirection: 'DESC',
-    });
+    let sql = `
+      SELECT * FROM meal_records
+      WHERE patient_id = ?
+      ORDER BY meal_date DESC, meal_time DESC, created_at DESC
+    `;
+
+    if (options?.limit) {
+      sql += ` LIMIT ${options.limit}`;
+      if (options?.offset) {
+        sql += ` OFFSET ${options.offset}`;
+      }
+    }
+
+    return this.query(sql, [patientId]) as MealRecord[];
   }
 
   /**
@@ -44,10 +53,13 @@ export class MealRecordModel extends BaseModel<MealRecord> {
    * 根据餐食类型查询
    */
   public findByMealType(patientId: string, mealType: MealType): MealRecord[] {
-    return this.findMany({ patientId, mealType } as any, {
-      orderBy: 'meal_date',
-      orderDirection: 'DESC',
-    });
+    const sql = `
+      SELECT * FROM meal_records
+      WHERE patient_id = ?
+      AND meal_type = ?
+      ORDER BY meal_date DESC, meal_time DESC, created_at DESC
+    `;
+    return this.query(sql, [patientId, mealType]) as MealRecord[];
   }
 
   /**

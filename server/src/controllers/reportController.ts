@@ -5,7 +5,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
-import { models } from '../models';
+import type { Models } from '../models';
 import { AccessLogController } from './accessLogController';
 import { ApiResponse } from '../types';
 import { logger } from '../utils/logger';
@@ -65,9 +65,9 @@ function rotatePick<T>(items: T[], offset: number, count: number): T[] {
 }
 
 export class ReportController {
-  private models: ReturnType<typeof models>;
+  private models: Models;
 
-  constructor(models: ReturnType<typeof models>) {
+  constructor(models: Models) {
     this.models = models;
   }
 
@@ -134,6 +134,17 @@ export class ReportController {
       data.endDate
     );
 
+    // 获取生命体征（按天）
+    const vitalsInWindow = this.models.vitalMeasurement
+      .findByPatientId(patientId, 30)
+      .filter((v) => (v.measurementDate || '') >= data.startDate && (v.measurementDate || '') <= data.endDate);
+
+    // 获取患者资料 / 医嘱 / 慢病信息（用于 AI 综合判断）
+    const profile = this.models.patient.findById(patientId);
+    const medicalOrders = this.models.medicalOrder.findByPatientId(patientId).slice(0, 5);
+    const healthConditions = this.models.healthCondition.findByPatientId(patientId);
+    const preferences = this.models.preference.findByPatientId(patientId);
+
     // 计算营养分数
     const avgScore = meals.length > 0
       ? meals.reduce((sum, meal) => sum + meal.nutritionScore, 0) / meals.length
@@ -146,16 +157,73 @@ export class ReportController {
       nutritionScore: meal.nutritionScore,
     }));
 
-    // 生成建议
-    const recommendations = [];
+    // 生命体征摘要
+    const latestBp = vitalsInWindow
+      .filter((v) => v.metricType === 'blood_pressure')
+      .sort((a, b) => (b.measuredAt || '').localeCompare(a.measuredAt || ''))[0];
+    const latestBg = vitalsInWindow
+      .filter((v) => v.metricType === 'blood_glucose')
+      .sort((a, b) => (b.measuredAt || '').localeCompare(a.measuredAt || ''))[0];
+
+    const bpRisk = !!latestBp && ((latestBp.systolicValue || 0) >= 140 || (latestBp.diastolicValue || 0) >= 90);
+    const bgRisk = !!latestBg && (latestBg.glucoseValue || 0) >= 7;
+
+    // 生成 AI 报告要点（给医生辅助诊疗）
+    const recommendations: string[] = [];
+
+    recommendations.push(
+      `【AI综合评估】患者${profile?.name || patientId}在 ${data.startDate} 至 ${data.endDate} 期间，共记录餐食 ${meals.length} 条，平均营养分 ${avgScore.toFixed(1)}。`
+    );
+
+    recommendations.push(
+      `【生命体征】` +
+      `${latestBp ? `最近血压 ${latestBp.systolicValue}/${latestBp.diastolicValue} mmHg（${latestBp.measurementDate}）` : '最近无血压数据'}；` +
+      `${latestBg ? `最近血糖 ${latestBg.glucoseValue} ${latestBg.unit || 'mmol/L'}（${latestBg.measurementDate}）` : '最近无血糖数据'}。`
+    );
+
+    if (medicalOrders.length > 0) {
+      const orderDigest = medicalOrders
+        .map((o: any) => `${o.orderDate || o.visitDate || ''} ${o.content || ''}`.trim())
+        .filter(Boolean)
+        .slice(0, 3)
+        .join('；');
+      recommendations.push(`【医嘱对照】近期待执行医嘱：${orderDigest}`);
+    }
+
+    if (healthConditions.length > 0) {
+      const condDigest = healthConditions
+        .map((c: any) => c.conditionName)
+        .filter(Boolean)
+        .join('、');
+      recommendations.push(`【病史要点】${condDigest}`);
+    }
+
+    if (preferences) {
+      let disliked: string[] = [];
+      try {
+        disliked = JSON.parse((preferences as any).dislikedFoods || '[]');
+      } catch {
+        disliked = [];
+      }
+      if (disliked.length > 0) {
+        recommendations.push(`【饮食偏好】患者忌口/不喜欢：${disliked.slice(0, 6).join('、')}`);
+      }
+    }
+
     if (avgScore < 60) {
-      recommendations.push('建议增加蔬菜和水果的摄入量');
+      recommendations.push('【诊疗建议】建议提高蔬菜与优质蛋白摄入，优先纠正早餐和晚餐结构。');
+    } else if (avgScore < 80) {
+      recommendations.push('【诊疗建议】建议继续控制油盐与总热量，保持三餐规律记录。');
+    } else {
+      recommendations.push('【诊疗建议】当前饮食执行度较好，建议维持并继续随访血压血糖波动。');
     }
-    if (avgScore < 80) {
-      recommendations.push('建议控制油盐摄入');
+
+    if (bpRisk || bgRisk) {
+      recommendations.push('【风险提示】当前生命体征存在偏高趋势，建议医生重点复核药物依从性与医嘱执行情况。');
     }
-    if (meals.length < 21) {
-      recommendations.push('请保持规律饮食，建议每天记录三餐');
+
+    if (meals.length < 3) {
+      recommendations.push('【数据质量】当前有效记录偏少，建议提醒患者补充完整三餐与体征数据，以提高报告可信度。');
     }
 
     const report = this.models.healthReport.create({
@@ -376,6 +444,6 @@ export class ReportController {
   });
 }
 
-export function createReportController(models: ReturnType<typeof models>) {
+export function createReportController(models: Models) {
   return new ReportController(models);
 }

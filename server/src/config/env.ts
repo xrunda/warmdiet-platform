@@ -40,4 +40,7 @@ export const config = {
 
   // 日志级别
   logLevel: process.env.LOG_LEVEL || 'info',
+
+  // 语音来源标识（默认保持旧值以兼容现有数据库 CHECK 约束）
+  voiceSourceType: process.env.VOICE_SOURCE_TYPE || 'xiaoai_voice',
 };
