@@ -26,7 +26,7 @@ function getModels() {
  * @desc    获取患者信息
  * @access  Private (Patient / Doctor)
  */
-router.get('/:id', authenticateDoctorOrPatient, (req, res, next) => getModels().controller.getPatient(req, res, next));
+router.get('/:id', authenticateDoctorOrHospitalOrPatient, (req, res, next) => getModels().controller.getPatient(req, res, next));
 
 /**
  * @route   PUT /api/patients/:id
@@ -38,9 +38,9 @@ router.put('/:id', authenticatePatient, (req, res, next) => getModels().controll
 /**
  * @route   GET /api/patients/:id/health-conditions
  * @desc    获取患者健康状况列表
- * @access  Private (Patient / Doctor)
+ * @access  Private (Patient / Doctor / Hospital)
  */
-router.get('/:id/health-conditions', authenticateDoctorOrPatient, (req, res, next) => getModels().controller.getHealthConditions(req, res, next));
+router.get('/:id/health-conditions', authenticateDoctorOrHospitalOrPatient, (req, res, next) => getModels().controller.getHealthConditions(req, res, next));
 
 /**
  * @route   POST /api/patients/:id/health-conditions
@@ -61,7 +61,7 @@ router.delete('/:id/health-conditions/:condId', authenticatePatient, (req, res, 
  * @desc    获取患者用药列表
  * @access  Private (Patient / Doctor)
  */
-router.get('/:id/medications', authenticateDoctorOrPatient, (req, res, next) => getModels().controller.getMedications(req, res, next));
+router.get('/:id/medications', authenticateDoctorOrHospitalOrPatient, (req, res, next) => getModels().controller.getMedications(req, res, next));
 
 /**
  * @route   POST /api/patients/:id/medications
@@ -110,7 +110,7 @@ router.put('/:id/preferences', authenticatePatient, (req, res, next) => getModel
  * @desc    获取患者医嘱列表
  * @access  Private (Patient / Doctor)
  */
-router.get('/:id/medical-orders', authenticateDoctorOrPatient, (req, res, next) => getModels().controller.getMedicalOrders(req, res, next));
+router.get('/:id/medical-orders', authenticateDoctorOrHospitalOrPatient, (req, res, next) => getModels().controller.getMedicalOrders(req, res, next));
 
 /**
  * @route   POST /api/patients/:id/medical-orders

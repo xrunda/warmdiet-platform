@@ -29,6 +29,7 @@ function App() {
   const { isAuthenticated, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [initialPatient, setInitialPatient] = useState<{ id: string; name: string; latestUpdate?: string; unreadMessages?: number } | null>(null);
 
   // 调试日志
   console.log('App render:', { isAuthenticated, loading, activeTab, selectedPatientId });
@@ -42,8 +43,9 @@ function App() {
   }
 
   // 处理患者选择
-  const handleSelectPatient = (patientId: string) => {
-    setSelectedPatientId(patientId);
+  const handleSelectPatient = (patient: { id: string; name: string; latestUpdate?: string; unreadMessages?: number }) => {
+    setSelectedPatientId(patient.id);
+    setInitialPatient(patient);
   };
 
   // 处理返回患者列表
@@ -62,10 +64,12 @@ function App() {
           onTabChange={(tab) => {
             setActiveTab(tab);
             setSelectedPatientId(null);
+            setInitialPatient(null);
           }}
         >
           <PatientDetail
             patientId={selectedPatientId}
+            initialPatient={initialPatient || undefined}
             onBack={handleBackToList}
           />
         </Navigation>
@@ -75,15 +79,23 @@ function App() {
           activeTab={activeTab}
           onTabChange={setActiveTab}
         >
-          {navItems.find(item => item.id === activeTab)?.component &&
-            (() => {
-              const Component = navItems.find(item => item.id === activeTab)!.component;
-              return activeTab === 'patients' ? (
-                <Component onSelectPatient={handleSelectPatient} />
-              ) : (
-                <Component onTabChange={setActiveTab} />
+          {(() => {
+            const ActiveItem = navItems.find((item) => item.id === activeTab);
+            if (!ActiveItem) return null;
+            const Component = ActiveItem.component;
+            if (activeTab === 'patients') {
+              return <Component onSelectPatient={handleSelectPatient} />;
+            }
+            if (activeTab === 'dashboard') {
+              return (
+                <Component
+                  onTabChange={setActiveTab}
+                  onSelectPatient={handleSelectPatient}
+                />
               );
-            })()}
+            }
+            return <Component onTabChange={setActiveTab} />;
+          })()}
         </Navigation>
       )}
     </ToastProvider>

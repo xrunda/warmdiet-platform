@@ -41,9 +41,10 @@ interface Stats {
 
 interface DoctorDashboardProps {
   onTabChange?: (tab: string) => void;
+  onSelectPatient?: (patient: { id: string; name: string; latestUpdate?: string; unreadMessages?: number }) => void;
 }
 
-export function DoctorDashboard({ onTabChange }: DoctorDashboardProps) {
+export function DoctorDashboard({ onTabChange, onSelectPatient }: DoctorDashboardProps) {
   const [stats, setStats] = useState<Stats>({
     totalPatients: 0,
     todayAlerts: 0,
@@ -81,67 +82,98 @@ export function DoctorDashboard({ onTabChange }: DoctorDashboardProps) {
         } catch { /* skip */ }
       }
 
-      // 加载患者数据（餐食、报告等）
       let totalMeals = 0;
       let totalReports = 0;
+      const patientAlerts: HealthAlert[] = [];
 
       for (const pid of patientIds) {
         try {
-          const mealsRes: any = await api.getMeals(pid);
-          totalMeals += (mealsRes.data || []).length;
+          const [mealsRes, reportsRes, vitalsRes]: any = await Promise.all([
+            api.getMeals(pid),
+            api.getReports(pid),
+            api.getVitalMeasurements(pid, { days: 7 }),
+          ]);
 
-          const reportsRes: any = await api.getReports(pid);
+          totalMeals += (mealsRes.data || []).length;
           totalReports += (reportsRes.data || []).length;
-        } catch { /* skip */ }
+
+          const vitals = (vitalsRes.data || []).slice().sort((a: any, b: any) =>
+            new Date(b.measuredAt).getTime() - new Date(a.measuredAt).getTime()
+          );
+          const latestBp = vitals.find((v: any) => v.metricType === 'blood_pressure');
+          const latestBg = vitals.find((v: any) => v.metricType === 'blood_glucose');
+          const reportList = reportsRes.data || [];
+          const latestReport = reportList[0];
+          const name = patientNameMap.get(pid) || pid;
+
+          if (latestBp) {
+            const systolic = Number(latestBp.systolicValue ?? latestBp.systolic ?? 0);
+            const diastolic = Number(latestBp.diastolicValue ?? latestBp.diastolic ?? 0);
+            const severity = systolic >= 140 || diastolic >= 90 ? 'high' : 'medium';
+            patientAlerts.push({
+              id: `${pid}-bp-${latestBp.measuredAt || Date.now()}`,
+              patientId: pid,
+              patientName: name,
+              type: 'blood_pressure',
+              severity,
+              title: severity === 'high' ? '血压偏高' : '血压略偏高',
+              description: `最近测量血压 ${systolic}/${diastolic} mmHg`,
+              value: `${systolic}/${diastolic} mmHg`,
+              normalRange: '< 130/85 mmHg',
+              createdAt: latestBp.measuredAt || new Date().toISOString(),
+            });
+          }
+
+          if (latestBg) {
+            const glucose = Number(latestBg.glucoseValue ?? latestBg.value ?? 0);
+            if (glucose >= 7) {
+              patientAlerts.push({
+                id: `${pid}-bg-${latestBg.measuredAt || Date.now()}`,
+                patientId: pid,
+                patientName: name,
+                type: 'blood_sugar',
+                severity: 'medium',
+                title: '空腹血糖偏高',
+                description: `空腹血糖 ${glucose.toFixed(1)} mmol/L，建议复查`,
+                value: `${glucose.toFixed(1)} mmol/L`,
+                normalRange: '< 6.1 mmol/L',
+                createdAt: latestBg.measuredAt || new Date().toISOString(),
+              });
+            }
+          }
+
+          if (latestReport && typeof latestReport.nutritionScore === 'number' && latestReport.nutritionScore < 70) {
+            patientAlerts.push({
+              id: `${pid}-ns-${latestReport.id || Date.now()}`,
+              patientId: pid,
+              patientName: name,
+              type: 'nutrition_score',
+              severity: 'medium',
+              title: '营养评分偏低',
+              description: `本周营养评分 ${latestReport.nutritionScore} 分，饮食结构需要调整`,
+              value: `${latestReport.nutritionScore} 分`,
+              normalRange: '> 70分',
+              createdAt: latestReport.reportDate || new Date().toISOString(),
+            });
+          }
+        } catch { /* skip patient with partial data */ }
       }
 
-      // 模拟健康预警数据（实际应该从API获取）
-      const mockAlerts: HealthAlert[] = [
-        {
-          id: '1',
-          patientId: 'p1',
-          patientName: patientNameMap.get('p1') || '张三',
-          type: 'blood_pressure',
-          severity: 'high',
-          title: '血压偏高',
-          description: '最近测量血压 142/92 mmHg，高于正常范围',
-          value: '142/92 mmHg',
-          normalRange: '< 130/85 mmHg',
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: '2',
-          patientId: 'p2',
-          patientName: patientNameMap.get('p2') || '李四',
-          type: 'nutrition_score',
-          severity: 'medium',
-          title: '营养评分偏低',
-          description: '本周营养评分 65 分，饮食结构需要调整',
-          value: '65分',
-          normalRange: '> 70分',
-          createdAt: new Date(Date.now() - 3600000).toISOString(),
-        },
-        {
-          id: '3',
-          patientId: 'p3',
-          patientName: patientNameMap.get('p3') || '王五',
-          type: 'blood_sugar',
-          severity: 'medium',
-          title: '空腹血糖偏高',
-          description: '空腹血糖 7.2 mmol/L，建议复查',
-          value: '7.2 mmol/L',
-          normalRange: '< 6.1 mmol/L',
-          createdAt: new Date(Date.now() - 7200000).toISOString(),
-        },
-      ];
+      const priority = { high: 3, medium: 2, low: 1 };
+      const sortedAlerts = patientAlerts
+        .sort((a, b) =>
+          (priority[b.severity] - priority[a.severity]) ||
+          (new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        )
+        .slice(0, 6);
 
       setStats({
         totalPatients: patientIds.size,
-        todayAlerts: mockAlerts.length,
+        todayAlerts: sortedAlerts.length,
         unreadMessages: 3,
         pendingFollowUps: 2,
       });
-      setAlerts(mockAlerts);
+      setAlerts(sortedAlerts);
     } catch (error) {
       console.error('加载工作台数据失败:', error);
     } finally {
@@ -411,22 +443,30 @@ export function DoctorDashboard({ onTabChange }: DoctorDashboardProps) {
                           </div>
                         )}
                       </div>
-                      <button
-                        style={{
-                          padding: '8px 12px',
-                          borderRadius: 8,
-                          border: 'none',
-                          backgroundColor: 'white',
-                          color: '#0891b2',
-                          fontSize: 13,
-                          fontWeight: 500,
-                          cursor: 'pointer',
-                          flexShrink: 0,
-                        }}
-                        onClick={() => onTabChange?.('patients')}
-                      >
-                        查看
-                      </button>
+                        <button
+                          style={{
+                            padding: '8px 12px',
+                            borderRadius: 8,
+                            border: 'none',
+                            backgroundColor: 'white',
+                            color: '#0891b2',
+                            fontSize: 13,
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                          }}
+                onClick={() => {
+                            onSelectPatient?.({
+                              id: alert.patientId,
+                              name: alert.patientName,
+                              latestUpdate: alert.createdAt,
+                              unreadMessages: 0,
+                            });
+                            onTabChange?.('patients');
+                          }}
+                        >
+                          查看
+                        </button>
                     </div>
                   );
                 })

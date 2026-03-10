@@ -76,6 +76,7 @@ export interface PatientAccount {
 export interface DoctorAuthorization {
   id: string;
   patientId: string;
+  patientName?: string;
   doctorId: string;
   authorizationType: AuthorizationType[];
   authorizedAt: string;
@@ -86,6 +87,8 @@ export interface DoctorAuthorization {
   scopeDataRange: DataRange;
   ipAddress?: string;
   deviceId?: string;
+  lastAccessedAt?: string;
+  accessCount?: number;
   createdAt: string;
   updatedAt: string;
 }

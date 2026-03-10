@@ -16,16 +16,27 @@ interface PatientInfo {
   mealCount?: number;
   reportCount?: number;
   followUpStatus?: 'pending' | 'upcoming' | 'none';
+  age?: number;
+  gender?: 'male' | 'female';
+  phone?: string;
+  phoneMasked?: string;
 }
 
 interface PatientListProps {
-  onSelectPatient?: (patientId: string) => void;
+  onSelectPatient?: (patient: PatientInfo) => void;
 }
 
 export function PatientList({ onSelectPatient }: PatientListProps) {
   const [loading, setLoading] = useState(true);
   const [patients, setPatients] = useState<PatientInfo[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+
+  const maskPhone = (phone?: string) => {
+    if (!phone) return '未填写';
+    const matched = phone.match(/^(\d{3})(\d+)(\d{4})$/);
+    if (!matched) return phone;
+    return `${matched[1]}****${matched[3]}`;
+  };
 
   useEffect(() => {
     loadPatients();
@@ -60,9 +71,20 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
         } catch { /* skip */ }
       }
 
-      // 加载每个患者的数据统计
+      // 加载每个患者的明细和统计
       for (const [pid, patient] of patientMap) {
         try {
+          const patientRes: any = await api.getPatient(pid);
+          const profile = patientRes?.data;
+          if (profile) {
+            patient.name = profile.name || patient.name;
+            patient.age = profile.age;
+            patient.gender = profile.gender;
+            patient.phone = profile.phone;
+            patient.phoneMasked = maskPhone(profile.phone);
+            patient.latestUpdate = profile.updatedAt || patient.latestUpdate;
+          }
+
           const mealsRes: any = await api.getMeals(pid);
           const reportsRes: any = await api.getReports(pid);
           patient.mealCount = (mealsRes.data || []).length;
@@ -208,9 +230,9 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
             const followUpBadge = getFollowUpBadge(patient.followUpStatus || 'none');
 
             return (
-              <div
-                key={patient.id}
-                onClick={() => onSelectPatient?.(patient.id)}
+                <div
+                  key={patient.id}
+                  onClick={() => onSelectPatient?.(patient)}
                 style={{
                   background: 'white',
                   borderRadius: '20px',
@@ -270,8 +292,15 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
                     <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', margin: '0 0 4px 0' }}>
                       {patient.name}
                     </h3>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', color: '#64748b' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', fontSize: '13px', color: '#64748b' }}>
                       <span>ID: {patient.id}</span>
+                      {patient.gender && (
+                        <span>{patient.gender === 'male' ? '男' : '女'}</span>
+                      )}
+                      {typeof patient.age === 'number' && (
+                        <span>{patient.age}岁</span>
+                      )}
+                      <span>{patient.phoneMasked || '未填写'}</span>
                       {patient.latestUpdate && (
                         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <Clock style={{ width: '12px', height: '12px' }} />

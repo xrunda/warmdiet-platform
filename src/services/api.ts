@@ -235,6 +235,27 @@ export class ApiService {
     return this.request(`/patients/search?q=${encodeURIComponent(keyword)}`);
   }
 
+  /**
+   * 获取患者医嘱列表
+   */
+  public async getMedicalOrders(patientId: string) {
+    return this.request(`/patients/${patientId}/medical-orders`);
+  }
+
+  /**
+   * 获取患者用药记录
+   */
+  public async getMedications(patientId: string) {
+    return this.request(`/patients/${patientId}/medications`);
+  }
+
+  /**
+   * 获取患者健康状况
+   */
+  public async getHealthConditions(patientId: string) {
+    return this.request(`/patients/${patientId}/health-conditions`);
+  }
+
   // ===== 授权管理 API =====
 
   /**

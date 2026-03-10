@@ -41,19 +41,6 @@ def extract_meta(text: str):
     }
 
 
-def create_cover_page(meta):
-    """创建封面页HTML"""
-    return """
-    <div class="cover-page">
-        <h1>{project_name}</h1>
-        <div class="subtitle">{title}</div>
-        <div class="info">组别：{group}</div>
-        <div class="info">项目类别：{category}</div>
-        <div class="date-info">{subtitle}</div>
-    </div>
-    <div style="page-break-after: always;"></div>
-    """.format(**meta)
-
 def main():
     md_path = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else DEFAULT_MD_PATH
 
@@ -64,10 +51,6 @@ def main():
     text = md_path.read_text(encoding="utf-8")
     # ## 一、 标题 -> ## 1. 标题（便于后续若用带目录的转换器）
     text = re.sub(r"\n## ([一二三四五六七八九十]+)、\s*(.+?)\n", replace_heading, text)
-    
-    # 添加封面页和结构化内容
-    meta = extract_meta(text)
-    cover_page = create_cover_page(meta)
     
     # 处理文档内容，确保中文正确显示
     MD_FOR_PDF.write_text(text, encoding="utf-8")
@@ -115,7 +98,6 @@ def main():
     <title>Diet Management Research Report</title>
 </head>
 <body>
-    {cover_page}
     {html_body}
 </body>
 </html>"""

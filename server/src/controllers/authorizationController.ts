@@ -5,7 +5,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
-import { models } from '../models';
+import type { Models } from '../models';
 import { ApiResponse, AuthorizationType, DataRange } from '../types';
 import { logger } from '../utils/logger';
 
@@ -21,9 +21,9 @@ const createAuthorizationSchema = z.object({
 });
 
 export class AuthorizationController {
-  private models: ReturnType<typeof models>;
+  private models: Models;
 
-  constructor(models: ReturnType<typeof models>) {
+  constructor(models: Models) {
     this.models = models;
   }
 
@@ -172,9 +172,17 @@ export class AuthorizationController {
 
     const authorizations = this.models.authorization.findByDoctorId(doctorId);
 
+    const detailedAuthorizations = authorizations.map((auth) => {
+      const patient = this.models.patient.findById(auth.patientId);
+      return {
+        ...auth,
+        patientName: patient?.name,
+      };
+    });
+
     const response: ApiResponse = {
       success: true,
-      data: authorizations,
+      data: detailedAuthorizations,
     };
 
     res.json(response);
@@ -282,6 +290,6 @@ export class AuthorizationController {
   });
 }
 
-export function createAuthorizationController(models: ReturnType<typeof models>) {
+export function createAuthorizationController(models: Models) {
   return new AuthorizationController(models);
 }

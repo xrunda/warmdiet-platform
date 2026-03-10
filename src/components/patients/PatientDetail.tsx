@@ -2,18 +2,25 @@
  * 患者详情页 - 以患者为中心，整合所有功能模块
  */
 
-import { useEffect, useState } from 'react';
-import { ArrowLeft, User, UtensilsCrossed, FileText, Activity, Pill, CalendarDays, MessageSquare, AlertTriangle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, UtensilsCrossed, FileText, Activity, Pill, CalendarDays, MessageSquare, AlertTriangle } from 'lucide-react';
 import { api } from '../../services/api';
 
-type TabType = 'profile' | 'meals' | 'reports' | 'orders' | 'medications' | 'followup' | 'vitals' | 'chat';
+type TabType = 'vitals' | 'meals' | 'reports' | 'orders' | 'medications' | 'healthProfile' | 'followup' | 'chat';
 
 interface PatientDetailProps {
   patientId: string;
+  initialPatient?: {
+    id: string;
+    name: string;
+    latestUpdate?: string;
+    unreadMessages?: number;
+  };
   onBack?: () => void;
 }
 
 type ApiListResponse<T> = { data?: T[] };
+type ApiSingleResponse<T> = { data?: T };
 
 type MealRecord = {
   id: string;
@@ -135,14 +142,82 @@ type PatientProfile = {
   createdAt: string;
 };
 
-export function PatientDetail({ patientId, onBack }: PatientDetailProps) {
-  const [activeTab, setActiveTab] = useState<TabType>('profile');
+type DailyVitalSummary = {
+  date: string;
+  entries: VitalMeasurement[];
+  bp?: VitalMeasurement;
+  bg?: VitalMeasurement;
+  riskFactors: string[];
+  healthScore: number;
+  badge: { label: string; color: string; bg: string };
+  summary: string;
+};
+
+function getDayRiskFactors(bp?: VitalMeasurement, bg?: VitalMeasurement): string[] {
+  const risks: string[] = [];
+  if (
+    bp &&
+    ((typeof bp.systolic === 'number' && bp.systolic >= 140) ||
+      (typeof bp.diastolic === 'number' && bp.diastolic >= 90))
+  ) {
+    risks.push('血压偏高');
+  }
+  if (bg && typeof bg.value === 'number' && bg.value >= 7) {
+    risks.push('血糖偏高');
+  }
+  if (!bp && !bg) {
+    risks.push('指标未采集');
+  }
+  return risks;
+}
+
+function getDayHealthBadge(riskFactors: string[]) {
+  if (riskFactors.length === 0) {
+    return { label: '健康', color: '#047857', bg: '#dcfce7' };
+  }
+  if (riskFactors.length === 1) {
+    return { label: '需关注', color: '#b45309', bg: '#fef3c7' };
+  }
+  return { label: '警示', color: '#b91c1c', bg: '#fee2e2' };
+}
+
+function getDayHealthScore(bp?: VitalMeasurement, bg?: VitalMeasurement): number {
+  const scores: number[] = [];
+  if (
+    bp &&
+    typeof bp.systolic === 'number' &&
+    typeof bp.diastolic === 'number'
+  ) {
+    if (bp.systolic < 130 && bp.diastolic < 85) {
+      scores.push(90);
+    } else if (bp.systolic < 140 && bp.diastolic < 90) {
+      scores.push(80);
+    } else {
+      scores.push(70);
+    }
+  }
+  if (bg && typeof bg.value === 'number') {
+    if (bg.value < 6.1) {
+      scores.push(95);
+    } else if (bg.value < 7) {
+      scores.push(85);
+    } else {
+      scores.push(75);
+    }
+  }
+  if (scores.length === 0) return 70;
+  return Math.round(scores.reduce((sum, curr) => sum + curr, 0) / scores.length);
+}
+
+export function PatientDetail({ patientId, initialPatient, onBack }: PatientDetailProps) {
+  const [activeTab, setActiveTab] = useState<TabType>('vitals');
   const [loading, setLoading] = useState(true);
   const [patient, setPatient] = useState<PatientProfile | null>(null);
   const [meals, setMeals] = useState<MealRecord[]>([]);
   const [reports, setReports] = useState<HealthReport[]>([]);
   const [orders, setOrders] = useState<MedicalOrder[]>([]);
   const [medications, setMedications] = useState<Medication[]>([]);
+  const [healthConditions, setHealthConditions] = useState<any[]>([]);
   const [vitals, setVitals] = useState<VitalMeasurement[]>([]);
   const [chats, setChats] = useState<ChatMessage[]>([]);
   const [alerts, setAlerts] = useState<string[]>([]);
@@ -152,17 +227,29 @@ export function PatientDetail({ patientId, onBack }: PatientDetailProps) {
   const [generatingReport, setGeneratingReport] = useState(false);
 
   useEffect(() => {
+    if (initialPatient) {
+      setPatient((prev) => ({
+        id: initialPatient.id,
+        name: initialPatient.name,
+        age: prev?.age,
+        gender: prev?.gender,
+        phone: prev?.phone,
+        email: prev?.email,
+        createdAt: prev?.createdAt || new Date().toISOString(),
+      }));
+    }
     loadPatientData();
-  }, [patientId]);
+  }, [patientId, initialPatient]);
 
   async function loadPatientData() {
     setLoading(true);
     try {
       // 并行加载所有数据
-      const [mealsRes, reportsRes, vitalsRes] = await Promise.all([
+      const [mealsRes, reportsRes, vitalsRes, patientRes] = await Promise.all([
         (api.getMeals(patientId) as Promise<ApiListResponse<MealRecord>>).catch(() => ({ data: [] })),
         (api.getReports(patientId) as Promise<ApiListResponse<HealthReport>>).catch(() => ({ data: [] })),
         (api.getVitalMeasurements(patientId, { days: 30 }) as Promise<ApiListResponse<VitalApiItem>>).catch(() => ({ data: [] })),
+        (api.getPatient(patientId) as Promise<ApiSingleResponse<PatientProfile>>).catch(() => ({ data: undefined } as ApiSingleResponse<PatientProfile>)),
       ]);
 
       const normalizedMeals = (mealsRes.data || []).map((meal: any) => ({
@@ -214,39 +301,60 @@ export function PatientDetail({ patientId, onBack }: PatientDetailProps) {
       setVitals(normalizedVitals);
 
       // 模拟其他数据（实际应该从 API 获取）
-      setPatient({
+      const fetchedPatient = (patientRes?.data as PatientProfile | undefined) || null;
+      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const doctorId = storedUser?.userId || storedUser?.id;
+      let authorizationName: string | undefined;
+      if (doctorId) {
+        try {
+          const authRes: any = await api.getDoctorAuthorizations(doctorId);
+          const auths = authRes.data || [];
+          const matched = auths.find((auth: any) => auth.patientId === patientId);
+          authorizationName = matched?.patientName;
+        } catch {
+          // ignore
+        }
+      }
+      setPatient((prev) => ({
         id: patientId,
-        name: `患者 ${patientId.split('_').pop()}`,
-        age: 65,
-        gender: 'male',
-        phone: '138****1234',
-        createdAt: new Date().toISOString(),
-      });
+        name: fetchedPatient?.name || initialPatient?.name || authorizationName || `患者 ${patientId.split('_').pop()}`,
+        age: fetchedPatient?.age ?? prev?.age,
+        gender: fetchedPatient?.gender ?? prev?.gender,
+        phone: fetchedPatient?.phone ?? prev?.phone,
+        email: fetchedPatient?.email ?? prev?.email,
+        createdAt: fetchedPatient?.createdAt ?? prev?.createdAt ?? new Date().toISOString(),
+      }));
 
-      setOrders([
-        {
-          id: 'o1',
-          patientId,
-          content: '控制饮食，少盐少油，每日步行30分钟',
-          doctorName: '王医生',
-          hospitalName: '测试医院',
-          visitDate: new Date(Date.now() - 7 * 24 * 3600000).toISOString().split('T')[0],
-          createdAt: new Date(Date.now() - 7 * 24 * 3600000).toISOString(),
-        },
-      ]);
+      const ordersRes = (await api.getMedicalOrders(patientId).catch(() => ({ data: [] }))) as ApiListResponse<any>;
+      const medsRes = (await api.getMedications(patientId).catch(() => ({ data: [] }))) as ApiListResponse<any>;
+      const healthRes = (await api.getHealthConditions(patientId).catch(() => ({ data: [] }))) as ApiListResponse<any>;
+      const orderList = (ordersRes.data || []).map((item: any) => ({
+        id: item.id,
+        patientId: item.patientId,
+        content: item.content,
+        doctorName: item.doctorName || '医生',
+        hospitalName: item.hospitalName || item.hospital || '医院',
+        visitDate: item.visitDate || item.orderDate || '',
+        originalImage: item.originalImage,
+        createdAt: item.createdAt,
+      }));
 
-      setMedications([
-        {
-          id: 'm1',
-          patientId,
-          name: '氨氯地平片',
-          dosage: '5mg',
-          frequency: '每日一次',
-          startDate: new Date(Date.now() - 30 * 24 * 3600000).toISOString().split('T')[0],
-          status: 'active',
-          createdAt: new Date(Date.now() - 30 * 24 * 3600000).toISOString(),
-        },
-      ]);
+      const medicationList = (medsRes.data || []).map((item: any) => ({
+        id: item.id,
+        patientId: item.patientId,
+        name: item.name,
+        dosage: item.dosage,
+        frequency: item.frequency,
+        startDate: item.startDate || item.createdAt?.split('T')[0] || '',
+        endDate: item.endDate || undefined,
+        status: item.isActive !== undefined ? (item.isActive ? 'active' : 'completed') : 'active',
+        notes: item.notes,
+        createdAt: item.createdAt,
+      }));
+
+      setOrders(orderList);
+      setMedications(medicationList);
+      setHealthConditions(healthRes.data || []);
 
       // 健康指标改为真实 API 数据，不再使用本地模拟数据
 
@@ -263,15 +371,57 @@ export function PatientDetail({ patientId, onBack }: PatientDetailProps) {
   }
 
   const tabs: Array<{ id: TabType; label: string; icon: any; count?: number }> = [
-    { id: 'profile', label: '基本信息', icon: User },
+    { id: 'vitals', label: '健康指标', icon: Activity, count: vitals.length },
     { id: 'meals', label: '餐食记录', icon: UtensilsCrossed, count: meals.length },
     { id: 'reports', label: '健康报告', icon: FileText, count: reports.length },
     { id: 'orders', label: '医嘱记录', icon: Activity },
     { id: 'medications', label: '用药管理', icon: Pill, count: medications.filter(m => m.status === 'active').length },
-    { id: 'vitals', label: '健康指标', icon: Activity, count: vitals.length },
+    { id: 'healthProfile', label: '健康档案', icon: Activity },
     { id: 'followup', label: '随访计划', icon: CalendarDays },
     { id: 'chat', label: '聊天记录', icon: MessageSquare },
   ];
+
+  const dailyVitalSummaries = useMemo(() => {
+    const map = new Map<string, VitalMeasurement[]>();
+    vitals.forEach((entry) => {
+      const date = (entry.measuredAt || new Date().toISOString()).split('T')[0];
+      if (!map.has(date)) map.set(date, []);
+      map.get(date)!.push(entry);
+    });
+    return Array.from(map.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([date, entries]) => {
+        const bp = entries.find((item) => item.type === 'blood_pressure');
+        const bg = entries.find((item) => item.type === 'blood_sugar');
+        const riskFactors = getDayRiskFactors(bp, bg);
+        const badge = getDayHealthBadge(riskFactors);
+        const healthScore = getDayHealthScore(bp, bg);
+        const summaryParts: string[] = [];
+        if (bp) {
+          summaryParts.push(`血压 ${bp.systolic ?? '--'}/${bp.diastolic ?? '--'} ${bp.unit || 'mmHg'}`);
+        }
+        if (bg) {
+          summaryParts.push(`血糖 ${(bg.value ?? '--')} ${bg.unit || 'mmol/L'}`);
+        }
+        return {
+          date,
+          entries,
+          bp,
+          bg,
+          riskFactors,
+          healthScore,
+          badge,
+          summary: summaryParts.join('，') || '暂无指标数据',
+        };
+      });
+  }, [vitals]);
+
+  const vitalsStats = useMemo(() => ({
+    totalDays: dailyVitalSummaries.length,
+    healthy: dailyVitalSummaries.filter((d) => d.riskFactors.length === 0).length,
+    needsAttention: dailyVitalSummaries.filter((d) => d.riskFactors.length === 1).length,
+    warnings: dailyVitalSummaries.filter((d) => d.riskFactors.length > 1).length,
+  }), [dailyVitalSummaries]);
 
   const renderTabContent = () => {
     if (loading) {
@@ -622,48 +772,216 @@ export function PatientDetail({ patientId, onBack }: PatientDetailProps) {
                 ))}
               </div>
             )}
+
+            <div style={{ marginTop: '32px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '12px' }}>
+                健康档案
+              </h3>
+              {healthConditions.length === 0 ? (
+                <div style={{ padding: '24px', borderRadius: 12, background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#64748b' }}>
+                  暂无健康档案信息
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: '12px' }}>
+                  {healthConditions.map((cond) => (
+                    <div key={cond.id} style={{
+                      borderRadius: 12,
+                      padding: '16px',
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+                        <span style={{ fontSize: '15px', fontWeight: 600, color: '#1e293b' }}>{cond.conditionName || cond.condition_name}</span>
+                        <span style={{ fontSize: 12, color: '#94a3b8' }}>{cond.conditionType === 'disease' ? '疾病' : cond.conditionType === 'surgery' ? '手术' : '过敏'} · {cond.diagnosedDate ? cond.diagnosedDate.split('T')[0] : '未知'}</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: 13, color: '#475569', whiteSpace: 'pre-wrap' }}>{cond.notes || cond.note || '未填写备注'}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            </div>
+        );
+
+      case 'healthProfile':
+        return (
+          <div>
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '12px' }}>
+              健康档案
+            </h3>
+            {healthConditions.length === 0 ? (
+              <div style={{ padding: '24px', borderRadius: 12, background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#64748b' }}>
+                暂无健康档案信息
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {healthConditions.map((cond) => (
+                  <div key={cond.id} style={{
+                    borderRadius: 12,
+                    padding: '16px',
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+                      <span style={{ fontSize: '15px', fontWeight: 600, color: '#1e293b' }}>{cond.conditionName || cond.condition_name}</span>
+                      <span style={{ fontSize: 12, color: '#94a3b8' }}>{cond.conditionType === 'disease' ? '疾病' : cond.conditionType === 'surgery' ? '手术' : '过敏'} · {cond.diagnosedDate ? cond.diagnosedDate.split('T')[0] : '未知'}</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: 13, color: '#475569', whiteSpace: 'pre-wrap' }}>{cond.notes || cond.note || '未填写备注'}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
 
       case 'vitals':
         return (
           <div>
-            <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '20px' }}>
-              健康指标（{vitals.length} 条记录）
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '12px' }}>
+              健康指标 · 按日展示
             </h3>
-            {vitals.length === 0 ? (
+            <p style={{ color: '#64748b', marginTop: 0, marginBottom: 24, fontSize: 14 }}>
+              参考健康报告的视觉规范，按天展示关键生命体征与健康评分。
+            </p>
+
+            {dailyVitalSummaries.length === 0 ? (
               <div style={{ padding: '64px', textAlign: 'center', color: '#94a3b8' }}>
                 暂无健康指标记录
               </div>
             ) : (
-              <div style={{ display: 'grid', gap: '12px', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
-                {vitals.map((vital) => (
-                  <div key={vital.id} style={{
-                    background: 'white',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    border: '1px solid #e2e8f0',
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ color: '#64748b', fontSize: '13px' }}>
-                        {vital.type === 'blood_pressure' ? '血压' : '血糖'}
-                      </span>
-                      <span style={{ color: '#94a3b8', fontSize: '12px' }}>
-                        {new Date(vital.measuredAt).toLocaleDateString('zh-CN')}
-                      </span>
+              <>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: 12,
+                    marginBottom: 20,
+                  }}
+                >
+                  {[{
+                    label: '覆盖天数',
+                    value: vitalsStats.totalDays,
+                    icon: '🗓️',
+                    color: '#1e293b',
+                  }, {
+                    label: '指标健康',
+                    value: vitalsStats.healthy,
+                    icon: '✅',
+                    color: '#047857',
+                  }, {
+                    label: '需关注',
+                    value: vitalsStats.needsAttention,
+                    icon: '⚠️',
+                    color: '#92400e',
+                  }, {
+                    label: '警示',
+                    value: vitalsStats.warnings,
+                    icon: '🚨',
+                    color: '#b91c1c',
+                  }].map((stat) => (
+                    <div
+                      key={stat.label}
+                      style={{
+                        borderRadius: 16,
+                        backgroundColor: '#ffffff',
+                        padding: '16px',
+                        border: '1px solid #e2e8f0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        boxShadow: '0 1px 3px rgba(15,23,42,0.08)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 12,
+                          background: '#eef2ff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 18,
+                        }}
+                      >
+                        {stat.icon}
+                      </div>
+                      <div>
+                        <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>{stat.label}</p>
+                        <p style={{ margin: 0, fontSize: 18, fontWeight: 600, color: stat.color }}>{stat.value}</p>
+                      </div>
                     </div>
-                    {vital.type === 'blood_pressure' ? (
-                      <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#1e293b' }}>
-                        {vital.systolic}/{vital.diastolic} mmHg
+                  ))}
+                </div>
+
+                <div style={{ display: 'grid', gap: '16px' }}>
+                  {dailyVitalSummaries.map((day) => (
+                    <div
+                      key={day.date}
+                      style={{
+                        borderRadius: 16,
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 1px 3px rgba(15,23,42,0.08)',
+                        padding: 20,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 16,
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                        <div>
+                          <p style={{ margin: 0, fontSize: 14, color: '#64748b' }}>{day.date}</p>
+                          <h4 style={{ margin: '4px 0 0 0', fontSize: 18, color: '#1e293b' }}>{day.summary}</h4>
+                        </div>
+                        <span
+                          style={{
+                            padding: '4px 12px',
+                            borderRadius: 999,
+                            backgroundColor: day.badge.bg,
+                            color: day.badge.color,
+                            fontWeight: 600,
+                            fontSize: 12,
+                          }}
+                        >
+                          {day.badge.label}
+                        </span>
                       </div>
-                    ) : (
-                      <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#1e293b' }}>
-                        {vital.value} {vital.unit}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                        {[{
+                          label: '血压',
+                          value: day.bp ? `${day.bp.systolic ?? '--'}/${day.bp.diastolic ?? '--'} ${day.bp.unit || 'mmHg'}` : '未采集',
+                        }, {
+                          label: '血糖',
+                          value: day.bg ? `${day.bg.value ?? '--'} ${day.bg.unit || 'mmol/L'}` : '未采集',
+                        }, {
+                          label: '评分',
+                          value: `${day.healthScore} / 100`,
+                        }].map((metric) => (
+                          <div
+                            key={metric.label}
+                            style={{
+                              flex: '1 1 140px',
+                              minWidth: 140,
+                              borderRadius: 12,
+                              backgroundColor: '#f8fafc',
+                              padding: '12px 14px',
+                              border: '1px solid #e2e8f0',
+                            }}
+                          >
+                            <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>{metric.label}</p>
+                            <p style={{ margin: '6px 0 0 0', fontSize: 16, fontWeight: 600, color: '#1e293b' }}>{metric.value}</p>
+                          </div>
+                        ))}
                       </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: '#94a3b8' }}>
+                        <span>采集条数：{day.entries.length}</span>
+                        <span>{day.riskFactors.join('、')}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         );
@@ -759,7 +1077,7 @@ export function PatientDetail({ patientId, onBack }: PatientDetailProps) {
           border: '1px solid #e2e8f0',
           marginBottom: '20px',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
             <div style={{
               width: '64px',
               height: '64px',
@@ -773,13 +1091,26 @@ export function PatientDetail({ patientId, onBack }: PatientDetailProps) {
             }}>
               👤
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: '1 1 220px', minWidth: 220 }}>
               <h2 style={{ fontSize: '22px', fontWeight: 'bold', color: '#1e293b', margin: '0 0 4px 0' }}>
                 {patient.name}
               </h2>
               <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>
-                {patient.age}岁 · {patient.gender === 'male' ? '男' : patient.gender === 'female' ? '女' : ''} · {patient.phone}
+                {patient.age}岁 · {patient.gender === 'male' ? '男' : patient.gender === 'female' ? '女' : '未知'} · {patient.phone || '未填写'}
               </p>
+              <p style={{ color: '#94a3b8', fontSize: '12px', margin: '4px 0 0' }}>
+                ID：{patient.id}
+              </p>
+            </div>
+            <div style={{ flex: '1 1 200px', minWidth: 200, fontSize: 13, color: '#475569', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '6px 12px' }}>
+              <div>
+                <span style={{ display: 'block', color: '#94a3b8' }}>邮箱</span>
+                <span>{patient.email || '未填写'}</span>
+              </div>
+              <div>
+                <span style={{ display: 'block', color: '#94a3b8' }}>注册时间</span>
+                <span>{patient.createdAt ? new Date(patient.createdAt).toLocaleDateString('zh-CN') : '未知'}</span>
+              </div>
             </div>
           </div>
         </div>
