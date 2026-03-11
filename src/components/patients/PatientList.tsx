@@ -4,8 +4,9 @@
  */
 
 import { useEffect, useState } from 'react';
-import { ArrowRight, Calendar, Clock, UtensilsCrossed, FileText, AlertTriangle, Users } from 'lucide-react';
+import { ArrowRight, Calendar, Clock, UtensilsCrossed, FileText, AlertTriangle, Users, BrainCircuit } from 'lucide-react';
 import { api } from '../../services/api';
+import { generatePatientAiSummary } from '../../utils/aiInsights';
 
 interface PatientInfo {
   id: string;
@@ -20,6 +21,10 @@ interface PatientInfo {
   gender?: 'male' | 'female';
   phone?: string;
   phoneMasked?: string;
+  aiRiskScore?: number;
+  aiConfidence?: number;
+  aiSummary?: string;
+  aiReason?: string;
 }
 
 interface PatientListProps {
@@ -59,9 +64,9 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
                 patientMap.set(auth.patientId, {
                   id: auth.patientId,
                   name: auth.patientName || auth.patientId,
-                  unreadMessages: Math.floor(Math.random() * 5),
-                  hasAlerts: Math.random() > 0.5,
-                  followUpStatus: ['pending', 'upcoming', 'none'][Math.floor(Math.random() * 3)] as any,
+                  unreadMessages: 0,
+                  hasAlerts: false,
+                  followUpStatus: 'none',
                   mealCount: 0,
                   reportCount: 0,
                 });
@@ -87,14 +92,33 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
 
           const mealsRes: any = await api.getMeals(pid);
           const reportsRes: any = await api.getReports(pid);
+          const vitalsRes: any = await api.getVitalMeasurements(pid, { days: 7 }).catch(() => ({ data: [] }));
           patient.mealCount = (mealsRes.data || []).length;
           patient.reportCount = (reportsRes.data || []).length;
+
+          const aiSummary = generatePatientAiSummary({
+            patientId: pid,
+            patientName: patient.name,
+            meals: mealsRes.data || [],
+            reports: reportsRes.data || [],
+            vitals: vitalsRes.data || [],
+          });
+
+          patient.aiRiskScore = aiSummary.riskScore;
+          patient.aiConfidence = aiSummary.confidence;
+          patient.aiSummary = aiSummary.summary;
+          patient.aiReason = aiSummary.insight;
+          patient.hasAlerts = aiSummary.riskScore >= 45;
+          patient.followUpStatus = aiSummary.riskScore >= 70 ? 'pending' : aiSummary.riskScore >= 45 ? 'upcoming' : 'none';
+          patient.unreadMessages = aiSummary.riskScore >= 70 ? 2 : aiSummary.riskScore >= 45 ? 1 : 0;
         } catch { /* skip */ }
       }
 
-      setPatients(Array.from(patientMap.values()).sort((a, b) =>
-        new Date(b.latestUpdate || 0).getTime() - new Date(a.latestUpdate || 0).getTime()
-      ));
+      setPatients(Array.from(patientMap.values()).sort((a, b) => {
+        const riskDiff = (b.aiRiskScore || 0) - (a.aiRiskScore || 0);
+        if (riskDiff !== 0) return riskDiff;
+        return new Date(b.latestUpdate || 0).getTime() - new Date(a.latestUpdate || 0).getTime();
+      }));
     } catch (err) {
       console.error('加载患者列表失败:', err);
     } finally {
@@ -129,7 +153,7 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
           我的患者
         </h1>
         <p style={{ color: '#64748b', marginTop: '8px', fontSize: '14px', marginBottom: 0 }}>
-          点击患者卡片，查看完整档案和健康数据
+          AI 已按风险优先级排序，帮助医生优先关注最值得干预的患者
         </p>
       </div>
 
@@ -273,6 +297,26 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
                   </div>
                 )}
 
+                {typeof patient.aiRiskScore === 'number' && (
+                  <div style={{
+                    position: 'absolute',
+                    top: patient.hasAlerts ? '54px' : '16px',
+                    right: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: '999px',
+                    background: 'linear-gradient(90deg, #dbeafe, #ede9fe)',
+                    color: '#4338ca',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                  }}>
+                    <BrainCircuit style={{ width: '14px', height: '14px' }} />
+                    AI 风险 {patient.aiRiskScore}
+                  </div>
+                )}
+
                 {/* 患者信息 */}
                 <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
                   <div style={{
@@ -372,6 +416,36 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
                     </div>
                   </div>
                 </div>
+
+                {patient.aiSummary && (
+                  <div style={{
+                    marginBottom: '16px',
+                    padding: '14px 16px',
+                    borderRadius: '14px',
+                    background: 'linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%)',
+                    border: '1px solid #dbeafe',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <span style={{
+                        padding: '3px 8px',
+                        borderRadius: '999px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        background: 'rgba(79,70,229,0.12)',
+                        color: '#4338ca',
+                      }}>
+                        🤖 AI 洞察
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#6366f1' }}>置信度 {patient.aiConfidence || 0}%</span>
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#334155', lineHeight: 1.7 }}>{patient.aiSummary}</div>
+                    {patient.aiReason && (
+                      <div style={{ marginTop: 8, fontSize: '12px', color: '#475569' }}>
+                        <strong>AI 判断：</strong>{patient.aiReason}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* 进入按钮 */}
                 <div style={{

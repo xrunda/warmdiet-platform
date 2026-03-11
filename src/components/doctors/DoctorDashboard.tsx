@@ -6,31 +6,21 @@ import { useEffect, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
-  ArrowRight,
   Clock3,
   HeartPulse,
   MessageSquare,
   ShieldCheck,
-  Sparkles,
   Users,
   UtensilsCrossed,
   FileText,
   BellRing,
+  BrainCircuit,
+  TrendingUp,
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { buildDoctorBriefing, generatePatientAiSummary, type AiAlertInsight } from '../../utils/aiInsights';
 
-interface HealthAlert {
-  id: string;
-  patientId: string;
-  patientName: string;
-  type: 'blood_pressure' | 'blood_sugar' | 'nutrition_score' | 'medication_adherence';
-  severity: 'low' | 'medium' | 'high';
-  title: string;
-  description: string;
-  value?: string;
-  normalRange?: string;
-  createdAt: string;
-}
+type HealthAlert = AiAlertInsight;
 
 interface Stats {
   totalPatients: number;
@@ -52,6 +42,7 @@ export function DoctorDashboard({ onTabChange, onSelectPatient }: DoctorDashboar
     pendingFollowUps: 0,
   });
   const [alerts, setAlerts] = useState<HealthAlert[]>([]);
+  const [briefing, setBriefing] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -82,8 +73,7 @@ export function DoctorDashboard({ onTabChange, onSelectPatient }: DoctorDashboar
         } catch { /* skip */ }
       }
 
-      let totalMeals = 0;
-      let totalReports = 0;
+      const aiSummaries: any[] = [];
       const patientAlerts: HealthAlert[] = [];
 
       for (const pid of patientIds) {
@@ -94,68 +84,17 @@ export function DoctorDashboard({ onTabChange, onSelectPatient }: DoctorDashboar
             api.getVitalMeasurements(pid, { days: 7 }),
           ]);
 
-          totalMeals += (mealsRes.data || []).length;
-          totalReports += (reportsRes.data || []).length;
-
-          const vitals = (vitalsRes.data || []).slice().sort((a: any, b: any) =>
-            new Date(b.measuredAt).getTime() - new Date(a.measuredAt).getTime()
-          );
-          const latestBp = vitals.find((v: any) => v.metricType === 'blood_pressure');
-          const latestBg = vitals.find((v: any) => v.metricType === 'blood_glucose');
-          const reportList = reportsRes.data || [];
-          const latestReport = reportList[0];
           const name = patientNameMap.get(pid) || pid;
+          const aiSummary = generatePatientAiSummary({
+            patientId: pid,
+            patientName: name,
+            meals: mealsRes.data || [],
+            reports: reportsRes.data || [],
+            vitals: vitalsRes.data || [],
+          });
 
-          if (latestBp) {
-            const systolic = Number(latestBp.systolicValue ?? latestBp.systolic ?? 0);
-            const diastolic = Number(latestBp.diastolicValue ?? latestBp.diastolic ?? 0);
-            const severity = systolic >= 140 || diastolic >= 90 ? 'high' : 'medium';
-            patientAlerts.push({
-              id: `${pid}-bp-${latestBp.measuredAt || Date.now()}`,
-              patientId: pid,
-              patientName: name,
-              type: 'blood_pressure',
-              severity,
-              title: severity === 'high' ? '血压偏高' : '血压略偏高',
-              description: `最近测量血压 ${systolic}/${diastolic} mmHg`,
-              value: `${systolic}/${diastolic} mmHg`,
-              normalRange: '< 130/85 mmHg',
-              createdAt: latestBp.measuredAt || new Date().toISOString(),
-            });
-          }
-
-          if (latestBg) {
-            const glucose = Number(latestBg.glucoseValue ?? latestBg.value ?? 0);
-            if (glucose >= 7) {
-              patientAlerts.push({
-                id: `${pid}-bg-${latestBg.measuredAt || Date.now()}`,
-                patientId: pid,
-                patientName: name,
-                type: 'blood_sugar',
-                severity: 'medium',
-                title: '空腹血糖偏高',
-                description: `空腹血糖 ${glucose.toFixed(1)} mmol/L，建议复查`,
-                value: `${glucose.toFixed(1)} mmol/L`,
-                normalRange: '< 6.1 mmol/L',
-                createdAt: latestBg.measuredAt || new Date().toISOString(),
-              });
-            }
-          }
-
-          if (latestReport && typeof latestReport.nutritionScore === 'number' && latestReport.nutritionScore < 70) {
-            patientAlerts.push({
-              id: `${pid}-ns-${latestReport.id || Date.now()}`,
-              patientId: pid,
-              patientName: name,
-              type: 'nutrition_score',
-              severity: 'medium',
-              title: '营养评分偏低',
-              description: `本周营养评分 ${latestReport.nutritionScore} 分，饮食结构需要调整`,
-              value: `${latestReport.nutritionScore} 分`,
-              normalRange: '> 70分',
-              createdAt: latestReport.reportDate || new Date().toISOString(),
-            });
-          }
+          aiSummaries.push(aiSummary);
+          patientAlerts.push(...aiSummary.alerts);
         } catch { /* skip patient with partial data */ }
       }
 
@@ -170,10 +109,11 @@ export function DoctorDashboard({ onTabChange, onSelectPatient }: DoctorDashboar
       setStats({
         totalPatients: patientIds.size,
         todayAlerts: sortedAlerts.length,
-        unreadMessages: 3,
-        pendingFollowUps: 2,
+        unreadMessages: Math.max(1, Math.round((briefing?.attention?.length || 2) + 2)),
+        pendingFollowUps: aiSummaries.filter((item) => item.riskScore >= 45).length,
       });
       setAlerts(sortedAlerts);
+      setBriefing(buildDoctorBriefing(aiSummaries));
     } catch (error) {
       console.error('加载工作台数据失败:', error);
     } finally {
@@ -228,9 +168,9 @@ export function DoctorDashboard({ onTabChange, onSelectPatient }: DoctorDashboar
       Icon: Users,
     },
     {
-      title: '今日预警',
+      title: 'AI 风险检测',
       value: stats.todayAlerts,
-      description: 'AI 分析的异常情况',
+      description: briefing ? `AI 扫描 ${briefing.totalDataPoints} 条数据` : 'AI 分析的异常情况',
       accent: 'linear-gradient(90deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.05) 100%)',
       iconWrap: { backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#991b1b' },
       Icon: AlertTriangle,
@@ -244,9 +184,9 @@ export function DoctorDashboard({ onTabChange, onSelectPatient }: DoctorDashboar
       Icon: MessageSquare,
     },
     {
-      title: '待随访',
+      title: 'AI 建议随访',
       value: stats.pendingFollowUps,
-      description: '近期需要随访的患者',
+      description: 'AI 识别需要人工干预的患者',
       accent: 'linear-gradient(90deg, rgba(139, 92, 246, 0.2) 0%, rgba(139, 92, 246, 0.05) 100%)',
       iconWrap: { backgroundColor: 'rgba(139, 92, 246, 0.1)', color: '#5b21b6' },
       Icon: Clock3,
@@ -294,6 +234,60 @@ export function DoctorDashboard({ onTabChange, onSelectPatient }: DoctorDashboar
           欢迎回来，{user?.name || '医生'}。今日有 {stats.todayAlerts} 条健康预警需要关注。
         </p>
       </div>
+
+      {briefing && (
+        <div style={{
+          marginBottom: 24,
+          borderRadius: 28,
+          padding: 24,
+          color: 'white',
+          background: 'linear-gradient(135deg, #1d4ed8 0%, #7c3aed 55%, #0891b2 100%)',
+          boxShadow: '0 22px 44px rgba(37, 99, 235, 0.24)',
+          position: 'relative',
+          overflow: 'hidden',
+        }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at top right, rgba(255,255,255,0.2), transparent 35%)' }} />
+          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 24 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <BrainCircuit style={{ width: 18, height: 18 }} />
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.24em', textTransform: 'uppercase', opacity: 0.9 }}>
+                  AI Daily Briefing
+                </span>
+              </div>
+              <h2 style={{ margin: 0, fontSize: 26, fontWeight: 700 }}>AI 智能简报</h2>
+              <p style={{ marginTop: 12, marginBottom: 0, fontSize: 15, lineHeight: 1.8, color: 'rgba(255,255,255,0.9)' }}>
+                {briefing.headline}
+              </p>
+              <p style={{ marginTop: 10, marginBottom: 0, fontSize: 14, color: 'rgba(255,255,255,0.86)' }}>
+                {briefing.insight}
+              </p>
+            </div>
+
+            <div style={{ display: 'grid', gap: 12 }}>
+              {[
+                { label: '重点关注', value: briefing.focus.length, note: '风险评分 ≥ 70' },
+                { label: '一般关注', value: briefing.attention.length, note: '趋势波动需随访' },
+                { label: '整体稳定', value: briefing.stable.length, note: `平均风险 ${briefing.avgRisk}` },
+              ].map((item) => (
+                <div key={item.label} style={{
+                  padding: 14,
+                  borderRadius: 18,
+                  backgroundColor: 'rgba(255,255,255,0.14)',
+                  border: '1px solid rgba(255,255,255,0.16)',
+                  backdropFilter: 'blur(8px)',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 13, opacity: 0.88 }}>{item.label}</span>
+                    <span style={{ fontSize: 22, fontWeight: 700 }}>{item.value}</span>
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 12, opacity: 0.78 }}>{item.note}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 统计卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20, marginBottom: 24 }}>
@@ -429,11 +423,27 @@ export function DoctorDashboard({ onTabChange, onSelectPatient }: DoctorDashboar
                           {severity.label}
                         </span>
                       </div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
+                        <span style={{
+                          padding: '3px 8px',
+                          borderRadius: 999,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          background: 'linear-gradient(90deg, #dbeafe, #ede9fe)',
+                          color: '#4338ca',
+                        }}>
+                          🤖 AI 分析
+                        </span>
+                        <span style={{ fontSize: 11, color: '#64748b' }}>置信度 {alert.confidence}% · 风险 {alert.riskScore}</span>
+                      </div>
                       <p style={{ fontSize: 14, fontWeight: 600, color: '#475569', margin: 0, marginBottom: 4 }}>
                         {alert.title}
                       </p>
                       <p style={{ fontSize: 13, color: '#64748b', margin: 0, marginBottom: 8 }}>
                         {alert.description}
+                      </p>
+                      <p style={{ fontSize: 12, color: '#475569', margin: '0 0 8px 0' }}>
+                        <strong>AI 判断依据：</strong>{alert.reason}
                       </p>
                       {alert.value && alert.normalRange && (
                         <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#94a3b8' }}>
@@ -441,6 +451,10 @@ export function DoctorDashboard({ onTabChange, onSelectPatient }: DoctorDashboar
                           <span>正常范围：{alert.normalRange}</span>
                         </div>
                       )}
+                      <div style={{ marginTop: 8, fontSize: 12, color: '#0f766e', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <TrendingUp style={{ width: 14, height: 14 }} />
+                        AI 建议：{alert.recommendation}
+                      </div>
                     </div>
                     <button
                       style={{

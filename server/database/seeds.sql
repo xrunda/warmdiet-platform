@@ -6,7 +6,7 @@ INSERT INTO hospital_accounts (
   plan_type, subscription_status, max_doctors, subscription_start, subscription_end,
   billing_cycle, created_at, updated_at
 ) VALUES (
-  'hospital_test_001', '北京仁爱医院', '91110000MD0010209', '张三',
+  'hospital_test_001', '北京大学国际医院', '91110000MD0010209', '张三',
   '13800138000', 'test@hospital.com', 'professional', 'active', 20,
   '2026-01-01T00:00:00.000Z', '2027-12-31T23:59:59.999Z', 'yearly',
   datetime('now'), datetime('now')

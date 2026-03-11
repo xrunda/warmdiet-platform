@@ -3,8 +3,9 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, UtensilsCrossed, FileText, Activity, Pill, CalendarDays, MessageSquare, AlertTriangle, RefreshCw } from 'lucide-react';
+import { ArrowLeft, UtensilsCrossed, FileText, Activity, Pill, CalendarDays, MessageSquare, AlertTriangle, RefreshCw, BrainCircuit, TrendingUp, Sparkles } from 'lucide-react';
 import { api } from '../../services/api';
+import { generatePatientAiSummary } from '../../utils/aiInsights';
 
 type TabType = 'vitals' | 'meals' | 'reports' | 'orders' | 'medications' | 'healthProfile' | 'followup' | 'chat';
 
@@ -435,6 +436,39 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
     needsAttention: dailyVitalSummaries.filter((d) => d.riskFactors.length === 1).length,
     warnings: dailyVitalSummaries.filter((d) => d.riskFactors.length > 1).length,
   }), [dailyVitalSummaries]);
+
+  const aiSummary = useMemo(() => generatePatientAiSummary({
+    patientId,
+    patientName: patient?.name || initialPatient?.name || '患者',
+    vitals,
+    meals,
+    reports,
+  }), [patientId, patient?.name, initialPatient?.name, vitals, meals, reports]);
+
+  const aiTimeline = useMemo(() => {
+    const items: Array<{ id: string; time: string; title: string; detail: string; level: 'high' | 'medium' | 'low' }> = [];
+    aiSummary.alerts.forEach((alert) => {
+      items.push({
+        id: `${alert.id}-timeline`,
+        time: alert.createdAt,
+        title: alert.title,
+        detail: `${alert.reason} · 建议：${alert.recommendation}`,
+        level: alert.severity,
+      });
+    });
+    dailyVitalSummaries.slice(0, 3).forEach((day, index) => {
+      if (day.riskFactors.length > 0) {
+        items.push({
+          id: `${day.date}-${index}`,
+          time: `${day.date}T08:00:00`,
+          title: `AI 识别到 ${day.date} 的趋势波动`,
+          detail: `${day.riskFactors.join('、')}；健康评分 ${day.healthScore}/100。`,
+          level: day.riskFactors.length > 1 ? 'high' : 'medium',
+        });
+      }
+    });
+    return items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+  }, [aiSummary, dailyVitalSummaries]);
 
   const renderTabContent = () => {
     if (loading) {
@@ -1106,6 +1140,72 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
         </div>
       )}
 
+      <div style={{
+        marginBottom: '20px',
+        borderRadius: '20px',
+        padding: '22px',
+        background: 'linear-gradient(135deg, #eff6ff 0%, #f5f3ff 45%, #ecfeff 100%)',
+        border: '1px solid #dbeafe',
+        boxShadow: '0 12px 28px rgba(59,130,246,0.08)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 320px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <BrainCircuit style={{ width: 18, height: 18, color: '#4338ca' }} />
+              <span style={{ fontSize: 11, letterSpacing: '0.18em', fontWeight: 700, color: '#4338ca', textTransform: 'uppercase' }}>
+                AI Health Assessment
+              </span>
+            </div>
+            <h3 style={{ margin: 0, fontSize: '24px', color: '#1e293b' }}>AI 风险评估</h3>
+            <p style={{ margin: '10px 0 0', fontSize: '14px', color: '#475569', lineHeight: 1.8 }}>{aiSummary.summary}</p>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
+              <span style={{ padding: '6px 12px', borderRadius: 999, background: '#e0e7ff', color: '#4338ca', fontSize: 12, fontWeight: 700 }}>
+                风险评分 {aiSummary.riskScore}/100
+              </span>
+              <span style={{ padding: '6px 12px', borderRadius: 999, background: '#cffafe', color: '#0f766e', fontSize: 12, fontWeight: 700 }}>
+                置信度 {aiSummary.confidence}%
+              </span>
+              <span style={{ padding: '6px 12px', borderRadius: 999, background: '#ede9fe', color: '#6d28d9', fontSize: 12, fontWeight: 700 }}>
+                {aiSummary.statusLabel}
+              </span>
+            </div>
+          </div>
+
+          <div style={{ flex: '1 1 260px', minWidth: 240 }}>
+            <div style={{ padding: '14px 16px', borderRadius: 16, background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.9)' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>AI 发现的关键洞察</div>
+              <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.7 }}>{aiSummary.insight}</div>
+              <div style={{ marginTop: 10, fontSize: 12, color: '#0f766e', lineHeight: 1.7 }}>
+                <strong>建议：</strong>{aiSummary.recommendation}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 18 }}>
+          {aiSummary.dimensions.map((dimension) => (
+            <div key={dimension.label} style={{ background: 'rgba(255,255,255,0.82)', borderRadius: 16, padding: 14, border: '1px solid rgba(255,255,255,0.9)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: '#475569', fontWeight: 600 }}>{dimension.label}</span>
+                <span style={{ fontSize: 18, fontWeight: 700, color: '#1e293b' }}>{dimension.score}</span>
+              </div>
+              <div style={{ marginTop: 10, height: 8, background: '#e2e8f0', borderRadius: 999, overflow: 'hidden' }}>
+                <div style={{ width: `${dimension.score}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #38bdf8, #8b5cf6)' }} />
+              </div>
+              <div style={{ marginTop: 8, fontSize: 12, color: '#64748b' }}>{dimension.note}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {aiSummary.basis.map((item, idx) => (
+            <span key={`${item}-${idx}`} style={{ padding: '6px 10px', borderRadius: 999, fontSize: 12, color: '#334155', background: 'rgba(255,255,255,0.86)', border: '1px solid #e2e8f0' }}>
+              ✨ {item}
+            </span>
+          ))}
+        </div>
+      </div>
+
       {/* 患者基本信息卡片 */}
       {patient && (
         <div style={{
@@ -1219,6 +1319,28 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
 
       {/* Tab 内容 */}
       <div style={{ background: 'white', borderRadius: '16px', padding: '24px', boxShadow: '0 1px 3px rgba(15,23,42,0.08)' }}>
+        {activeTab === 'vitals' && aiTimeline.length > 0 && (
+          <div style={{ marginBottom: 24, padding: 18, borderRadius: 16, background: '#faf5ff', border: '1px solid #e9d5ff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <Sparkles style={{ width: 18, height: 18, color: '#9333ea' }} />
+              <h3 style={{ margin: 0, fontSize: 18, color: '#581c87' }}>AI 异常检测时间线</h3>
+            </div>
+            <div style={{ display: 'grid', gap: 12 }}>
+              {aiTimeline.map((item) => (
+                <div key={item.id} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: 12, borderRadius: 12, background: 'white', border: '1px solid #f3e8ff' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 12, background: item.level === 'high' ? '#fee2e2' : item.level === 'medium' ? '#fef3c7' : '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <TrendingUp style={{ width: 16, height: 16, color: item.level === 'high' ? '#b91c1c' : item.level === 'medium' ? '#b45309' : '#1d4ed8' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, color: '#94a3b8' }}>{formatDateTime(item.time)}</div>
+                    <div style={{ marginTop: 4, fontSize: 14, fontWeight: 700, color: '#1e293b' }}>{item.title}</div>
+                    <div style={{ marginTop: 4, fontSize: 13, color: '#475569', lineHeight: 1.7 }}>{item.detail}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {renderTabContent()}
       </div>
     </div>
