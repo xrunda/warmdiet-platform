@@ -236,11 +236,24 @@ export async function fetchDietAlerts(date?: string) {
   return request<any[]>(`/patients/${patientId}/diet-alerts${query}`);
 }
 
+// ===== Timeline =====
+
+export async function fetchTimeline(date?: string, limit?: number) {
+  const { patientId } = await getDemoToken();
+  const query = new URLSearchParams();
+  if (date) query.set('date', date);
+  if (limit) query.set('limit', String(limit));
+  return request<any[]>(`/patients/${patientId}/timeline${query.toString() ? `?${query.toString()}` : ''}`);
+}
+
 // ===== Conversation Logs =====
 
-export async function fetchConversationLogs(date: string) {
+export async function fetchConversationLogs(date?: string, limit?: number) {
   const { patientId } = await getDemoToken();
-  return request<any[]>(`/patients/${patientId}/conversation-logs?date=${date}`);
+  const query = new URLSearchParams();
+  if (date) query.set('date', date);
+  if (limit) query.set('limit', String(limit));
+  return request<any[]>(`/patients/${patientId}/conversation-logs${query.toString() ? `?${query.toString()}` : ''}`);
 }
 
 export async function fetchConversationDates() {

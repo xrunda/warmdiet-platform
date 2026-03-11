@@ -148,6 +148,13 @@ router.put('/:id/medical-orders/:orderId/scan', authenticatePatient, (req, res, 
 router.get('/:id/diet-alerts', authenticateDoctorOrPatient, (req, res, next) => getModels().controller.getDietAlerts(req, res, next));
 
 /**
+ * @route   GET /api/patients/:id/timeline
+ * @desc    获取统一时间线（对话+饮食+体征）
+ * @access  Private (Patient / Doctor)
+ */
+router.get('/:id/timeline', authenticateDoctorOrPatient, (req, res, next) => getModels().controller.getTimeline(req, res, next));
+
+/**
  * @route   GET /api/patients/:id/vital-measurements/latest
  * @desc    获取患者最新血压血糖摘要
  * @access  Private (Patient / Doctor / Hospital)

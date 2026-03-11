@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -23,6 +23,7 @@ import {
   Mic,
   Pill,
   Plus,
+  RefreshCw,
   Search,
   Settings,
   Share2,
@@ -52,6 +53,7 @@ import {
   fetchVitalMeasurements,
   fetchLatestHealthReport,
   fetchTomorrowMealGuide,
+  fetchTimeline,
   fetchConversationLogs,
   fetchConversationDates,
   fetchPatientProfile,
@@ -106,13 +108,37 @@ type VitalSummary = {
   recentCount: number;
 };
 
+const FOOD_NAME_ZH: Record<string, string> = {
+  banana: '香蕉', apple: '苹果', orange: '橙子', grape: '葡萄', watermelon: '西瓜', pear: '梨', peach: '桃子', mango: '芒果', strawberry: '草莓', kiwi: '猕猴桃', cherry: '樱桃', lemon: '柠檬', pineapple: '菠萝', papaya: '木瓜', blueberry: '蓝莓', plum: '李子', pomegranate: '石榴', fig: '无花果', lychee: '荔枝', longan: '龙眼', coconut: '椰子', cantaloupe: '哈密瓜', durian: '榴莲', persimmon: '柿子', tangerine: '橘子', avocado: '牛油果',
+  rice: '米饭', noodles: '面条', noodle: '面条', porridge: '粥', congee: '粥', bread: '面包', steamed_bun: '馒头', mantou: '馒头', bun: '包子', dumpling: '饺子', dumplings: '饺子', wonton: '馄饨', pancake: '煎饼', fried_rice: '炒饭', millet_porridge: '小米粥', oatmeal: '燕麦粥', toast: '吐司', pasta: '意面',
+  egg: '鸡蛋', eggs: '鸡蛋', boiled_egg: '煮鸡蛋', steamed_egg: '蒸蛋', tea_egg: '茶叶蛋', fried_egg: '煎蛋', omelette: '蛋饼', scrambled_eggs: '炒鸡蛋',
+  milk: '牛奶', yogurt: '酸奶', soy_milk: '豆浆', soymilk: '豆浆', juice: '果汁',
+  tofu: '豆腐', bean_curd: '豆腐',
+  chicken: '鸡肉', pork: '猪肉', beef: '牛肉', lamb: '羊肉', duck: '鸭肉', fish: '鱼', shrimp: '虾', prawn: '虾', crab: '螃蟹',
+  'lean pork': '瘦肉', 'lean meat': '瘦肉', 'pork belly': '五花肉', 'braised pork': '红烧肉', 'roast duck': '烤鸭', 'steamed fish': '清蒸鱼', 'grilled fish': '烤鱼',
+  'chicken breast': '鸡胸肉', 'chicken wing': '鸡翅', 'chicken leg': '鸡腿', 'pork ribs': '排骨', 'spare ribs': '排骨', 'beef steak': '牛排', steak: '牛排',
+  spinach: '菠菜', cabbage: '白菜', broccoli: '西兰花', carrot: '胡萝卜', tomato: '番茄', cucumber: '黄瓜', potato: '土豆', corn: '玉米', lettuce: '生菜', celery: '芹菜', onion: '洋葱', garlic: '大蒜', ginger: '姜', pepper: '辣椒', mushroom: '蘑菇', eggplant: '茄子', pumpkin: '南瓜', zucchini: '西葫芦', asparagus: '芦笋', pea: '豌豆', peas: '豌豆', bean: '豆子', beans: '豆子', 'green beans': '青豆', 'sweet potato': '红薯', radish: '萝卜', turnip: '萝卜', bamboo_shoot: '竹笋', 'bok choy': '青菜', 'chinese cabbage': '大白菜',
+  soup: '汤', salad: '沙拉', stew: '炖菜', 'vegetable soup': '蔬菜汤', 'egg soup': '蛋花汤', 'bone soup': '骨头汤',
+  cookie: '饼干', cookies: '饼干', cake: '蛋糕', chocolate: '巧克力', candy: '糖果', ice_cream: '冰淇淋', 'ice cream': '冰淇淋', pudding: '布丁', pie: '馅饼',
+  tea: '茶', coffee: '咖啡', water: '水', beer: '啤酒', wine: '葡萄酒',
+  sausage: '香肠', ham: '火腿', bacon: '培根', 'fried chicken': '炸鸡', hamburger: '汉堡', sandwich: '三明治', pizza: '披萨',
+  walnut: '核桃', peanut: '花生', peanuts: '花生', almond: '杏仁', cashew: '腰果', sesame: '芝麻',
+  honey: '蜂蜜', sugar: '糖', salt: '盐', vinegar: '醋', 'soy sauce': '酱油', oil: '油', butter: '黄油', cheese: '奶酪',
+};
+
+function translateFoodName(name: string): string {
+  if (!name) return name;
+  const lower = name.toLowerCase().trim();
+  return FOOD_NAME_ZH[lower] || name;
+}
+
 function mapApiMealToMeal(apiMeal: any): Meal {
   const foods: any[] = apiMeal.foods || [];
   return {
     id: String(apiMeal.id),
     type: apiMeal.mealType || apiMeal.meal_type,
     time: apiMeal.mealTime || apiMeal.meal_time || '',
-    items: foods.map((f: any) => f.name),
+    items: foods.map((f: any) => translateFoodName(f.name)),
     calories: apiMeal.calories || 0,
     protein: foods.reduce((s: number, f: any) => s + (f.protein || 0), 0),
     fat: foods.reduce((s: number, f: any) => s + (f.fat || 0), 0),
@@ -131,6 +157,16 @@ function formatTrendDay(dateStr: string): string {
 function formatDateLabel(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
   return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
+function formatChatTimestamp(logDate?: string, timestamp?: string) {
+  if (!timestamp) return '';
+  if (!logDate) return timestamp.slice(0, 5);
+  const normalized = /^\d{2}:\d{2}:\d{2}$/.test(timestamp) ? timestamp : `${timestamp}:00`;
+  const dt = new Date(`${logDate}T${normalized}`);
+  if (Number.isNaN(dt.getTime())) return timestamp.slice(0, 5);
+  const dateLabel = formatDateLabel(logDate);
+  return `${dateLabel} ${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
 }
 
 function formatMeasuredTime(dateTime?: string) {
@@ -194,6 +230,31 @@ const FOOD_LIBRARY = [
   { category: '肉类', items: ['猪肉', '牛肉', '鸡肉', '排骨', '红烧肉', '鱼片', '虾'] },
   { category: '汤品', items: ['蔬菜汤', '紫菜蛋花汤', '鱼汤', '骨头汤', '番茄蛋汤', '冬瓜汤'] },
 ];
+
+const MEAL_SCHEDULES = [
+  { key: 'breakfast', label: '早餐', emoji: '🌅' },
+  { key: 'lunch', label: '午餐', emoji: '☀️' },
+  { key: 'dinner', label: '晚餐', emoji: '🌙' },
+] as const;
+
+type MealType = (typeof MEAL_SCHEDULES)[number]['key'];
+
+function parseMealTimeStamp(value?: string) {
+  if (!value) return new Date(0);
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime())) return parsed;
+  const fallback = new Date(`1970-01-01T${value}`);
+  return fallback;
+}
+
+function formatMealRecordTime(value?: string) {
+  if (!value) return '暂无时间';
+  const date = new Date(value);
+  if (!Number.isNaN(date.getTime())) {
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  }
+  return value;
+}
 
 // --- Shared bottom sheet wrapper ---
 function BottomSheet({
@@ -1650,29 +1711,69 @@ const HomeScreen = ({
   const [stats, setStats] = useState({ avgScore: 0, maxScore: 0, minScore: 0 });
   const [patientName, setPatientName] = useState('');
   const [vitalsSummary, setVitalsSummary] = useState<VitalSummary | null>(null);
+  const [refreshingMeals, setRefreshingMeals] = useState(false);
+  const [refreshingVitals, setRefreshingVitals] = useState(false);
 
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
   const [selectedAlert, setSelectedAlert] = useState<AlertItem | null>(null);
   const [showWeekly, setShowWeekly] = useState(false);
   const [showVitalsSheet, setShowVitalsSheet] = useState(false);
 
+  const loadDashboard = useCallback(async () => {
+    const data: any = await fetchDashboard();
+    setPatientName(data.patient?.name || '');
+    setHealthScore(data.healthScore || 0);
+    setMeals((data.meals || []).map(mapApiMealToMeal));
+    setAlerts(data.alerts || []);
+    setChats(data.conversations || []);
+    setTrendData(
+      (data.trendData || []).map((d: any) => ({ day: formatTrendDay(d.date), score: d.score }))
+    );
+    setStats(data.stats || { avgScore: 0, maxScore: 0, minScore: 0 });
+    setVitalsSummary(data.vitals || null);
+  }, []);
+
   useEffect(() => {
-    fetchDashboard()
-      .then((data: any) => {
-        setPatientName(data.patient?.name || '');
-        setHealthScore(data.healthScore || 0);
-        setMeals((data.meals || []).map(mapApiMealToMeal));
-        setAlerts(data.alerts || []);
-        setChats(data.conversations || []);
-        setTrendData(
-          (data.trendData || []).map((d: any) => ({ day: formatTrendDay(d.date), score: d.score }))
-        );
-        setStats(data.stats || { avgScore: 0, maxScore: 0, minScore: 0 });
-        setVitalsSummary(data.vitals || null);
-      })
+    setLoading(true);
+    loadDashboard()
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [loadDashboard]);
+
+  const handleMealsRefresh = useCallback(async () => {
+    if (refreshingMeals) return;
+    setRefreshingMeals(true);
+    try {
+      await loadDashboard();
+    } catch (error) {
+      console.error('刷新饮食数据失败', error);
+    } finally {
+      setRefreshingMeals(false);
+    }
+  }, [loadDashboard, refreshingMeals]);
+
+  const handleVitalsRefresh = useCallback(async () => {
+    if (refreshingVitals) return;
+    setRefreshingVitals(true);
+    try {
+      await loadDashboard();
+    } catch (error) {
+      console.error('刷新附属健康指标失败', error);
+    } finally {
+      setRefreshingVitals(false);
+    }
+  }, [loadDashboard, refreshingVitals]);
+
+  const groupedMeals = useMemo(
+    () =>
+      MEAL_SCHEDULES.map((schedule) => ({
+        ...schedule,
+        entries: meals
+          .filter((meal) => meal.type === schedule.key)
+          .sort((a, b) => parseMealTimeStamp(a.time).getTime() - parseMealTimeStamp(b.time).getTime()),
+      })),
+    [meals]
+  );
 
   const getMealLabel = (type: string) =>
     type === 'breakfast' ? '早餐' : type === 'lunch' ? '午餐' : '晚餐';
@@ -1872,12 +1973,30 @@ const HomeScreen = ({
               <Heart className="h-3.5 w-3.5" />
               附属健康指标
             </div>
-            <button
-              onClick={() => setShowVitalsSheet(true)}
-              className="shrink-0 rounded-2xl border border-white/80 bg-white/85 px-4 py-3 text-sm font-bold text-indigo-700 shadow-[0_10px_24px_rgba(79,70,229,0.08)]"
-            >
-              查看详情
-            </button>
+            <div className="flex items-center gap-2">
+              <motion.button
+                type="button"
+                onClick={handleVitalsRefresh}
+                disabled={refreshingVitals}
+                whileTap={{ scale: 0.92 }}
+                animate={{ rotate: refreshingVitals ? 360 : 0 }}
+                transition={{
+                  repeat: refreshingVitals ? Infinity : 0,
+                  duration: refreshingVitals ? 0.9 : 0,
+                  ease: 'linear',
+                }}
+                className="rounded-full p-2 text-gray-400 hover:text-indigo-600 hover:bg-gray-100 transition"
+                aria-label="刷新附属健康指标"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </motion.button>
+              <button
+                onClick={() => setShowVitalsSheet(true)}
+                className="shrink-0 rounded-2xl border border-white/80 bg-white/85 px-4 py-3 text-sm font-bold text-indigo-700 shadow-[0_10px_24px_rgba(79,70,229,0.08)]"
+              >
+                查看详情
+              </button>
+            </div>
           </div>
 
           <div className="mt-4 grid grid-cols-1 gap-3">
@@ -1929,6 +2048,22 @@ const HomeScreen = ({
             <div className="flex items-center gap-2">
               <Calendar className="w-5 h-5 text-indigo-600" />
               <h3 className="text-lg font-bold text-gray-900">今日饮食</h3>
+              <motion.button
+                type="button"
+                onClick={handleMealsRefresh}
+                disabled={refreshingMeals}
+                whileTap={{ scale: 0.92 }}
+                animate={{ rotate: refreshingMeals ? 360 : 0 }}
+                transition={{
+                  repeat: refreshingMeals ? Infinity : 0,
+                  duration: refreshingMeals ? 0.9 : 0,
+                  ease: 'linear',
+                }}
+                className="rounded-full p-2 text-gray-400 hover:text-indigo-600 hover:bg-gray-100 transition"
+                aria-label="刷新今日饮食"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </motion.button>
             </div>
             <div className={cn('gap-2', elderMode ? 'grid grid-cols-2' : 'flex')}>
               <button onClick={() => setShowWeekly(true)} className="text-sm text-indigo-600 font-medium px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition">
@@ -1940,47 +2075,58 @@ const HomeScreen = ({
             </div>
           </div>
 
-          {meals.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">暂无饮食记录</p>
-          ) : (
-            <div className="space-y-4">
-              {meals.map((meal) => (
-                <div key={meal.id} className="border-b border-gray-50 last:border-0 pb-4 last:pb-0">
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base font-bold text-gray-900">
-                        {getMealLabel(meal.type)} ({meal.time})
-                      </span>
-                      {meal.isWarning && <AlertTriangle className="w-3.5 h-3.5 text-red-400" />}
+          <div className="space-y-4">
+            {groupedMeals.map(({ key, label, emoji, entries }) => (
+              <div key={key} className="rounded-[20px] border border-gray-100/80 bg-gray-50/70 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{emoji}</span>
+                    <div>
+                      <p className="text-sm font-bold text-gray-900">{label}</p>
+                      <p className="text-xs text-gray-500">
+                        {entries.length > 0 ? `${entries.length} 条记录` : '暂无记录'}
+                      </p>
                     </div>
-                    <button onClick={() => setSelectedMeal(meal)} className="text-sm text-indigo-600 font-medium">
-                      查看详情
-                    </button>
                   </div>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {meal.items.map((item, i) => (
-                      <div key={i} className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-xl">
-                        <span className="text-sm">{item}</span>
-                        {meal.isWarning ? (
-                          <span className="text-xs text-red-500 font-bold">⚠</span>
-                        ) : (
-                          <Check className="w-3 h-3 text-emerald-500" />
-                        )}
-                      </div>
+                  {entries.length > 0 && (
+                    <span className="text-xs text-emerald-500 font-bold">{entries[entries.length - 1].calories} kcal</span>
+                  )}
+                </div>
+                {entries.length === 0 ? (
+                  <p className="mt-3 text-sm text-gray-400">暂无该餐记录</p>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {entries.map((meal) => (
+                      <button
+                        key={`${meal.id}-${meal.time}`}
+                        onClick={() => setSelectedMeal(meal)}
+                        className="w-full rounded-2xl border border-gray-100 bg-white p-3 text-left hover:border-indigo-100 transition"
+                      >
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                          <span>记录时间：{formatMealRecordTime(meal.time)}</span>
+                          <span className={cn('font-bold', meal.isWarning ? 'text-red-500' : 'text-indigo-600')}>
+                            {meal.calories} kcal
+                          </span>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {meal.items.map((item, index) => (
+                            <span key={index} className="inline-flex items-center gap-1 rounded-xl border border-gray-100 bg-gray-50 px-3 py-1 text-xs text-gray-600">
+                              <span>{item}</span>
+                              {meal.isWarning ? (
+                                <span className="text-xs text-red-500 font-bold">⚠</span>
+                              ) : (
+                                <Check className="w-3 h-3 text-emerald-500" />
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      </button>
                     ))}
                   </div>
-                  <div className="flex justify-between items-center text-sm text-gray-400">
-                    <span className="flex items-center gap-1">
-                      <Mic className="w-3 h-3" /> 语音录入
-                    </span>
-                    <span className={cn('font-bold', meal.isWarning ? 'text-red-500' : 'text-emerald-600')}>
-                      {meal.calories} kcal
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                )}
+              </div>
+            ))}
+          </div>
         </section>
 
         {/* Weekly Trend */}
@@ -2145,36 +2291,62 @@ const LogScreen = () => {
   const [dateIndex, setDateIndex] = useState(0);
   const [chats, setChats] = useState<ChatMessage[]>([]);
   const [chatsLoading, setChatsLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<'all' | 'byDate'>('byDate');
 
   useEffect(() => {
-    fetchConversationDates()
-      .then((d: string[]) => {
-        const sortedDates = (d || []).sort();
-        setDates(sortedDates);
-        setDateIndex(Math.max(0, sortedDates.length - 1));
+    // 先加载全部时间线获取所有可用日期
+    fetchTimeline(undefined, 1000)
+      .then((items: any[]) => {
+        const allDates = Array.from(new Set((items || []).map((it: any) => it.logDate).filter(Boolean))).sort();
+        setDates(allDates);
+        setDateIndex(Math.max(0, allDates.length - 1));
+        setTimelineItems(items || []);
+        setChats(
+          (items || [])
+            .filter((it: any) => it.type === 'conversation')
+            .map((it: any) => ({
+              id: it.id,
+              role: it.data?.role,
+              content: it.data?.content,
+              timestamp: formatChatTimestamp(it.logDate, it.timestamp),
+              logDate: it.logDate,
+              extra: it.data?.extra || undefined,
+            }))
+        );
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
+  const [timelineItems, setTimelineItems] = useState<any[]>([]);
+
   useEffect(() => {
     if (dates.length === 0) return;
     setChatsLoading(true);
-    fetchConversationLogs(dates[dateIndex])
-      .then((logs: any[]) => {
+    const dateParam = viewMode === 'byDate' ? dates[dateIndex] : undefined;
+    const limitParam = viewMode === 'all' ? 1000 : undefined;
+    fetchTimeline(dateParam, limitParam)
+      .then((items: any[]) => {
+        setTimelineItems(items || []);
+        // 兼容：把 conversation 类型的也放到 chats 里
         setChats(
-          (logs || []).map((log: any) => ({
-            id: String(log.id),
-            role: log.role,
-            content: log.content,
-            timestamp: log.timestamp,
-            extra: log.extra || undefined,
-          }))
+          (items || [])
+            .filter((it: any) => it.type === 'conversation')
+            .map((it: any) => ({
+              id: it.id,
+              role: it.data?.role,
+              content: it.data?.content,
+              timestamp: viewMode === 'all'
+                ? formatChatTimestamp(it.logDate, it.timestamp)
+                : (it.timestamp || '').slice(0, 5),
+              logDate: it.logDate,
+              extra: it.data?.extra || undefined,
+            }))
         );
       })
-      .catch(() => setChats([]))
+      .catch(() => { setTimelineItems([]); setChats([]); })
       .finally(() => setChatsLoading(false));
-  }, [dates, dateIndex]);
+  }, [dates, dateIndex, viewMode]);
 
   const today = new Date().toISOString().slice(0, 10);
   const isToday = dates[dateIndex] === today;
@@ -2199,9 +2371,38 @@ const LogScreen = () => {
           </svg>
         </div>
         <div className="relative z-10 flex items-center justify-between py-3">
-          <h1 className="text-xl font-bold text-white">对话记录</h1>
+          <h1 className="text-xl font-bold text-white">记录</h1>
           <div className="flex gap-1">
-            <button className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition"><Search className="w-5 h-5" /></button>
+            <button
+              onClick={() => {
+                setChatsLoading(true);
+                const dateParam = viewMode === 'byDate' ? dates[dateIndex] : undefined;
+                const limitParam = viewMode === 'all' ? 1000 : undefined;
+                fetchTimeline(dateParam, limitParam)
+                  .then((items: any[]) => {
+                    setTimelineItems(items || []);
+                    setChats(
+                      (items || [])
+                        .filter((it: any) => it.type === 'conversation')
+                        .map((it: any) => ({
+                          id: it.id,
+                          role: it.data?.role,
+                          content: it.data?.content,
+                          timestamp: viewMode === 'all'
+                            ? formatChatTimestamp(it.logDate, it.timestamp)
+                            : (it.timestamp || '').slice(0, 5),
+                          logDate: it.logDate,
+                          extra: it.data?.extra || undefined,
+                        }))
+                    );
+                  })
+                  .catch(() => { setTimelineItems([]); setChats([]); })
+                  .finally(() => setChatsLoading(false));
+              }}
+              className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition"
+            >
+              <RefreshCw className="w-5 h-5" />
+            </button>
             <button className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition"><Calendar className="w-5 h-5" /></button>
           </div>
         </div>
@@ -2222,7 +2423,7 @@ const LogScreen = () => {
         </div>
       </header>
 
-      {dates.length > 0 && (
+      {dates.length > 0 && viewMode === 'byDate' && (
         <div className="bg-white px-4 py-3 flex items-center justify-between shadow-sm shrink-0 border-b border-gray-100/80">
           <button
             onClick={() => setDateIndex((i) => Math.max(0, i - 1))}
@@ -2246,7 +2447,30 @@ const LogScreen = () => {
       )}
 
       <main className="flex-1 overflow-y-auto p-4 space-y-5 hide-scrollbar">
-        {dates.length > 0 && (
+        <div className="flex items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => setViewMode('byDate')}
+            className={cn(
+              'rounded-full px-4 py-2 text-xs font-bold transition',
+              viewMode === 'byDate' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-gray-500 border border-gray-200'
+            )}
+          >
+            按日期查看
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('all')}
+            className={cn(
+              'rounded-full px-4 py-2 text-xs font-bold transition',
+              viewMode === 'all' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-gray-500 border border-gray-200'
+            )}
+          >
+            全部记录
+          </button>
+        </div>
+
+        {dates.length > 0 && viewMode === 'byDate' && (
           <div className="flex justify-center">
             <span className="bg-gray-100 text-gray-400 text-xs px-3 py-1 rounded-full">
               {isToday ? '今天 ' : ''}{currentYear}年{currentDateLabel}
@@ -2256,76 +2480,154 @@ const LogScreen = () => {
 
         {chatsLoading ? (
           <LoadingSpinner />
-        ) : chats.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-10">暂无对话记录</p>
+        ) : timelineItems.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-10">暂无记录</p>
         ) : (
-          chats.map((chat) => (
-            <div key={chat.id} className={cn('flex items-start gap-3', chat.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
-              <div className={cn(
-                'w-9 h-9 rounded-full shrink-0 border-2 border-white shadow-sm overflow-hidden flex items-center justify-center',
-                chat.role === 'user' ? 'bg-gray-200' : 'bg-indigo-100'
-              )}>
-                {chat.role === 'user' ? (
-                  <img src="https://picsum.photos/seed/elderly/100/100" alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                ) : (
-                  <Sparkles className="w-4 h-4 text-indigo-600" />
-                )}
-              </div>
-              <div className={cn('flex flex-col max-w-[78%]', chat.role === 'user' ? 'items-end' : 'items-start')}>
-                <div className={cn(
-                  'px-4 py-3 rounded-[20px] text-sm leading-relaxed shadow-sm',
-                  chat.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-md' : 'bg-white text-gray-800 rounded-tl-md'
-                )}>
-                  {chat.content}
-                </div>
-                {chat.extra && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={cn(
-                      'mt-2 p-3.5 rounded-2xl border w-full shadow-sm',
-                      chat.extra.type === 'alert'
-                        ? 'bg-red-50/70 border-red-100'
-                        : chat.extra.type === 'metric'
-                        ? 'bg-sky-50/80 border-sky-100'
-                        : 'bg-emerald-50/70 border-emerald-100'
-                    )}
-                  >
-                    <div className="flex items-center gap-2 mb-1.5">
-                      {chat.extra.type === 'alert' ? (
-                        <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
-                      ) : chat.extra.type === 'metric' ? (
-                        <Heart className="w-3.5 h-3.5 text-sky-500" />
-                      ) : (
-                        <Utensils className="w-3.5 h-3.5 text-emerald-600" />
-                      )}
-                      <span className={cn(
-                        'text-sm font-bold',
-                        chat.extra.type === 'alert'
-                          ? 'text-red-600'
-                          : chat.extra.type === 'metric'
-                          ? 'text-sky-700'
-                          : 'text-emerald-700'
-                      )}>
-                        {chat.extra.title}
-                      </span>
+          (() => {
+            // 聚合同餐次的饮食记录
+            const mealGroups: Record<string, any[]> = {};
+            const nonMealItems: any[] = [];
+            let firstMealInserted = new Set<string>();
+            const processedItems: any[] = [];
+
+            timelineItems.forEach((item: any) => {
+              if (item.type === 'meal') {
+                const mealType = item.data?.mealType || 'other';
+                if (!mealGroups[mealType]) mealGroups[mealType] = [];
+                mealGroups[mealType].push(item);
+              } else {
+                processedItems.push({ ...item, _kind: 'normal' });
+              }
+            });
+
+            // 为每个餐次生成一个聚合卡片，插入到第一条该餐次出现的位置
+            const mealCards: any[] = [];
+            (['breakfast', 'lunch', 'dinner'] as const).forEach((mt) => {
+              const group = mealGroups[mt];
+              if (!group || group.length === 0) return;
+              const label = mt === 'breakfast' ? '🌅 早餐' : mt === 'lunch' ? '☀️ 午餐' : '🌙 晚餐';
+              const totalCal = group.reduce((s: number, g: any) => s + (g.data?.calories || 0), 0);
+              const allFoods = group.flatMap((g: any) => (g.data?.foodNames || '').split('、').filter(Boolean));
+              const allNotes = group.map((g: any) => g.data?.notes).filter(Boolean);
+              const latestTime = group[group.length - 1]?.timestamp || '';
+              const latestLogDate = group[group.length - 1]?.logDate || '';
+              mealCards.push({
+                id: `meal-agg-${mt}`,
+                _kind: 'meal-agg',
+                mealType: mt,
+                label,
+                totalCal,
+                allFoods,
+                allNotes,
+                count: group.length,
+                timestamp: latestTime,
+                logDate: latestLogDate,
+              });
+            });
+
+            // 把聚合饮食卡片按时间插入到对话流中（放在最前面）
+            const finalItems = [...mealCards, ...processedItems];
+
+            return finalItems.map((item: any) => {
+              if (item._kind === 'meal-agg') {
+                const timeLabel = viewMode === 'all'
+                  ? formatChatTimestamp(item.logDate, item.timestamp)
+                  : (item.timestamp || '').slice(0, 5);
+                return (
+                  <div key={item.id} className="rounded-[20px] border border-amber-100 bg-[linear-gradient(135deg,#fffbf0_0%,#fff7e6_100%)] p-4 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+                        <Utensils className="w-4 h-4 text-amber-600" />
+                      </div>
+                      <div className="flex-1">
+                        <span className="text-sm font-bold text-amber-800">{item.label}</span>
+                        <span className="text-xs text-amber-500 ml-2">{item.totalCal} kcal</span>
+                        {item.count > 1 && <span className="text-xs text-gray-400 ml-1">({item.count}条记录)</span>}
+                      </div>
+                      <span className="text-xs text-gray-400">{timeLabel}</span>
                     </div>
-                    <p className="text-sm text-gray-600 leading-relaxed">{chat.extra.text}</p>
-                    {chat.extra.items && (
-                      <ul className="mt-2 space-y-1">
-                        {chat.extra.items.map((item, i) => (
-                          <li key={i} className="flex items-center gap-1.5 text-sm text-gray-600">
-                            <div className="w-1 h-1 bg-emerald-500 rounded-full shrink-0" />{item}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </motion.div>
-                )}
-                <span className="text-xs text-gray-400 mt-1 px-1">{chat.timestamp}</span>
+                    <p className="text-sm text-gray-700">
+                      {item.allFoods.map((n: string) => translateFoodName(n.trim())).join('、') || '暂无食物记录'}
+                    </p>
+                    {item.allNotes.length > 0 && <p className="text-xs text-gray-400 mt-1">备注：{item.allNotes.join('；')}</p>}
+                  </div>
+                );
+              }
+
+            const timeLabel = viewMode === 'all'
+              ? formatChatTimestamp(item.logDate, item.timestamp)
+              : (item.timestamp || '').slice(0, 5);
+
+            // --- 体征记录卡片 ---
+            if (item.type === 'vital') {
+              const isPressure = item.data.metricType === 'blood_pressure';
+              const statusColor = item.data.status === 'high' ? 'text-red-600' : item.data.status === 'low' ? 'text-blue-600' : 'text-emerald-600';
+              return (
+                <div key={item.id} className="rounded-[20px] border border-sky-100 bg-[linear-gradient(135deg,#f8fbff_0%,#eef5ff_100%)] p-4 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className={cn('w-8 h-8 rounded-full flex items-center justify-center', isPressure ? 'bg-rose-50 text-rose-500' : 'bg-sky-50 text-sky-500')}>
+                      {isPressure ? <Heart className="w-4 h-4" /> : <Droplets className="w-4 h-4" />}
+                    </div>
+                    <div className="flex-1">
+                      <span className="text-sm font-bold text-gray-800">{item.data.label}{item.data.contextLabel ? ` · ${item.data.contextLabel}` : ''}</span>
+                    </div>
+                    <span className="text-xs text-gray-400">{timeLabel}</span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className={cn('text-2xl font-black', statusColor)}>{item.data.value}</span>
+                    <span className="text-sm text-gray-400">{item.data.unit}</span>
+                  </div>
+                </div>
+              );
+            }
+
+            // --- 对话记录（默认） ---
+            const role = item.data?.role;
+            const content = item.data?.content;
+            const extra = item.data?.extra;
+            return (
+              <div key={item.id} className={cn('flex items-start gap-3', role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
+                <div className={cn(
+                  'w-9 h-9 rounded-full shrink-0 border-2 border-white shadow-sm overflow-hidden flex items-center justify-center',
+                  role === 'user' ? 'bg-gray-200' : 'bg-indigo-100'
+                )}>
+                  {role === 'user' ? (
+                    <img src="https://picsum.photos/seed/elderly/100/100" alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <Sparkles className="w-4 h-4 text-indigo-600" />
+                  )}
+                </div>
+                <div className={cn('flex flex-col max-w-[78%]', role === 'user' ? 'items-end' : 'items-start')}>
+                  <div className={cn(
+                    'px-4 py-3 rounded-[20px] text-sm leading-relaxed shadow-sm',
+                    role === 'user' ? 'bg-indigo-600 text-white rounded-tr-md' : 'bg-white text-gray-800 rounded-tl-md'
+                  )}>
+                    {content}
+                  </div>
+                  {extra && (
+                    <div className={cn(
+                      'mt-2 p-3.5 rounded-2xl border w-full shadow-sm',
+                      extra.type === 'alert' ? 'bg-red-50/70 border-red-100' : 'bg-emerald-50/70 border-emerald-100'
+                    )}>
+                      <p className="text-sm font-bold text-gray-700">{extra.title}</p>
+                      <p className="text-sm text-gray-600 mt-1">{extra.text}</p>
+                      {extra.items && (
+                        <ul className="mt-2 space-y-1">
+                          {extra.items.map((it: string, i: number) => (
+                            <li key={i} className="flex items-center gap-1.5 text-sm text-gray-600">
+                              <div className="w-1 h-1 bg-emerald-500 rounded-full shrink-0" />{it}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                  <span className="text-xs text-gray-400 mt-1 px-1">{timeLabel}</span>
+                </div>
               </div>
-            </div>
-          ))
+            );
+          });
+          })()
         )}
         <div className="h-4" />
       </main>

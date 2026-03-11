@@ -553,18 +553,119 @@ export class PatientController {
     res.json({ success: true, data: alerts });
   });
 
+  // --- Timeline (unified: conversations + meals + vitals) ---
+
+  public getTimeline = asyncHandler(async (req: Request, res: Response) => {
+    const patientId = req.params.id;
+    const limit = Math.min(Math.max(Number(req.query.limit) || 500, 1), 2000);
+    const date = req.query.date as string | undefined;
+    this.ensurePatientExists(patientId);
+    this.syncVitalsFromConversationLogs(patientId);
+
+    type TimelineItem = {
+      type: 'conversation' | 'meal' | 'vital';
+      id: string;
+      sortKey: string; // ISO-ish for sorting
+      logDate: string;
+      timestamp: string;
+      data: any;
+    };
+
+    const items: TimelineItem[] = [];
+
+    // 1) Conversation logs
+    const convLogs = date
+      ? this.models.conversationLog.findByPatientIdAndDate(patientId, date)
+      : this.models.conversationLog.findByPatientId(patientId, { limit });
+    for (const c of convLogs) {
+      items.push({
+        type: 'conversation',
+        id: `conv_${c.id}`,
+        sortKey: `${c.logDate}T${c.timestamp || '00:00'}`,
+        logDate: c.logDate,
+        timestamp: c.timestamp,
+        data: { role: c.role, content: c.content, extra: c.extra ? JSON.parse(c.extra) : undefined },
+      });
+    }
+
+    // 2) Meal records
+    const mealLogs = date
+      ? this.models.mealRecord.findByDate(patientId, date)
+      : this.models.mealRecord.findByPatientId(patientId, { limit });
+    for (const m of mealLogs) {
+      const mealLabel = m.mealType === 'breakfast' ? '早餐' : m.mealType === 'lunch' ? '午餐' : m.mealType === 'dinner' ? '晚餐' : '加餐';
+      const foods = JSON.parse(m.foods || '[]');
+      const foodNames = foods.map((f: any) => f.name || f).join('、');
+      items.push({
+        type: 'meal',
+        id: `meal_${m.id}`,
+        sortKey: `${m.mealDate}T${m.mealTime || '00:00'}`,
+        logDate: m.mealDate,
+        timestamp: m.mealTime,
+        data: {
+          mealType: m.mealType,
+          mealLabel,
+          foods,
+          foodNames,
+          calories: m.calories,
+          nutritionScore: m.nutritionScore,
+          notes: m.notes,
+        },
+      });
+    }
+
+    // 3) Vital measurements
+    const vitals = date
+      ? this.models.vitalMeasurement.findByPatientId(patientId, 90, undefined).filter(v => v.measurementDate === date)
+      : this.models.vitalMeasurement.findByPatientId(patientId, 90);
+    for (const v of vitals) {
+      const isPressure = v.metricType === 'blood_pressure';
+      const value = isPressure ? `${v.systolicValue}/${v.diastolicValue}` : String(v.glucoseValue);
+      const label = isPressure ? '血压' : '血糖';
+      const contextLabel = !isPressure
+        ? (v.glucoseContext === 'fasting' ? '空腹' : v.glucoseContext === 'post_meal' ? '餐后' : v.glucoseContext === 'before_sleep' ? '睡前' : '')
+        : '';
+      items.push({
+        type: 'vital',
+        id: `vital_${v.id}`,
+        sortKey: v.measuredAt || `${v.measurementDate}T00:00`,
+        logDate: v.measurementDate,
+        timestamp: v.measuredAt ? v.measuredAt.split('T')[1]?.slice(0, 5) || '' : '',
+        data: {
+          metricType: v.metricType,
+          label,
+          value,
+          unit: v.unit,
+          contextLabel,
+          sourceType: v.sourceType,
+          status: this.normalizeVitalSummaryItem(v)?.status,
+        },
+      });
+    }
+
+    // Sort: newest first
+    items.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+
+    // Limit
+    const result = items.slice(0, limit);
+
+    res.json({ success: true, data: result });
+  });
+
   // --- Conversation Logs ---
 
   public getConversationLogs = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.id;
-    const date = req.query.date as string;
+    const date = req.query.date as string | undefined;
+    const limit = Math.min(Math.max(Number(req.query.limit) || 500, 1), 1000);
     this.ensurePatientExists(patientId);
-
-    if (!date) throw new AppError('请提供日期参数', 400);
 
     this.syncVitalsFromConversationLogs(patientId);
 
-    const logs = this.models.conversationLog.findByPatientIdAndDate(patientId, date)
+    const logs = (date
+      ? this.models.conversationLog.findByPatientIdAndDate(patientId, date)
+      : this.models.conversationLog.findByPatientId(patientId, { limit })
+    )
       .map(c => ({ ...c, extra: c.extra ? JSON.parse(c.extra) : undefined }));
 
     res.json({ success: true, data: logs });

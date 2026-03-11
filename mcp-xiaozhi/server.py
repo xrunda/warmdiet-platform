@@ -37,15 +37,153 @@ def _safe_response(data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+# 中英文食物名称映射表（用于将 LLM 翻译的英文转回中文）
+FOOD_NAME_TRANSLATION = {
+    # 主食
+    "porridge": "粥",
+    "rice": "米饭",
+    "noodles": "面条",
+    "noodle": "面条",
+    "bread": "面包",
+    "steamed bread": "馒头",
+    "steamed_bread": "馒头",
+    "corn": "玉米",
+    "sweet potato": "红薯",
+    "sweet_potato": "红薯",
+    "oatmeal": "燕麦",
+    "oats": "燕麦",
+    "congee": "粥",
+    "millet porridge": "小米粥",
+    "millet_congee": "小米粥",
+    "millet": "小米",
+    "whole wheat bread": "全麦面包",
+    "whole_wheat_bread": "全麦面包",
+    "glutinous rice": "糯米",
+    
+    # 蛋白质
+    "egg": "鸡蛋",
+    "eggs": "鸡蛋",
+    "steamed egg": "蒸蛋",
+    "steamed_egg": "蒸蛋",
+    "boiled egg": "煮鸡蛋",
+    "boiled_egg": "煮鸡蛋",
+    "tofu": "豆腐",
+    "fish": "鱼肉",
+    "chicken breast": "鸡胸肉",
+    "chicken_breast": "鸡胸肉",
+    "lean pork": "瘦肉",
+    "lean_meat": "瘦肉",
+    "pork": "猪肉",
+    "beef": "牛肉",
+    "shrimp": "虾仁",
+    "milk": "牛奶",
+    "soy milk": "豆浆",
+    "soy_milk": "豆浆",
+    
+    # 蔬菜
+    "spinach": "菠菜",
+    "cabbage": "白菜",
+    "bok choy": "小白菜",
+    "broccoli": "西兰花",
+    "carrot": "胡萝卜",
+    "tomato": "番茄",
+    "cucumber": "黄瓜",
+    "lettuce": "生菜",
+    "vegetable": "蔬菜",
+    "vegetables": "蔬菜",
+    "greens": "青菜",
+    "winter melon": "冬瓜",
+    "potato": "土豆",
+    "eggplant": "茄子",
+    "mushroom": "蘑菇",
+    "mushrooms": "蘑菇",
+    
+    # 肉类
+    "pork belly": "五花肉",
+    "red braised pork": "红烧肉",
+    "braised pork": "红烧肉",
+    "steamed chicken": "蒸鸡",
+    "steamed fish": "清蒸鱼",
+    "fish fillet": "鱼片",
+    "ribs": "排骨",
+    
+    # 汤品
+    "soup": "汤",
+    "vegetable soup": "蔬菜汤",
+    "seaweed egg soup": "紫菜蛋花汤",
+    "fish soup": "鱼汤",
+    "bone soup": "骨头汤",
+    "tomato egg soup": "番茄蛋汤",
+    "winter melon soup": "冬瓜汤",
+    
+    # 水果
+    "apple": "苹果",
+    "banana": "香蕉",
+    "orange": "橙子",
+    "pear": "梨",
+    "watermelon": "西瓜",
+    "grape": "葡萄",
+    "fruit": "水果",
+    
+    # 其他
+    "salad": "沙拉",
+    "rice porridge": "粥",
+    "corn porridge": "玉米粥",
+    "red bean porridge": "红豆粥",
+    "green bean porridge": "绿豆粥",
+    "walnut": "核桃",
+    "peanut": "花生",
+    "sesame": "芝麻",
+    "honey": "蜂蜜",
+    "sugar": "糖",
+    "salt": "盐",
+    "oil": "油",
+    "soy sauce": "酱油",
+    "vinegar": "醋",
+    "garlic": "大蒜",
+    "ginger": "姜",
+    "onion": "洋葱",
+    "pepper": "辣椒",
+    "chili": "辣椒",
+}
+
+def _translate_food_name(name: str) -> str:
+    """将英文食物名称翻译回中文"""
+    # 先检查是否已经是中文
+    if any('\u4e00' <= c <= '\u9fff' for c in name):
+        return name
+    
+    # 转换为小写进行匹配
+    lower_name = name.lower().strip()
+    
+    # 直接匹配
+    if lower_name in FOOD_NAME_TRANSLATION:
+        return FOOD_NAME_TRANSLATION[lower_name]
+    
+    # 尝试匹配带下划线的版本
+    if lower_name in FOOD_NAME_TRANSLATION:
+        return FOOD_NAME_TRANSLATION[lower_name]
+    
+    # 尝试部分匹配（如 "lean pork stir-fry" -> "瘦肉"）
+    for eng, chi in FOOD_NAME_TRANSLATION.items():
+        if eng in lower_name or lower_name in eng:
+            return chi
+    
+    # 如果找不到翻译，返回原始名称
+    return name
+
+
 def _build_foods(food_names: List[str]) -> List[Dict[str, Any]]:
     foods: List[Dict[str, Any]] = []
     for name in food_names:
         n = name.strip()
         if not n:
             continue
+        # 翻译食物名称为中文
+        chinese_name = _translate_food_name(n)
         foods.append(
             {
-                "name": n,
+                "name": chinese_name,
                 "amount": 1,
                 "unit": "份",
                 "calories": 100,

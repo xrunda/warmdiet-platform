@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, UtensilsCrossed, FileText, Activity, Pill, CalendarDays, MessageSquare, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, UtensilsCrossed, FileText, Activity, Pill, CalendarDays, MessageSquare, AlertTriangle, RefreshCw } from 'lucide-react';
 import { api } from '../../services/api';
 
 type TabType = 'vitals' | 'meals' | 'reports' | 'orders' | 'medications' | 'healthProfile' | 'followup' | 'chat';
@@ -993,27 +993,75 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
 
   return (
     <div style={{ minHeight: '100%', backgroundColor: '#f8fafc' }}>
-      {/* 返回按钮 */}
-      <button
-        onClick={onBack}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '10px 16px',
-          background: 'white',
-          border: '1px solid #e2e8f0',
-          borderRadius: '10px',
-          color: '#64748b',
-          fontSize: '14px',
-          fontWeight: '500',
-          cursor: 'pointer',
-          marginBottom: '20px',
-        }}
-      >
-        <ArrowLeft style={{ width: '16px', height: '16px' }} />
-        返回患者列表
-      </button>
+      {/* 顶部操作栏 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '12px', flexWrap: 'wrap' }}>
+        <button
+          onClick={onBack}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 16px',
+            background: 'white',
+            border: '1px solid #e2e8f0',
+            borderRadius: '10px',
+            color: '#64748b',
+            fontSize: '14px',
+            fontWeight: '500',
+            cursor: 'pointer',
+          }}
+        >
+          <ArrowLeft style={{ width: '16px', height: '16px' }} />
+          返回患者列表
+        </button>
+        
+        <button
+          onClick={() => loadPatientData()}
+          disabled={loading}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 16px',
+            background: loading ? '#f1f5f9' : 'white',
+            border: '1px solid #e2e8f0',
+            borderRadius: '10px',
+            color: loading ? '#94a3b8' : '#0891b2',
+            fontSize: '14px',
+            fontWeight: '500',
+            cursor: loading ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            if (!loading) {
+              e.currentTarget.style.background = '#f0f9ff';
+              e.currentTarget.style.borderColor = '#0891b2';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!loading) {
+              e.currentTarget.style.background = 'white';
+              e.currentTarget.style.borderColor = '#e2e8f0';
+            }
+          }}
+        >
+          <RefreshCw 
+            style={{ 
+              width: '16px', 
+              height: '16px',
+              animation: loading ? 'spin 1s linear infinite' : 'none'
+            }} 
+          />
+          {loading ? '刷新中...' : '刷新数据'}
+        </button>
+      </div>
+      
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
 
       {/* 健康预警横幅 */}
       {alerts.length > 0 && (

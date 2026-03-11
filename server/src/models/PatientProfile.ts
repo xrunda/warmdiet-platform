@@ -122,6 +122,17 @@ export class ConversationLogModel extends BaseModel<ConversationLog> {
     return this.query(sql, [patientId, date]);
   }
 
+  public findByPatientId(patientId: string, options?: { limit?: number }): ConversationLog[] {
+    const limit = options?.limit ?? 300;
+    const sql = `
+      SELECT * FROM conversation_logs
+      WHERE patient_id = ?
+      ORDER BY log_date DESC, timestamp DESC, created_at DESC
+      LIMIT ?
+    `;
+    return this.query(sql, [patientId, limit]);
+  }
+
   public getAvailableDates(patientId: string): string[] {
     const sql = `SELECT DISTINCT log_date FROM conversation_logs WHERE patient_id = ? ORDER BY log_date DESC LIMIT 30`;
     const rows = this.db.prepare(sql).all(patientId) as any[];

@@ -16,11 +16,13 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  logDate?: string;
   extra?: {
-    type: 'alert' | 'recommendation';
+    type: 'alert' | 'recommendation' | 'metric' | 'meal';
     title: string;
     text: string;
     items?: string[];
+    source?: string;
   };
 }
 
