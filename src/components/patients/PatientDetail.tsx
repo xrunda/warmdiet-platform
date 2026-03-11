@@ -70,6 +70,19 @@ function formatMinute(input?: string) {
   return `${`${d.getHours()}`.padStart(2, '0')}:${`${d.getMinutes()}`.padStart(2, '0')}`;
 }
 
+function formatDateTime(input?: string) {
+  if (!input) return '--';
+  const d = new Date(input);
+  if (Number.isNaN(d.getTime())) return '--';
+  const Y = d.getFullYear();
+  const M = `${d.getMonth() + 1}`.padStart(2, '0');
+  const D = `${d.getDate()}`.padStart(2, '0');
+  const h = `${d.getHours()}`.padStart(2, '0');
+  const m = `${d.getMinutes()}`.padStart(2, '0');
+  const s = `${d.getSeconds()}`.padStart(2, '0');
+  return `${Y}-${M}-${D} ${h}:${m}:${s}`;
+}
+
 type HealthReport = {
   id: string;
   patientId: string;
@@ -923,12 +936,15 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                         {[{
                           label: '血压',
                           value: day.bp ? `${day.bp.systolic ?? '--'}/${day.bp.diastolic ?? '--'} ${day.bp.unit || 'mmHg'}` : '未采集',
+                          updatedAt: day.bp ? formatDateTime(day.bp.measuredAt) : undefined,
                         }, {
                           label: '血糖',
                           value: day.bg ? `${day.bg.value ?? '--'} ${day.bg.unit || 'mmol/L'}` : '未采集',
+                          updatedAt: day.bg ? formatDateTime(day.bg.measuredAt) : undefined,
                         }, {
                           label: '评分',
                           value: `${day.healthScore} / 100`,
+                          updatedAt: undefined as string | undefined,
                         }].map((metric) => (
                           <div
                             key={metric.label}
@@ -943,6 +959,9 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                           >
                             <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>{metric.label}</p>
                             <p style={{ margin: '6px 0 0 0', fontSize: 16, fontWeight: 600, color: '#1e293b' }}>{metric.value}</p>
+                            {metric.updatedAt && (
+                              <p style={{ margin: '4px 0 0 0', fontSize: 11, color: '#94a3b8' }}>更新：{metric.updatedAt}</p>
+                            )}
                           </div>
                         ))}
                       </div>

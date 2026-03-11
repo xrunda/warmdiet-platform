@@ -54,3 +54,11 @@ class WarmDietApiClient:
 
     def get_today_summary(self) -> Dict[str, Any]:
         return self._request("GET", f"/patients/{self.patient_id}/dashboard")
+
+    def get_meal_suggestion(self, mode: str = "set", meal_type: str | None = None) -> Dict[str, Any]:
+        """获取用餐指引建议"""
+        import time
+        payload: Dict[str, Any] = {"mode": mode, "nonce": int(time.time())}
+        if meal_type:
+            payload["mealType"] = meal_type
+        return self._request("POST", f"/reports/patient/{self.patient_id}/tomorrow-guide", json_data=payload)

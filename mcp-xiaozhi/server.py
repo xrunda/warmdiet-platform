@@ -368,6 +368,77 @@ def append_conversation_log(
         return {"success": False, "error": str(ex)}
 
 
+# 餐次英文→中文映射
+MEAL_TYPE_MAP = {
+    "breakfast": "早餐",
+    "lunch": "午餐",
+    "dinner": "晚餐",
+}
+
+
+@mcp.tool()
+def get_meal_suggestion(
+    meal_type: str = "",
+) -> dict:
+    """当用户询问建议吃什么、该吃什么、饮食建议时，使用该工具获取用餐指引。
+
+    适用问题举例：
+    - 早上吃什么？明天早上吃什么？早餐建议？
+    - 中午吃什么？明天中午吃什么？午餐吃什么？
+    - 晚上吃什么？明天晚上吃什么？晚餐吃什么？
+    - 今天吃什么？明天吃什么？最近建议吃什么？
+    - 有什么饮食建议？该怎么吃？
+
+    参数说明：
+    - meal_type: 可选。breakfast 表示早餐，lunch 表示午餐，dinner 表示晚餐；
+      不填或填 all 则返回三餐完整建议方案。
+    """
+    logger.info("[TOOL-IN] get_meal_suggestion meal_type=%s", meal_type)
+
+    mt = meal_type.strip().lower() if meal_type else ""
+
+    try:
+        if mt in MEAL_TYPE_MAP:
+            # 查询单餐建议
+            chinese_type = MEAL_TYPE_MAP[mt]
+            data = api_client.get_meal_suggestion(mode="single", meal_type=chinese_type)
+            result = {
+                "success": True,
+                "meal_type": chinese_type,
+                "menu": data.get("menu", ""),
+                "reason": data.get("reason", ""),
+                "time": data.get("time", ""),
+                "message": f"建议{chinese_type}吃：{data.get('menu', '')}。{data.get('reason', '')}",
+            }
+        else:
+            # 查询三餐完整建议
+            data = api_client.get_meal_suggestion(mode="set")
+            plan = data.get("plan", [])
+            meals_text = []
+            plan_list = []
+            for item in plan:
+                meals_text.append(
+                    f"{item.get('type', '')}（{item.get('time', '')}）：{item.get('menu', '')}。{item.get('reason', '')}"
+                )
+                plan_list.append({
+                    "meal_type": item.get("type", ""),
+                    "time": item.get("time", ""),
+                    "menu": item.get("menu", ""),
+                    "reason": item.get("reason", ""),
+                })
+            result = {
+                "success": True,
+                "plan": plan_list,
+                "message": "以下是为您推荐的三餐方案：\n" + "\n".join(meals_text),
+            }
+
+        logger.info("[TOOL-OK] get_meal_suggestion meal_type=%s", meal_type)
+        return _safe_response(result)
+    except WarmDietApiError as ex:
+        logger.error("[TOOL-ERR] get_meal_suggestion err=%s", ex)
+        return {"success": False, "error": str(ex)}
+
+
 @mcp.tool()
 def get_today_summary() -> dict:
     """当用户询问“今天情况如何/今日总结”时，使用该工具获取仪表盘摘要。"""
