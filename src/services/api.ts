@@ -364,6 +364,10 @@ export class ApiService {
   /**
    * 获取健康报告列表
    */
+  public async getAIConsultations(patientId: string) {
+    return this.request(`/ai-consultations/patient/${patientId}`);
+  }
+
   public async getReports(patientId: string) {
     return this.request(`/reports/patient/${patientId}`);
   }

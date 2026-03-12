@@ -21,19 +21,6 @@ type AIConsultationReport = {
   sourceMaterials: string[];
 };
 
-const MOCK_AI_CONSULTATION_REPORTS: AIConsultationReport[] = [
-  {
-    id: 'ai-consult-20260301-001',
-    title: 'AI 会诊报告',
-    hospitalName: '北京大学国际医院',
-    reportUrl: 'https://cyberai.dev.xrunda.com/creator-review/cw_1772258265509_6c593e23?version=2027629665153216513',
-    createdAt: '2026-03-01T12:00:00+08:00',
-    riskLevel: 'high',
-    tags: ['CKD 3a期', '高胆固醇血症'],
-    summary: '患者在家属端上传检查单后生成的 AI 会诊报告，医生可直接查看重点风险与建议，辅助制定下一步巡诊方案。',
-    sourceMaterials: [],
-  },
-];
 
 interface PatientDetailProps {
   patientId: string;
@@ -266,7 +253,7 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
   const [selectedOrderImage, setSelectedOrderImage] = useState<MedicalOrder | null>(null);
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
   const [generatingReport, setGeneratingReport] = useState(false);
-  const [aiConsultReports] = useState<AIConsultationReport[]>(MOCK_AI_CONSULTATION_REPORTS);
+  const [aiConsultReports, setAiConsultReports] = useState<AIConsultationReport[]>([]);
 
   useEffect(() => {
     if (initialPatient) {
@@ -397,6 +384,25 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
       setOrders(orderList);
       setMedications(medicationList);
       setHealthConditions(healthRes.data || []);
+
+      // 加载 AI 会诊报告
+      try {
+        const aiConsultRes: any = await api.getAIConsultations(patientId);
+        const aiReports = (aiConsultRes.data || []).map((r: any) => ({
+          id: r.id,
+          title: r.title || 'AI 会诊报告',
+          hospitalName: r.hospitalName || '',
+          reportUrl: r.htmlReportUrl || r.reportUrl || '',
+          createdAt: r.createdAt || r.created_at || '',
+          riskLevel: r.riskLevel || r.risk_level || 'low',
+          tags: Array.isArray(r.tags) ? r.tags : (() => { try { return JSON.parse(r.tags || '[]'); } catch { return []; } })(),
+          summary: r.consultationSummary || r.summary || '',
+          sourceMaterials: Array.isArray(r.sourceFiles) ? r.sourceFiles : (() => { try { return JSON.parse(r.sourceFiles || '[]'); } catch { return []; } })(),
+        }));
+        setAiConsultReports(aiReports);
+      } catch {
+        setAiConsultReports([]);
+      }
 
       // 健康指标改为真实 API 数据，不再使用本地模拟数据
 
@@ -766,6 +772,13 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
               <span style={{ fontSize: 12, color: '#64748b' }}>来自患者端上传触发</span>
             </div>
 
+            {aiConsultReports.length === 0 ? (
+              <div style={{ padding: '64px', textAlign: 'center', color: '#94a3b8' }}>
+                <Sparkles style={{ width: 32, height: 32, color: '#c7d2fe', margin: '0 auto 12px' }} />
+                <p style={{ fontSize: 15, fontWeight: 600, color: '#64748b' }}>暂无 AI 会诊报告</p>
+                <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 6 }}>患者在家属端上传检查单后，系统会自动生成会诊报告并展示在此处。</p>
+              </div>
+            ) : (
             <div style={{ display: 'grid', gap: '12px' }}>
               {aiConsultReports.map((report) => (
                 <div
@@ -845,6 +858,7 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                 </div>
               ))}
             </div>
+            )}
           </div>
         );
 
