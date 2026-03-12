@@ -133,6 +133,81 @@ type AIConsultationReportItem = {
 
 const MOCK_AI_CONSULTATION_REPORTS: AIConsultationReportItem[] = [];
 
+/** 简易 Markdown 渲染（Tailwind 版）：将文本按段落、标题、列表等拆分为 React 元素 */
+function renderFormattedTextH5(text: string) {
+  if (!text) return null;
+  const lines = text.split(/\n/);
+  const elements: React.ReactNode[] = [];
+  let listBuffer: string[] = [];
+  let key = 0;
+
+  const flushList = () => {
+    if (listBuffer.length === 0) return;
+    elements.push(
+      <ul key={key++} className="my-2 pl-5 list-disc space-y-0.5">
+        {listBuffer.map((item, i) => (
+          <li key={i} className="text-sm text-gray-700 leading-relaxed">{renderInline(item)}</li>
+        ))}
+      </ul>
+    );
+    listBuffer = [];
+  };
+
+  const renderInline = (line: string): React.ReactNode => {
+    const parts: React.ReactNode[] = [];
+    const boldRegex = /\*\*(.+?)\*\*/g;
+    let lastIdx = 0;
+    let match;
+    while ((match = boldRegex.exec(line)) !== null) {
+      if (match.index > lastIdx) parts.push(line.slice(lastIdx, match.index));
+      parts.push(<strong key={`b${match.index}`} className="text-gray-900 font-bold">{match[1]}</strong>);
+      lastIdx = match.index + match[0].length;
+    }
+    if (lastIdx < line.length) parts.push(line.slice(lastIdx));
+    return parts.length > 0 ? <>{parts}</> : line;
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+
+    if (!line) {
+      flushList();
+      elements.push(<div key={key++} className="h-2" />);
+      continue;
+    }
+
+    if (/^#{1,3}\s/.test(line)) {
+      flushList();
+      const level = (line.match(/^(#+)/)?.[1]?.length) || 1;
+      const headingText = line.replace(/^#{1,3}\s*/, '');
+      const cls = level === 1
+        ? 'text-base font-bold text-gray-900 mt-4 mb-1 pb-1.5 border-b border-gray-100'
+        : level === 2
+        ? 'text-[15px] font-bold text-gray-900 mt-3 mb-1 pb-1 border-b border-gray-50'
+        : 'text-sm font-bold text-gray-800 mt-2 mb-0.5';
+      elements.push(<div key={key++} className={cls}>{renderInline(headingText)}</div>);
+      continue;
+    }
+
+    if (/^[-*•]\s/.test(line)) {
+      listBuffer.push(line.replace(/^[-*•]\s*/, ''));
+      continue;
+    }
+
+    if (/^\d+[.、)]\s/.test(line)) {
+      listBuffer.push(line);
+      continue;
+    }
+
+    flushList();
+    elements.push(
+      <p key={key++} className="text-sm text-gray-700 leading-relaxed my-1">{renderInline(line)}</p>
+    );
+  }
+  flushList();
+  return <>{elements}</>;
+}
+
 
 
 
@@ -3436,6 +3511,7 @@ const ConsultScreen = () => {
   });
   const [galleryData, setGalleryData] = useState<{ images: string[]; index: number } | null>(null);
   const [detailReport, setDetailReport] = useState<AIConsultationReportItem | null>(null);
+  const [expandedSummaryIds, setExpandedSummaryIds] = useState<Set<string>>(new Set());
 
   // 同步状态到模块级变量
   useEffect(() => { _consultReports = reports; }, [reports]);
@@ -3866,7 +3942,40 @@ const ConsultScreen = () => {
                   </div>
                 )}
 
-                {report.summary && <p className="mt-3 text-sm leading-relaxed text-gray-600 line-clamp-3">{report.summary}</p>}
+                {report.summary && (
+                  <div className="mt-3">
+                    {!expandedSummaryIds.has(report.id) ? (
+                      <p className="text-sm leading-relaxed text-gray-500 line-clamp-2">
+                        {report.summary.replace(/[#*\-•]/g, '').replace(/\n+/g, ' ').trim().slice(0, 80)}
+                        {report.summary.length > 80 ? '…' : ''}
+                      </p>
+                    ) : (
+                      <div className="rounded-2xl border border-indigo-100 bg-indigo-50/30 p-4 max-h-[400px] overflow-y-auto">
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <FileText className="w-3.5 h-3.5 text-indigo-500" />
+                          <span className="text-xs font-bold text-indigo-600">AI 会诊分析全文</span>
+                        </div>
+                        {renderFormattedTextH5(report.summary)}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => setExpandedSummaryIds(prev => {
+                        const next = new Set(prev);
+                        if (next.has(report.id)) next.delete(report.id); else next.add(report.id);
+                        return next;
+                      })}
+                      className={cn(
+                        'mt-2 inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold border transition',
+                        expandedSummaryIds.has(report.id)
+                          ? 'border-indigo-200 bg-indigo-50 text-indigo-600'
+                          : 'border-gray-200 bg-gray-50 text-gray-500'
+                      )}
+                    >
+                      <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', expandedSummaryIds.has(report.id) && 'rotate-180')} />
+                      {expandedSummaryIds.has(report.id) ? '收起文字版' : '展开文字版'}
+                    </button>
+                  </div>
+                )}
 
                 <div className="mt-4 flex gap-3">
                   {report.status === 'completed' && report.reportUrl ? (
@@ -3978,7 +4087,7 @@ const ConsultScreen = () => {
                 <Sparkles className="w-4 h-4 text-indigo-600" />
                 <p className="text-sm font-bold text-gray-900">AI 分析结论</p>
               </div>
-              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{detailReport.summary || '暂无分析结论'}</p>
+              <div className="text-sm text-gray-700 leading-relaxed">{renderFormattedTextH5(detailReport.summary || '暂无分析结论')}</div>
             </div>
             {detailReport.reportUrl && (
               <a
