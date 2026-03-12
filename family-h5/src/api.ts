@@ -297,3 +297,27 @@ export async function createAuthorization(payload: {
 export async function revokeAuthorization(id: string) {
   return request(`/authorizations/${id}`, { method: 'DELETE' });
 }
+
+// ===== AI Consultation =====
+
+export async function createAIConsultation(payload: {
+  title?: string;
+  sourceType?: 'lab' | 'checkup' | 'imaging' | 'mixed';
+  files: Array<{ name: string; type: 'image' | 'text'; content: string }>;
+}) {
+  const { patientId } = await getDemoToken();
+  return request<any>(`/ai-consultations/patient/${patientId}`, {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+export async function fetchAIConsultations() {
+  const { patientId } = await getDemoToken();
+  return request<any[]>(`/ai-consultations/patient/${patientId}`);
+}
+
+export async function fetchLatestAIConsultation() {
+  const { patientId } = await getDemoToken();
+  return request<any>(`/ai-consultations/patient/${patientId}/latest`);
+}

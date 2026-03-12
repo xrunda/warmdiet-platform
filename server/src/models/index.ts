@@ -10,6 +10,7 @@ import { AuthorizationModel } from './Authorization';
 import { MealRecordModel } from './MealRecord';
 import { HealthReportModel } from './HealthReport';
 import { AccessLogModel } from './AccessLog';
+import { AIConsultationReportModel } from './AIConsultationReport';
 import {
   PatientHealthConditionModel,
   PatientMedicationModel,
@@ -29,6 +30,7 @@ export function initModels(db: Database.Database) {
     mealRecord: new MealRecordModel(db),
     healthReport: new HealthReportModel(db),
     accessLog: new AccessLogModel(db),
+    aiConsultationReport: new AIConsultationReportModel(db),
     healthCondition: new PatientHealthConditionModel(db),
     medication: new PatientMedicationModel(db),
     preference: new PatientPreferenceModel(db),
@@ -49,6 +51,7 @@ export {
   MealRecordModel,
   HealthReportModel,
   AccessLogModel,
+  AIConsultationReportModel,
   PatientHealthConditionModel,
   PatientMedicationModel,
   PatientPreferenceModel,

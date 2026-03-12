@@ -279,3 +279,28 @@ CREATE TABLE IF NOT EXISTS conversation_logs (
 
 CREATE INDEX IF NOT EXISTS idx_conv_patient ON conversation_logs(patient_id);
 CREATE INDEX IF NOT EXISTS idx_conv_date ON conversation_logs(log_date);
+
+-- AI会诊报告表
+CREATE TABLE IF NOT EXISTS ai_consultation_reports (
+  id TEXT PRIMARY KEY,
+  patient_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  source_type TEXT NOT NULL DEFAULT 'mixed' CHECK(source_type IN ('lab', 'checkup', 'imaging', 'mixed')),
+  source_files TEXT NOT NULL DEFAULT '[]',
+  extracted_content TEXT NOT NULL DEFAULT '',
+  model_analysis TEXT NOT NULL DEFAULT '{}',
+  consultation_summary TEXT NOT NULL DEFAULT '',
+  html_report_url TEXT,
+  external_task_id TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'processing', 'completed', 'failed')),
+  risk_level TEXT NOT NULL DEFAULT 'medium' CHECK(risk_level IN ('low', 'medium', 'high')),
+  tags TEXT NOT NULL DEFAULT '[]',
+  error_message TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (patient_id) REFERENCES patient_accounts(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_consult_patient ON ai_consultation_reports(patient_id);
+CREATE INDEX IF NOT EXISTS idx_ai_consult_status ON ai_consultation_reports(status);
+CREATE INDEX IF NOT EXISTS idx_ai_consult_task ON ai_consultation_reports(external_task_id);

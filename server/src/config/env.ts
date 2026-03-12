@@ -35,8 +35,14 @@ export const config = {
   // API 密钥
   geminiApiKey: process.env.GEMINI_API_KEY || '',
   openRouterApiKey: process.env.OPENROUTER_API_KEY || '',
+  openRouterBackupApiKey: process.env.OPENROUTER_BACKUP_API_KEY || '',
   openRouterAppName: process.env.OPENROUTER_APP_NAME || 'WarmDiet Platform OCR',
   openRouterAppUrl: process.env.OPENROUTER_APP_URL || 'http://localhost:4100',
+
+  aiConsultationTemplateId: process.env.AI_CONSULTATION_TEMPLATE_ID || '10012',
+  aiConsultationUserId: process.env.AI_CONSULTATION_USER_ID || '1937392131941998594',
+  aiConsultationTenantId: process.env.AI_CONSULTATION_TENANT_ID || '994637',
+  aiConsultationApiBaseUrl: process.env.AI_CONSULTATION_API_BASE_URL || 'https://cyberai.dev.xrunda.com/api',
 
   // 日志级别
   logLevel: process.env.LOG_LEVEL || 'info',

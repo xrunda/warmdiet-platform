@@ -73,6 +73,9 @@ import {
   createMedicalOrder as createMedicalOrderApi,
   updateMedicalOrder as updateMedicalOrderApi,
   scanMedicalOrderImage,
+  createAIConsultation,
+  fetchAIConsultations,
+  fetchLatestAIConsultation,
 } from './api';
 
 type AlertItem = {
@@ -122,20 +125,11 @@ type AIConsultationReportItem = {
   sourceMaterials: string[];
 };
 
-const MOCK_AI_CONSULTATION_REPORTS: AIConsultationReportItem[] = [
-  {
-    id: 'ai-consult-20260301-001',
-    title: 'AI 会诊报告',
-    hospitalName: '北京大学国际医院',
-    reportUrl: 'https://cyberai.dev.xrunda.com/creator-review/cw_1772258265509_6c593e23?version=2027629665153216513',
-    createdAt: '2026-03-01T12:00:00+08:00',
-    status: 'completed',
-    riskLevel: 'high',
-    tags: ['CKD 3a期', '高胆固醇血症'],
-    summary: 'AI 已完成化验单综合解读，提示慢性肾脏病 3a 期风险与血脂异常，建议结合后续随诊完善检查。',
-    sourceMaterials: [],
-  },
-];
+const MOCK_AI_CONSULTATION_REPORTS: AIConsultationReportItem[] = [];
+
+
+
+
 
 const FOOD_NAME_ZH: Record<string, string> = {
   banana: '香蕉', apple: '苹果', orange: '橙子', grape: '葡萄', watermelon: '西瓜', pear: '梨', peach: '桃子', mango: '芒果', strawberry: '草莓', kiwi: '猕猴桃', cherry: '樱桃', lemon: '柠檬', pineapple: '菠萝', papaya: '木瓜', blueberry: '蓝莓', plum: '李子', pomegranate: '石榴', fig: '无花果', lychee: '荔枝', longan: '龙眼', coconut: '椰子', cantaloupe: '哈密瓜', durian: '榴莲', persimmon: '柿子', tangerine: '橘子', avocado: '牛油果',
@@ -3410,13 +3404,102 @@ const ReportScreen = () => {
   );
 };
 
+type BufferedFile = {
+  id: string;
+  name: string;
+  dataUrl: string;
+  file: File;
+};
+
 const ConsultScreen = () => {
-  const [reports] = useState<AIConsultationReportItem[]>(MOCK_AI_CONSULTATION_REPORTS);
+  const [reports, setReports] = useState<AIConsultationReportItem[]>(MOCK_AI_CONSULTATION_REPORTS);
+  const [uploading, setUploading] = useState(false);
+  const [buffer, setBuffer] = useState<BufferedFile[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
 
   const getRiskTone = (riskLevel: AIConsultationReportItem['riskLevel']) => {
     if (riskLevel === 'high') return 'bg-red-50 text-red-600 border-red-100';
     if (riskLevel === 'medium') return 'bg-amber-50 text-amber-600 border-amber-100';
     return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    // 将选中的文件添加到缓冲区
+    const newFiles: BufferedFile[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const dataUrl = await fileToDataUrl(file);
+        newFiles.push({
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          name: file.name,
+          dataUrl,
+          file,
+        });
+      } catch (e) {
+        console.error('Failed to read file:', e);
+      }
+    }
+
+    setBuffer((prev) => [...prev, ...newFiles]);
+    // 清空 input 以便再次选择相同文件
+    event.target.value = '';
+  };
+
+  const handleRemoveFromBuffer = (id: string) => {
+    setBuffer((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  const handleClearBuffer = () => {
+    setBuffer([]);
+  };
+
+  const handleSubmitBuffer = async () => {
+    if (buffer.length === 0) return;
+
+    try {
+      setUploading(true);
+      const filesPayload = buffer.map((f) => ({
+        name: f.name,
+        type: 'image' as const,
+        content: f.dataUrl,
+      }));
+      
+      const result = await createAIConsultation({
+        files: filesPayload,
+      });
+      
+      // 清空缓冲区
+      setBuffer([]);
+      
+      // 刷新报告列表
+      const list = await fetchAIConsultations();
+      setReports(list || []);
+      
+      // 显示友好的提示信息
+      alert('上传成功！AI 正在后台生成会诊报告，您可继续使用其他功能。报告生成完成后会通知您。');
+    } catch (e) {
+      console.error('Failed to create consultation:', e);
+      alert('上传失败，请重试');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const openImagePreview = (url: string, name: string) => {
+    setPreviewImage({ url, name });
+  };
+
+  const closeImagePreview = () => {
+    setPreviewImage(null);
   };
 
   return (
@@ -3438,12 +3521,91 @@ const ConsultScreen = () => {
               <Sparkles className="w-5 h-5" />
             </div>
           </div>
-          <button className="mt-4 w-full rounded-2xl bg-white text-indigo-700 py-3 text-sm font-bold shadow-lg shadow-indigo-900/10 flex items-center justify-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.pdf"
+            capture="environment"
+            className="hidden"
+            onChange={handleFileChange}
+            multiple
+          />
+          <button 
+            onClick={handleUploadClick}
+            disabled={uploading}
+            className="mt-4 w-full rounded-2xl bg-white text-indigo-700 py-3 text-sm font-bold shadow-lg shadow-indigo-900/10 flex items-center justify-center gap-2 disabled:opacity-50"
+          >
             <Upload className="w-4 h-4" />
-            上传检查单并发起 AI 会诊
+            {uploading ? '上传中...' : '上传检查单并发起 AI 会诊'}
           </button>
         </div>
       </header>
+
+      {/* 缓冲池区域 */}
+      {buffer.length > 0 && (
+        <div className="p-4 -mt-2">
+          <section className="bg-white rounded-[22px] p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-base font-bold text-gray-900">待上传检查单 ({buffer.length} 项)</h3>
+                <p className="text-xs text-gray-400 mt-1">您可以继续添加或预览检查单</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleClearBuffer}
+                  disabled={uploading}
+                  className="text-xs font-bold text-red-500 px-3 py-1.5 rounded-lg border border-red-100 bg-red-50 disabled:opacity-50"
+                >
+                  清空
+                </button>
+                <button
+                  onClick={handleSubmitBuffer}
+                  disabled={uploading}
+                  className="text-xs font-bold text-white px-3 py-1.5 rounded-lg bg-indigo-600 shadow-lg shadow-indigo-200 disabled:opacity-50"
+                >
+                  {uploading ? '上传中...' : '全部上传'}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {buffer.map((file) => (
+                <div key={file.id} className="relative group">
+                  <div 
+                    className="aspect-square rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 overflow-hidden cursor-pointer hover:border-indigo-300 transition-colors"
+                    onClick={() => openImagePreview(file.dataUrl, file.name)}
+                  >
+                    {file.dataUrl ? (
+                      <img 
+                        src={file.dataUrl} 
+                        alt={file.name} 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <FileText className="w-8 h-8 text-gray-300" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-2">
+                    <p className="text-xs font-medium text-gray-700 truncate">{file.name}</p>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveFromBuffer(file.id);
+                    }}
+                    disabled={uploading}
+                    className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-sm disabled:opacity-50"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
 
       <div className="p-4 space-y-4 -mt-2">
         <section className="bg-white rounded-[22px] p-5">
@@ -3494,6 +3656,30 @@ const ConsultScreen = () => {
           </div>
         </section>
       </div>
+
+      {/* 图片预览模态框 */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4" onClick={closeImagePreview}>
+          <div className="relative max-w-4xl w-full max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <button 
+              onClick={closeImagePreview}
+              className="absolute -top-12 right-0 text-white p-2 rounded-full hover:bg-white/10 transition"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <div className="bg-white rounded-2xl overflow-hidden">
+              <img 
+                src={previewImage.url} 
+                alt={previewImage.name} 
+                className="w-full max-h-[80vh] object-contain"
+              />
+              <div className="p-4 bg-gray-50 border-t border-gray-200">
+                <p className="text-sm font-medium text-gray-900 truncate">{previewImage.name}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
