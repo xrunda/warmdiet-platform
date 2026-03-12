@@ -266,9 +266,9 @@ export function DoctorDashboard({ onTabChange, onSelectPatient }: DoctorDashboar
 
             <div style={{ display: 'grid', gap: 12 }}>
               {[
-                { label: '重点关注', value: briefing.focus.length, note: '风险评分 ≥ 70' },
-                { label: '一般关注', value: briefing.attention.length, note: '趋势波动需随访' },
-                { label: '整体稳定', value: briefing.stable.length, note: `平均风险 ${briefing.avgRisk}` },
+                { label: '重点关注', list: briefing.focus, note: '风险评分 ≥ 70', empty: '当前暂无高风险患者' },
+                { label: '一般关注', list: briefing.attention, note: '趋势波动需随访', empty: '当前暂无一般关注患者' },
+                { label: '整体稳定', list: briefing.stable, note: `平均风险 ${briefing.avgRisk}`, empty: '暂无稳定患者数据' },
               ].map((item) => (
                 <div key={item.label} style={{
                   padding: 14,
@@ -279,9 +279,61 @@ export function DoctorDashboard({ onTabChange, onSelectPatient }: DoctorDashboar
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: 13, opacity: 0.88 }}>{item.label}</span>
-                    <span style={{ fontSize: 22, fontWeight: 700 }}>{item.value}</span>
+                    <span style={{ fontSize: 18, fontWeight: 700 }}>{item.list.length} 人</span>
                   </div>
                   <div style={{ marginTop: 6, fontSize: 12, opacity: 0.78 }}>{item.note}</div>
+
+                  <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+                    {item.list.length === 0 ? (
+                      <div style={{ fontSize: 12, opacity: 0.72 }}>{item.empty}</div>
+                    ) : (
+                      item.list.slice(0, 2).map((patient: any) => (
+                        <button
+                          key={`${item.label}-${patient.patientId}`}
+                          onClick={() => {
+                            onSelectPatient?.({
+                              id: patient.patientId,
+                              name: patient.patientName,
+                              latestUpdate: new Date().toISOString(),
+                              unreadMessages: 0,
+                            });
+                            onTabChange?.('patients');
+                          }}
+                          style={{
+                            textAlign: 'left',
+                            width: '100%',
+                            border: '1px solid rgba(255,255,255,0.14)',
+                            background: 'rgba(255,255,255,0.08)',
+                            borderRadius: 14,
+                            padding: '10px 12px',
+                            cursor: 'pointer',
+                            color: 'white',
+                            transition: 'all 0.2s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'rgba(255,255,255,0.16)';
+                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)';
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                            e.currentTarget.style.boxShadow = '0 10px 24px rgba(15,23,42,0.18)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                            <span style={{ fontSize: 13, fontWeight: 700 }}>{patient.patientName}</span>
+                            <span style={{ fontSize: 11, opacity: 0.82 }}>风险 {patient.riskScore}</span>
+                          </div>
+                          <div style={{ marginTop: 5, fontSize: 12, lineHeight: 1.6, opacity: 0.86 }}>
+                            {patient.insight}
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
