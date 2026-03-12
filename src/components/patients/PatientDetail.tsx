@@ -2,8 +2,8 @@
  * 患者详情页 - 以患者为中心，整合所有功能模块
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, UtensilsCrossed, FileText, Activity, Pill, CalendarDays, MessageSquare, AlertTriangle, RefreshCw, BrainCircuit, TrendingUp, Sparkles, ExternalLink } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, UtensilsCrossed, FileText, Activity, Pill, CalendarDays, MessageSquare, AlertTriangle, RefreshCw, BrainCircuit, TrendingUp, Sparkles, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import { api } from '../../services/api';
 import { generatePatientAiSummary } from '../../utils/aiInsights';
 
@@ -180,6 +180,99 @@ type DailyVitalSummary = {
   summary: string;
 };
 
+/** 简易 Markdown 渲染：将文本按段落、标题、列表等拆分为 React 元素 */
+function renderFormattedText(text: string) {
+  if (!text) return null;
+  // 按连续换行拆段落，单换行保留
+  const lines = text.split(/\n/);
+  const elements: JSX.Element[] = [];
+  let listBuffer: string[] = [];
+  let key = 0;
+
+  const flushList = () => {
+    if (listBuffer.length === 0) return;
+    elements.push(
+      <ul key={key++} style={{ margin: '8px 0', paddingLeft: 20, listStyle: 'disc' }}>
+        {listBuffer.map((item, i) => (
+          <li key={i} style={{ fontSize: 14, color: '#334155', lineHeight: 1.8, marginBottom: 2 }}>
+            {renderInline(item)}
+          </li>
+        ))}
+      </ul>
+    );
+    listBuffer = [];
+  };
+
+  const renderInline = (line: string) => {
+    // Bold: **text** or __text__
+    const parts: (string | JSX.Element)[] = [];
+    const boldRegex = /\*\*(.+?)\*\*/g;
+    let lastIdx = 0;
+    let match;
+    while ((match = boldRegex.exec(line)) !== null) {
+      if (match.index > lastIdx) parts.push(line.slice(lastIdx, match.index));
+      parts.push(<strong key={`b${match.index}`} style={{ color: '#1e293b' }}>{match[1]}</strong>);
+      lastIdx = match.index + match[0].length;
+    }
+    if (lastIdx < line.length) parts.push(line.slice(lastIdx));
+    return parts.length > 0 ? <>{parts}</> : line;
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+
+    // Empty line → flush + spacer
+    if (!line) {
+      flushList();
+      elements.push(<div key={key++} style={{ height: 8 }} />);
+      continue;
+    }
+
+    // Heading: ### or ## or #
+    if (/^#{1,3}\s/.test(line)) {
+      flushList();
+      const level = (line.match(/^(#+)/)?.[1]?.length) || 1;
+      const headingText = line.replace(/^#{1,3}\s*/, '');
+      const fontSize = level === 1 ? 18 : level === 2 ? 16 : 15;
+      elements.push(
+        <div key={key++} style={{
+          fontSize,
+          fontWeight: 700,
+          color: '#0f172a',
+          margin: '16px 0 6px',
+          paddingBottom: level <= 2 ? 6 : 0,
+          borderBottom: level <= 2 ? '1px solid #e2e8f0' : 'none',
+        }}>
+          {renderInline(headingText)}
+        </div>
+      );
+      continue;
+    }
+
+    // Unordered list: - or * or •
+    if (/^[-*•]\s/.test(line)) {
+      listBuffer.push(line.replace(/^[-*•]\s*/, ''));
+      continue;
+    }
+
+    // Numbered list: 1. 2. etc
+    if (/^\d+[.、)]\s/.test(line)) {
+      listBuffer.push(line);
+      continue;
+    }
+
+    // Regular paragraph
+    flushList();
+    elements.push(
+      <p key={key++} style={{ margin: '4px 0', fontSize: 14, color: '#334155', lineHeight: 1.8 }}>
+        {renderInline(line)}
+      </p>
+    );
+  }
+  flushList();
+  return <>{elements}</>;
+}
+
 function getDayRiskFactors(bp?: VitalMeasurement, bg?: VitalMeasurement): string[] {
   const risks: string[] = [];
   if (
@@ -254,6 +347,7 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [aiConsultReports, setAiConsultReports] = useState<AIConsultationReport[]>([]);
+  const [expandedAiReports, setExpandedAiReports] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (initialPatient) {
@@ -762,7 +856,21 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
           </div>
         );
 
-      case 'aiConsult':
+      case 'aiConsult': {
+        const toggleExpand = (id: string) => {
+          setExpandedAiReports(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+          });
+        };
+        // summary 预览：取前 80 字
+        const getPreview = (text: string) => {
+          if (!text) return '暂无摘要';
+          const plain = text.replace(/[#*\-•]/g, '').replace(/\n+/g, ' ').trim();
+          return plain.length > 80 ? plain.slice(0, 80) + '…' : plain;
+        };
+
         return (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -779,88 +887,153 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                 <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 6 }}>患者在家属端上传检查单后，系统会自动生成会诊报告并展示在此处。</p>
               </div>
             ) : (
-            <div style={{ display: 'grid', gap: '12px' }}>
-              {aiConsultReports.map((report) => (
+            <div style={{ display: 'grid', gap: '16px' }}>
+              {aiConsultReports.map((report) => {
+                const isExpanded = expandedAiReports.has(report.id);
+                return (
                 <div
                   key={report.id}
                   style={{
                     background: 'white',
                     borderRadius: '16px',
-                    padding: '18px',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 1px 3px rgba(15,23,42,0.08)',
+                    border: isExpanded ? '1px solid #c7d2fe' : '1px solid #e2e8f0',
+                    boxShadow: isExpanded ? '0 4px 16px rgba(67,56,202,0.08)' : '0 1px 3px rgba(15,23,42,0.08)',
+                    overflow: 'hidden',
+                    transition: 'all 0.2s ease',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
-                    <div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>{report.title}</div>
-                      <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>
-                        {report.hospitalName} · {formatDateTime(report.createdAt)}
+                  {/* 卡片头部 - 始终可见 */}
+                  <div style={{ padding: '18px 20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Sparkles style={{ width: 16, height: 16, color: '#8b5cf6', flexShrink: 0 }} />
+                          <span style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>{report.title}</span>
+                        </div>
+                        <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>
+                          {report.hospitalName} · {formatDateTime(report.createdAt)}
+                        </div>
                       </div>
-                    </div>
-                    <span
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: 999,
-                        fontSize: 11,
-                        fontWeight: 700,
-                        background: report.riskLevel === 'high' ? '#fee2e2' : report.riskLevel === 'medium' ? '#fef3c7' : '#dcfce7',
-                        color: report.riskLevel === 'high' ? '#b91c1c' : report.riskLevel === 'medium' ? '#b45309' : '#166534',
-                      }}
-                    >
-                      {report.riskLevel === 'high' ? '重点关注' : report.riskLevel === 'medium' ? '需观察' : '平稳'}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-                    {report.tags.map((tag) => (
                       <span
-                        key={tag}
                         style={{
-                          fontSize: 12,
-                          color: '#4338ca',
-                          background: '#eef2ff',
-                          border: '1px solid #c7d2fe',
-                          borderRadius: 999,
                           padding: '4px 10px',
+                          borderRadius: 999,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          flexShrink: 0,
+                          background: report.riskLevel === 'high' ? '#fee2e2' : report.riskLevel === 'medium' ? '#fef3c7' : '#dcfce7',
+                          color: report.riskLevel === 'high' ? '#b91c1c' : report.riskLevel === 'medium' ? '#b45309' : '#166534',
                         }}
                       >
-                        {tag}
+                        {report.riskLevel === 'high' ? '重点关注' : report.riskLevel === 'medium' ? '需观察' : '平稳'}
                       </span>
-                    ))}
+                    </div>
+
+                    {/* 标签 */}
+                    {report.tags.length > 0 && (
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+                        {report.tags.map((tag) => (
+                          <span key={tag} style={{ fontSize: 11, color: '#4338ca', background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: 999, padding: '3px 8px' }}>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 折叠时显示预览 */}
+                    {!isExpanded && (
+                      <p style={{ margin: '10px 0 0', fontSize: 13, lineHeight: 1.6, color: '#94a3b8' }}>
+                        {getPreview(report.summary)}
+                      </p>
+                    )}
+
+                    {/* 展开/折叠按钮 + 操作栏 */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, gap: 10, flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => toggleExpand(report.id)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 5,
+                          padding: '6px 14px',
+                          borderRadius: 10,
+                          border: '1px solid #e2e8f0',
+                          background: isExpanded ? '#f5f3ff' : '#f8fafc',
+                          color: isExpanded ? '#6d28d9' : '#475569',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {isExpanded ? <ChevronUp style={{ width: 14, height: 14 }} /> : <ChevronDown style={{ width: 14, height: 14 }} />}
+                        {isExpanded ? '收起文字版' : '展开文字版'}
+                      </button>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 11, color: '#94a3b8' }}>素材 {report.sourceMaterials.length} 份</span>
+                        {report.reportUrl && (
+                          <a
+                            href={report.reportUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 5,
+                              padding: '6px 12px',
+                              borderRadius: 10,
+                              background: '#0f172a',
+                              color: '#fff',
+                              textDecoration: 'none',
+                              fontSize: 12,
+                              fontWeight: 600,
+                            }}
+                          >
+                            查看完整报告
+                            <ExternalLink style={{ width: 12, height: 12 }} />
+                          </a>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  <p style={{ margin: '12px 0 0', fontSize: 13, lineHeight: 1.7, color: '#475569' }}>{report.summary}</p>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, gap: 12, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 12, color: '#94a3b8' }}>元素材 {report.sourceMaterials.length} 份</span>
-                    <a
-                      href={report.reportUrl}
-                      target="_blank"
-                      rel="noreferrer"
+                  {/* 展开后的格式化文字版 */}
+                  {isExpanded && (
+                    <div
                       style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        padding: '8px 12px',
-                        borderRadius: 10,
-                        background: '#0f172a',
-                        color: '#fff',
-                        textDecoration: 'none',
-                        fontSize: 13,
-                        fontWeight: 600,
+                        borderTop: '1px solid #e2e8f0',
+                        background: 'linear-gradient(180deg, #fafafe 0%, #ffffff 100%)',
+                        padding: '20px 24px 24px',
                       }}
                     >
-                      查看完整报告
-                      <ExternalLink style={{ width: 14, height: 14 }} />
-                    </a>
-                  </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                        <FileText style={{ width: 14, height: 14, color: '#8b5cf6' }} />
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#4338ca', letterSpacing: '0.04em' }}>AI 会诊分析全文</span>
+                      </div>
+                      <div
+                        style={{
+                          padding: '16px 20px',
+                          borderRadius: 14,
+                          background: '#ffffff',
+                          border: '1px solid #f1f5f9',
+                          boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.02)',
+                          maxHeight: 520,
+                          overflowY: 'auto',
+                        }}
+                      >
+                        {renderFormattedText(report.summary)}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
             )}
           </div>
         );
+      }
 
       case 'orders':
         return (
