@@ -2744,7 +2744,7 @@ const SettingsScreen = ({
             )}
           >
             <Eye className="w-3.5 h-3.5" />
-            阅读模式
+            老人模式
           </button>
         </div>
         <div className="relative z-10 bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/15 mt-3">
