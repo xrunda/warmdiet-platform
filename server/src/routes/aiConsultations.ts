@@ -48,4 +48,30 @@ router.post('/patient/:id', authenticatePatient, (req, res, next) => {
   getModels().controller.createReport(req, res, next);
 });
 
+/**
+ * POST /api/ai-consultations/:reportId/retry-html
+ * 重新生成 HTML 报告（用于 completed 但缺失 htmlReportUrl 的报告）
+ * 权限: 患者本人
+ */
+router.post('/:reportId/retry-html', authenticatePatient, (req, res, next) => {
+  getModels().controller.retryHtmlReport(req, res, next);
+});
+
+/**
+ * PATCH /api/ai-consultations/:reportId
+ * 更新报告（如修改标题）
+ */
+router.put('/:reportId', authenticatePatient, (req, res, next) => {
+  getModels().controller.updateReport(req, res, next);
+});
+
+/**
+ * DELETE /api/ai-consultations/:reportId
+ * 删除 AI 会诊报告
+ * 权限: 患者本人
+ */
+router.delete('/:reportId', authenticatePatient, (req, res, next) => {
+  getModels().controller.deleteReport(req, res, next);
+});
+
 export default router;

@@ -321,3 +321,15 @@ export async function fetchLatestAIConsultation() {
   const { patientId } = await getDemoToken();
   return request<any>(`/ai-consultations/patient/${patientId}/latest`);
 }
+
+export async function retryAIConsultationHtml(reportId: string) {
+  return request<any>(`/ai-consultations/${reportId}/retry-html`, { method: 'POST' });
+}
+
+export async function deleteAIConsultation(reportId: string) {
+  return request<any>(`/ai-consultations/${reportId}`, { method: 'DELETE' });
+}
+
+export async function updateAIConsultation(reportId: string, data: { title?: string }) {
+  return request<any>(`/ai-consultations/${reportId}`, { method: 'PUT', body: data });
+}
