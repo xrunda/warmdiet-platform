@@ -31,6 +31,7 @@ import {
   Stethoscope,
   ThumbsDown,
   ThumbsUp,
+  Upload,
   User,
   Utensils,
   X,
@@ -107,6 +108,34 @@ type VitalSummary = {
   latestBloodGlucose: VitalSummaryItem | null;
   recentCount: number;
 };
+
+type AIConsultationReportItem = {
+  id: string;
+  title: string;
+  hospitalName: string;
+  reportUrl: string;
+  createdAt: string;
+  status: 'completed' | 'pending' | 'failed';
+  riskLevel: 'low' | 'medium' | 'high';
+  tags: string[];
+  summary: string;
+  sourceMaterials: string[];
+};
+
+const MOCK_AI_CONSULTATION_REPORTS: AIConsultationReportItem[] = [
+  {
+    id: 'ai-consult-20260301-001',
+    title: 'AI 会诊报告',
+    hospitalName: '北京大学国际医院',
+    reportUrl: 'https://cyberai.dev.xrunda.com/creator-review/cw_1772258265509_6c593e23?version=2027629665153216513',
+    createdAt: '2026-03-01T12:00:00+08:00',
+    status: 'completed',
+    riskLevel: 'high',
+    tags: ['CKD 3a期', '高胆固醇血症'],
+    summary: 'AI 已完成化验单综合解读，提示慢性肾脏病 3a 期风险与血脂异常，建议结合后续随诊完善检查。',
+    sourceMaterials: [],
+  },
+];
 
 const FOOD_NAME_ZH: Record<string, string> = {
   banana: '香蕉', apple: '苹果', orange: '橙子', grape: '葡萄', watermelon: '西瓜', pear: '梨', peach: '桃子', mango: '芒果', strawberry: '草莓', kiwi: '猕猴桃', cherry: '樱桃', lemon: '柠檬', pineapple: '菠萝', papaya: '木瓜', blueberry: '蓝莓', plum: '李子', pomegranate: '石榴', fig: '无花果', lychee: '荔枝', longan: '龙眼', coconut: '椰子', cantaloupe: '哈密瓜', durian: '榴莲', persimmon: '柿子', tangerine: '橘子', avocado: '牛油果',
@@ -383,7 +412,7 @@ const BottomNav = ({
   const tabs = [
     { id: 'home', label: '首页', icon: HomeIcon },
     { id: 'report', label: '报告', icon: BarChart2 },
-    { id: 'log', label: '记录', icon: FileText },
+    { id: 'consult', label: 'AI会诊', icon: Sparkles },
     { id: 'settings', label: '我的', icon: User },
   ];
 
@@ -1697,10 +1726,12 @@ const HomeScreen = ({
   onTabChange,
   elderMode,
   onOpenElderMode,
+  onOpenRecordSheet,
 }: {
   onTabChange: (tab: string) => void;
   elderMode: boolean;
   onOpenElderMode: () => void;
+  onOpenRecordSheet: () => void;
 }) => {
   const [loading, setLoading] = useState(true);
   const [meals, setMeals] = useState<Meal[]>([]);
@@ -1719,13 +1750,21 @@ const HomeScreen = ({
   const [showWeekly, setShowWeekly] = useState(false);
   const [showVitalsSheet, setShowVitalsSheet] = useState(false);
 
+  const latestChats = useMemo(() => {
+    return chats;
+  }, [chats]);
+
   const loadDashboard = useCallback(async () => {
     const data: any = await fetchDashboard();
     setPatientName(data.patient?.name || '');
     setHealthScore(data.healthScore || 0);
     setMeals((data.meals || []).map(mapApiMealToMeal));
     setAlerts(data.alerts || []);
-    setChats(data.conversations || []);
+    const dashboardConversations = (data.conversations || []).map((item: any) => ({
+      ...item,
+      timestamp: item.timestamp || formatChatTimestamp(item.logDate, item.rawTimestamp || item.createdAt || ''),
+    }));
+    setChats(dashboardConversations);
     setTrendData(
       (data.trendData || []).map((d: any) => ({ day: formatTrendDay(d.date), score: d.score }))
     );
@@ -1739,6 +1778,27 @@ const HomeScreen = ({
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [loadDashboard]);
+
+  useEffect(() => {
+    fetchTimeline(undefined, 20)
+      .then((items: any[]) => {
+        const conversationItems = (items || [])
+          .filter((it: any) => it.type === 'conversation' && it.data?.content)
+          .map((it: any) => ({
+            id: it.id,
+            role: it.data?.role,
+            content: it.data?.content,
+            timestamp: formatChatTimestamp(it.logDate, it.timestamp),
+            logDate: it.logDate,
+            extra: it.data?.extra || undefined,
+          }));
+
+        if (conversationItems.length > 0) {
+          setChats(conversationItems);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleMealsRefresh = useCallback(async () => {
     if (refreshingMeals) return;
@@ -1829,7 +1889,7 @@ const HomeScreen = ({
           </button>
         </div>
 
-        <div className="relative z-10 flex items-end justify-between mt-3">
+        <div className="relative z-10 flex items-end justify-between mt-3 gap-3">
           <div>
             <p className="text-white/60 text-xs mb-1">今日健康指数</p>
             <div className="flex items-baseline gap-1">
@@ -1838,9 +1898,14 @@ const HomeScreen = ({
             </div>
             <p className="text-white/50 text-xs mt-1">较昨日 +3分 ↑</p>
           </div>
-          <div className="bg-white/12 backdrop-blur-sm rounded-2xl px-4 py-2.5 border border-white/15">
-            <p className="text-xs text-white/60">今日节气</p>
-            <p className="text-sm font-bold text-white">立冬 · 宜温补</p>
+          <div className="flex flex-col items-center gap-2">
+            <button
+              onClick={onOpenRecordSheet}
+              className="inline-flex items-center gap-1.5 rounded-full bg-white/18 px-3 py-1.5 text-[11px] font-bold text-white border border-white/25 backdrop-blur-sm"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              查看记录
+            </button>
           </div>
         </div>
       </header>
@@ -1907,21 +1972,31 @@ const HomeScreen = ({
                 </p>
 
                 <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                  <button
-                    onClick={() => setSelectedAlert(primaryAlert)}
-                    className="flex-1 rounded-2xl bg-[#8f4b06] px-4 py-3 text-sm font-bold text-white shadow-[0_10px_24px_rgba(122,63,0,0.22)] transition active:scale-[0.98]"
-                  >
-                    立即查看原因
-                  </button>
-                  <button
-                    onClick={() => {
-                      const warningMeal = meals.find((meal) => meal.isWarning) || meals[0];
-                      if (warningMeal) setSelectedMeal(warningMeal);
-                    }}
-                    className="flex-1 rounded-2xl border border-[#efc777] bg-white/75 px-4 py-3 text-sm font-bold text-[#8f4b06] transition hover:bg-white"
-                  >
-                    去看今日饮食
-                  </button>
+                  <div className="grid grid-cols-1 gap-2 w-full">
+                    <button
+                      onClick={() => setSelectedAlert(primaryAlert)}
+                      className="w-full rounded-2xl bg-[#8f4b06] px-4 py-3 text-sm font-bold text-white shadow-[0_10px_24px_rgba(122,63,0,0.22)] transition active:scale-[0.98]"
+                    >
+                      立即查看原因
+                    </button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => {
+                          const warningMeal = meals.find((meal) => meal.isWarning) || meals[0];
+                          if (warningMeal) setSelectedMeal(warningMeal);
+                        }}
+                        className="rounded-2xl border border-[#efc777] bg-white/80 px-4 py-3 text-sm font-bold text-[#8f4b06] transition hover:bg-white"
+                      >
+                        去看今日饮食
+                      </button>
+                      <button
+                        onClick={() => onTabChange('report')}
+                        className="rounded-2xl border border-[#efc777] bg-[#fff7e8] px-4 py-3 text-sm font-bold text-[#8f4b06] transition hover:bg-white"
+                      >
+                        查看报告
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {remainingAlerts.length > 0 ? (
@@ -2171,37 +2246,6 @@ const HomeScreen = ({
           )}
         </section>
 
-        {/* Latest Conversation */}
-        <section className="bg-white rounded-[22px] p-5">
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-indigo-600" />
-              <h3 className="text-lg font-bold text-gray-900">最新对话</h3>
-            </div>
-            <button onClick={() => onTabChange('log')} className="text-sm text-indigo-600 font-medium">
-              查看全部对话 ▶
-            </button>
-          </div>
-          {chats.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-4">暂无对话记录</p>
-          ) : (
-            <div className="space-y-3">
-              {chats.slice(0, 4).map((chat) => (
-                <div key={chat.id} className="py-2 border-b border-gray-50 last:border-0 last:pb-0">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs text-gray-400">{chat.timestamp}</span>
-                    <span className={cn('text-xs font-bold', chat.role === 'user' ? 'text-gray-500' : 'text-indigo-500')}>
-                      {chat.role === 'user' ? '老人' : '小爱'}
-                    </span>
-                  </div>
-                  <p className={cn('text-sm leading-relaxed', chat.role === 'user' ? 'text-gray-800' : 'text-gray-500')}>
-                    {chat.content}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
       </div>
 
       {/* Meal Detail Bottom Sheet */}
@@ -3366,6 +3410,94 @@ const ReportScreen = () => {
   );
 };
 
+const ConsultScreen = () => {
+  const [reports] = useState<AIConsultationReportItem[]>(MOCK_AI_CONSULTATION_REPORTS);
+
+  const getRiskTone = (riskLevel: AIConsultationReportItem['riskLevel']) => {
+    if (riskLevel === 'high') return 'bg-red-50 text-red-600 border-red-100';
+    if (riskLevel === 'medium') return 'bg-amber-50 text-amber-600 border-amber-100';
+    return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+  };
+
+  return (
+    <div className="flex-1 overflow-y-auto bg-brand-bg pb-24 hide-scrollbar">
+      <header className="relative bg-gradient-to-br from-fuchsia-600 via-violet-600 to-indigo-700 px-5 pt-safe pb-6 overflow-hidden">
+        <div className="relative z-10 flex items-center justify-between py-3">
+          <h1 className="text-xl font-bold text-white">AI会诊</h1>
+          <button className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition">
+            <History className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="relative z-10 rounded-[24px] border border-white/15 bg-white/10 backdrop-blur-sm p-4 mt-3 text-white">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold">上传检查单，获取 AI 会诊解读</p>
+              <p className="text-xs text-white/70 mt-1 leading-relaxed">患者自行上传化验单、检查报告后，系统调用润思平台异步生成独立 H5 会诊报告，便于自己查看，也便于医生随诊参考。</p>
+            </div>
+            <div className="w-10 h-10 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
+              <Sparkles className="w-5 h-5" />
+            </div>
+          </div>
+          <button className="mt-4 w-full rounded-2xl bg-white text-indigo-700 py-3 text-sm font-bold shadow-lg shadow-indigo-900/10 flex items-center justify-center gap-2">
+            <Upload className="w-4 h-4" />
+            上传检查单并发起 AI 会诊
+          </button>
+        </div>
+      </header>
+
+      <div className="p-4 space-y-4 -mt-2">
+        <section className="bg-white rounded-[22px] p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-base font-bold text-gray-900">我的会诊报告</h3>
+              <p className="text-xs text-gray-400 mt-1">可直接在微信或医生端打开完整 H5 报告</p>
+            </div>
+            <span className="text-xs font-bold text-indigo-600">{reports.length} 份</span>
+          </div>
+
+          <div className="space-y-3">
+            {reports.map((report) => (
+              <div key={report.id} className="rounded-[22px] border border-gray-100 bg-[linear-gradient(135deg,#ffffff_0%,#faf7ff_100%)] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{report.title}</p>
+                    <p className="text-xs text-gray-400 mt-1">{new Date(report.createdAt).toLocaleString('zh-CN')} · {report.hospitalName}</p>
+                  </div>
+                  <span className={cn('rounded-full border px-2.5 py-1 text-[11px] font-bold', getRiskTone(report.riskLevel))}>
+                    {report.riskLevel === 'high' ? '重点关注' : report.riskLevel === 'medium' ? '需观察' : '平稳'}
+                  </span>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {report.tags.map((tag) => (
+                    <span key={tag} className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 border border-indigo-100">{tag}</span>
+                  ))}
+                </div>
+
+                <p className="mt-3 text-sm leading-relaxed text-gray-600">{report.summary}</p>
+
+                <div className="mt-4 flex gap-3">
+                  <a
+                    href={report.reportUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 rounded-2xl bg-indigo-600 text-white text-center py-3 text-sm font-bold shadow-lg shadow-indigo-200"
+                  >
+                    查看完整报告
+                  </a>
+                  <button className="rounded-2xl border border-gray-200 px-4 py-3 text-sm font-bold text-gray-600 bg-white">
+                    历史素材 {report.sourceMaterials.length}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+};
+
 // ========== MAIN APP ==========
 
 export default function App() {
@@ -3375,6 +3507,7 @@ export default function App() {
   const [showMealEntry, setShowMealEntry] = useState(false);
   const [showNoteEntry, setShowNoteEntry] = useState(false);
   const [showShareReport, setShowShareReport] = useState(false);
+  const [showRecordSheet, setShowRecordSheet] = useState(false);
 
   useEffect(() => {
     document.documentElement.style.fontSize = elderMode ? '17px' : '16px';
@@ -3395,10 +3528,15 @@ export default function App() {
           className="flex-1 flex flex-col overflow-hidden"
         >
           {activeTab === 'home' && (
-            <HomeScreen onTabChange={setActiveTab} elderMode={elderMode} onOpenElderMode={() => setElderMode((p) => !p)} />
+            <HomeScreen
+              onTabChange={setActiveTab}
+              elderMode={elderMode}
+              onOpenElderMode={() => setElderMode((p) => !p)}
+              onOpenRecordSheet={() => setShowRecordSheet(true)}
+            />
           )}
           {activeTab === 'report' && <ReportScreen />}
-          {activeTab === 'log' && <LogScreen />}
+          {activeTab === 'consult' && <ConsultScreen />}
           {activeTab === 'settings' && <SettingsScreen elderMode={elderMode} onElderModeChange={setElderMode} />}
         </motion.div>
       </AnimatePresence>
@@ -3406,7 +3544,7 @@ export default function App() {
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} elderMode={elderMode} />
 
       {/* FAB */}
-      {(activeTab === 'home' || activeTab === 'log') && (
+      {activeTab === 'home' && (
         <>
           <motion.button
             initial={{ scale: 0 }}
@@ -3463,6 +3601,140 @@ export default function App() {
       <MealEntrySheet open={showMealEntry} onClose={() => setShowMealEntry(false)} />
       <NoteEntrySheet open={showNoteEntry} onClose={() => setShowNoteEntry(false)} />
       <ShareReportDialog open={showShareReport} onClose={() => setShowShareReport(false)} />
+      <RecordSheet open={showRecordSheet} onClose={() => setShowRecordSheet(false)} />
     </div>
+  );
+}
+
+function RecordSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [loading, setLoading] = useState(true);
+  const [dates, setDates] = useState<string[]>([]);
+  const [dateIndex, setDateIndex] = useState(0);
+  const [timelineItems, setTimelineItems] = useState<any[]>([]);
+  const [viewMode, setViewMode] = useState<'all' | 'byDate'>('byDate');
+
+  useEffect(() => {
+    if (!open) return;
+    setLoading(true);
+    fetchTimeline(undefined, 1000)
+      .then((items: any[]) => {
+        const allDates = Array.from(new Set((items || []).map((it: any) => it.logDate).filter(Boolean))).sort();
+        setDates(allDates);
+        setDateIndex(Math.max(0, allDates.length - 1));
+        setTimelineItems(items || []);
+      })
+      .catch(() => {
+        setDates([]);
+        setTimelineItems([]);
+      })
+      .finally(() => setLoading(false));
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || dates.length === 0) return;
+    setLoading(true);
+    const dateParam = viewMode === 'byDate' ? dates[dateIndex] : undefined;
+    const limitParam = viewMode === 'all' ? 1000 : undefined;
+    fetchTimeline(dateParam, limitParam)
+      .then((items: any[]) => setTimelineItems(items || []))
+      .catch(() => setTimelineItems([]))
+      .finally(() => setLoading(false));
+  }, [open, dates, dateIndex, viewMode]);
+
+  return (
+    <BottomSheet open={open} onClose={onClose} title="今日记录">
+      <div className="p-5 space-y-4">
+        <div className="flex items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => setViewMode('byDate')}
+            className={cn(
+              'rounded-full px-4 py-2 text-xs font-bold transition',
+              viewMode === 'byDate' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-gray-500 border border-gray-200'
+            )}
+          >
+            按日期查看
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('all')}
+            className={cn(
+              'rounded-full px-4 py-2 text-xs font-bold transition',
+              viewMode === 'all' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-gray-500 border border-gray-200'
+            )}
+          >
+            全部记录
+          </button>
+        </div>
+
+        {viewMode === 'byDate' && dates.length > 0 && (
+          <div className="flex items-center justify-between rounded-2xl border border-gray-100 bg-gray-50 px-3 py-2">
+            <button onClick={() => setDateIndex((i) => Math.max(0, i - 1))} disabled={dateIndex === 0} className="p-2 text-gray-400 disabled:opacity-40">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <div className="text-center">
+              <p className="text-sm font-bold text-gray-900">{dates[dateIndex] ? formatDateLabel(dates[dateIndex]) : '暂无日期'}</p>
+              <p className="text-xs text-gray-400">{dates[dateIndex] || ''}</p>
+            </div>
+            <button onClick={() => setDateIndex((i) => Math.min(dates.length - 1, i + 1))} disabled={dateIndex === dates.length - 1} className="p-2 text-gray-400 disabled:opacity-40">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {loading ? (
+          <p className="py-10 text-center text-sm text-gray-400">加载中...</p>
+        ) : timelineItems.length === 0 ? (
+          <p className="py-10 text-center text-sm text-gray-400">暂无记录</p>
+        ) : (
+          <div className="space-y-3">
+            {timelineItems.map((item: any) => {
+              const timeLabel = viewMode === 'all'
+                ? formatChatTimestamp(item.logDate, item.timestamp)
+                : (item.timestamp || '').slice(0, 5);
+
+              if (item.type === 'meal') {
+                return (
+                  <div key={item.id} className="rounded-[20px] border border-amber-100 bg-[linear-gradient(135deg,#fffbf0_0%,#fff7e6_100%)] p-4 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+                        <Utensils className="w-4 h-4 text-amber-600" />
+                      </div>
+                      <div className="flex-1">
+                        <span className="text-sm font-bold text-amber-800">{item.data?.mealType || '饮食记录'}</span>
+                      </div>
+                      <span className="text-xs text-gray-400">{timeLabel}</span>
+                    </div>
+                    <p className="text-sm text-gray-700">{item.data?.foodNames || '暂无食物记录'}</p>
+                  </div>
+                );
+              }
+
+              if (item.type === 'vital') {
+                return (
+                  <div key={item.id} className="rounded-[20px] border border-sky-100 bg-[linear-gradient(135deg,#f8fbff_0%,#eef5ff_100%)] p-4 shadow-sm">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="text-sm font-bold text-gray-800">{item.data?.label || '指标记录'}</span>
+                      <span className="text-xs text-gray-400">{timeLabel}</span>
+                    </div>
+                    <p className="text-sm text-gray-700">{item.data?.value} {item.data?.unit || ''}</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={item.id} className="rounded-[20px] border border-gray-100 bg-white p-4 shadow-sm">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-xs font-bold text-indigo-500">{item.data?.role === 'user' ? '老人' : '小爱'}</span>
+                    <span className="text-xs text-gray-400">{timeLabel}</span>
+                  </div>
+                  <p className="text-sm leading-relaxed text-gray-700">{item.data?.content || '暂无内容'}</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </BottomSheet>
   );
 }

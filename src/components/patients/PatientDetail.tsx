@@ -3,11 +3,37 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, UtensilsCrossed, FileText, Activity, Pill, CalendarDays, MessageSquare, AlertTriangle, RefreshCw, BrainCircuit, TrendingUp, Sparkles } from 'lucide-react';
+import { ArrowLeft, UtensilsCrossed, FileText, Activity, Pill, CalendarDays, MessageSquare, AlertTriangle, RefreshCw, BrainCircuit, TrendingUp, Sparkles, ExternalLink } from 'lucide-react';
 import { api } from '../../services/api';
 import { generatePatientAiSummary } from '../../utils/aiInsights';
 
-type TabType = 'vitals' | 'meals' | 'reports' | 'orders' | 'medications' | 'healthProfile' | 'followup' | 'chat';
+type TabType = 'vitals' | 'meals' | 'reports' | 'aiConsult' | 'orders' | 'medications' | 'healthProfile' | 'followup' | 'chat';
+
+type AIConsultationReport = {
+  id: string;
+  title: string;
+  hospitalName: string;
+  reportUrl: string;
+  createdAt: string;
+  riskLevel: 'low' | 'medium' | 'high';
+  tags: string[];
+  summary: string;
+  sourceMaterials: string[];
+};
+
+const MOCK_AI_CONSULTATION_REPORTS: AIConsultationReport[] = [
+  {
+    id: 'ai-consult-20260301-001',
+    title: 'AI 会诊报告',
+    hospitalName: '北京大学国际医院',
+    reportUrl: 'https://cyberai.dev.xrunda.com/creator-review/cw_1772258265509_6c593e23?version=2027629665153216513',
+    createdAt: '2026-03-01T12:00:00+08:00',
+    riskLevel: 'high',
+    tags: ['CKD 3a期', '高胆固醇血症'],
+    summary: '患者在家属端上传检查单后生成的 AI 会诊报告，医生可直接查看重点风险与建议，辅助制定下一步巡诊方案。',
+    sourceMaterials: [],
+  },
+];
 
 interface PatientDetailProps {
   patientId: string;
@@ -240,6 +266,7 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
   const [selectedOrderImage, setSelectedOrderImage] = useState<MedicalOrder | null>(null);
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
   const [generatingReport, setGeneratingReport] = useState(false);
+  const [aiConsultReports] = useState<AIConsultationReport[]>(MOCK_AI_CONSULTATION_REPORTS);
 
   useEffect(() => {
     if (initialPatient) {
@@ -389,6 +416,7 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
     { id: 'vitals', label: '健康指标', icon: Activity, count: vitals.length },
     { id: 'meals', label: '餐食记录', icon: UtensilsCrossed, count: meals.length },
     { id: 'reports', label: '健康报告', icon: FileText, count: reports.length },
+    { id: 'aiConsult', label: 'AI会诊', icon: Sparkles, count: aiConsultReports.length },
     { id: 'orders', label: '医嘱记录', icon: Activity },
     { id: 'medications', label: '用药管理', icon: Pill, count: medications.filter(m => m.status === 'active').length },
     { id: 'healthProfile', label: '健康档案', icon: Activity },
@@ -725,6 +753,98 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                 </div>
               </div>
             )}
+          </div>
+        );
+
+      case 'aiConsult':
+        return (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
+                AI 会诊报告（{aiConsultReports.length} 份）
+              </h3>
+              <span style={{ fontSize: 12, color: '#64748b' }}>来自患者端上传触发</span>
+            </div>
+
+            <div style={{ display: 'grid', gap: '12px' }}>
+              {aiConsultReports.map((report) => (
+                <div
+                  key={report.id}
+                  style={{
+                    background: 'white',
+                    borderRadius: '16px',
+                    padding: '18px',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 1px 3px rgba(15,23,42,0.08)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>{report.title}</div>
+                      <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>
+                        {report.hospitalName} · {formatDateTime(report.createdAt)}
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: 999,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        background: report.riskLevel === 'high' ? '#fee2e2' : report.riskLevel === 'medium' ? '#fef3c7' : '#dcfce7',
+                        color: report.riskLevel === 'high' ? '#b91c1c' : report.riskLevel === 'medium' ? '#b45309' : '#166534',
+                      }}
+                    >
+                      {report.riskLevel === 'high' ? '重点关注' : report.riskLevel === 'medium' ? '需观察' : '平稳'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                    {report.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        style={{
+                          fontSize: 12,
+                          color: '#4338ca',
+                          background: '#eef2ff',
+                          border: '1px solid #c7d2fe',
+                          borderRadius: 999,
+                          padding: '4px 10px',
+                        }}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+
+                  <p style={{ margin: '12px 0 0', fontSize: 13, lineHeight: 1.7, color: '#475569' }}>{report.summary}</p>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, gap: 12, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, color: '#94a3b8' }}>元素材 {report.sourceMaterials.length} 份</span>
+                    <a
+                      href={report.reportUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '8px 12px',
+                        borderRadius: 10,
+                        background: '#0f172a',
+                        color: '#fff',
+                        textDecoration: 'none',
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      查看完整报告
+                      <ExternalLink style={{ width: 14, height: 14 }} />
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         );
 
