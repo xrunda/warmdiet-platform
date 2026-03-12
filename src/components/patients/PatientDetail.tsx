@@ -237,6 +237,7 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
   const [alerts, setAlerts] = useState<string[]>([]);
   const [selectedReport, setSelectedReport] = useState<HealthReport | null>(null);
   const [selectedMealDay, setSelectedMealDay] = useState<DailyMealSummary | null>(null);
+  const [selectedOrderImage, setSelectedOrderImage] = useState<MedicalOrder | null>(null);
   const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
   const [generatingReport, setGeneratingReport] = useState(false);
 
@@ -765,8 +766,63 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                     }}>
                       {order.content}
                     </div>
+                    {order.originalImage && (
+                      <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+                        <button
+                          onClick={() => setSelectedOrderImage(order)}
+                          style={{
+                            border: '1px solid #cbd5e1',
+                            borderRadius: 8,
+                            padding: '8px 12px',
+                            background: '#fff',
+                            color: '#334155',
+                            fontSize: 13,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          查看医嘱原件
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
+              </div>
+            )}
+
+            {selectedOrderImage && (
+              <div
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) setSelectedOrderImage(null);
+                }}
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 120,
+                  background: 'rgba(15,23,42,0.6)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 20,
+                }}
+              >
+                <div style={{ width: '100%', maxWidth: 920, maxHeight: '90vh', overflow: 'auto', background: '#fff', borderRadius: 18, padding: 20 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div>
+                      <h4 style={{ margin: 0, color: '#1e293b' }}>医嘱原件</h4>
+                      <p style={{ margin: '6px 0 0', fontSize: 12, color: '#64748b' }}>{selectedOrderImage.hospitalName || '医院'} · {selectedOrderImage.visitDate || '就诊日期未填写'}</p>
+                    </div>
+                    <button onClick={() => setSelectedOrderImage(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 18 }}>✕</button>
+                  </div>
+
+                  <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                    <img
+                      src={selectedOrderImage.originalImage}
+                      alt="医嘱原件"
+                      style={{ width: '100%', display: 'block', objectFit: 'contain', background: '#f8fafc' }}
+                    />
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -1068,45 +1124,6 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
           返回患者列表
         </button>
         
-        <button
-          onClick={() => loadPatientData()}
-          disabled={loading}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 16px',
-            background: loading ? '#f1f5f9' : 'white',
-            border: '1px solid #e2e8f0',
-            borderRadius: '10px',
-            color: loading ? '#94a3b8' : '#0891b2',
-            fontSize: '14px',
-            fontWeight: '500',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            transition: 'all 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            if (!loading) {
-              e.currentTarget.style.background = '#f0f9ff';
-              e.currentTarget.style.borderColor = '#0891b2';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!loading) {
-              e.currentTarget.style.background = 'white';
-              e.currentTarget.style.borderColor = '#e2e8f0';
-            }
-          }}
-        >
-          <RefreshCw 
-            style={{ 
-              width: '16px', 
-              height: '16px',
-              animation: loading ? 'spin 1s linear infinite' : 'none'
-            }} 
-          />
-          {loading ? '刷新中...' : '刷新数据'}
-        </button>
       </div>
       
       <style>{`
@@ -1231,9 +1248,50 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
               👤
             </div>
             <div style={{ flex: '1 1 220px', minWidth: 220 }}>
-              <h2 style={{ fontSize: '22px', fontWeight: 'bold', color: '#1e293b', margin: '0 0 4px 0' }}>
-                {patient.name}
-              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                <h2 style={{ fontSize: '22px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
+                  {patient.name}
+                </h2>
+                <button
+                  onClick={() => loadPatientData()}
+                  disabled={loading}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    background: loading ? '#f1f5f9' : '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '999px',
+                    color: loading ? '#94a3b8' : '#0891b2',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!loading) {
+                      e.currentTarget.style.background = '#f0f9ff';
+                      e.currentTarget.style.borderColor = '#0891b2';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!loading) {
+                      e.currentTarget.style.background = '#f8fafc';
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                    }
+                  }}
+                >
+                  <RefreshCw 
+                    style={{ 
+                      width: '14px', 
+                      height: '14px',
+                      animation: loading ? 'spin 1s linear infinite' : 'none'
+                    }} 
+                  />
+                  {loading ? '刷新中...' : '刷新'}
+                </button>
+              </div>
               <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>
                 {patient.age}岁 · {patient.gender === 'male' ? '男' : patient.gender === 'female' ? '女' : '未知'} · {patient.phone || '未填写'}
               </p>
