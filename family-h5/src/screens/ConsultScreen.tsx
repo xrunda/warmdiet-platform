@@ -61,6 +61,53 @@ export const ConsultScreen = () => {
     return 'bg-emerald-50 text-emerald-600 border-emerald-100';
   };
 
+  // 截断文本，超出长度用...代替
+  const truncateText = (text: string, maxLength: number = 20): string => {
+    if (!text || text.length <= maxLength) return text;
+    return text.slice(0, maxLength) + '...';
+  };
+
+  // 从报告关键信息中提取标题
+  const generateReportTitle = (r: any): string => {
+    // 优先使用已有的自定义标题
+    if (r.title && r.title !== 'AI 会诊报告') {
+      return truncateText(r.title, 22);
+    }
+
+    // 从 tags 中提取关键信息（如疾病标签）
+    const tags = r.tags || [];
+    if (tags.length > 0) {
+      // 使用第一个 tag 作为主要关键词
+      return truncateText(`${tags[0]}会诊报告`, 22);
+    }
+
+    // 从 consultationSummary 或 summary 提取关键词
+    const summary = r.consultationSummary || r.summary || '';
+    if (summary) {
+      // 提取前15个字符作为标题
+      const keyInfo = summary.replace(/[#*\-•]/g, '').replace(/\n+/g, ' ').trim().slice(0, 15);
+      if (keyInfo.length >= 5) {
+        return truncateText(`${keyInfo}会诊报告`, 22);
+      }
+    }
+
+    // 从 extractedContent 提取
+    if (r.extractedContent) {
+      const content = String(r.extractedContent).trim().slice(0, 15);
+      if (content.length >= 5) {
+        return truncateText(`${content}会诊报告`, 22);
+      }
+    }
+
+    // 从 hospitalName 生成
+    if (r.hospitalName) {
+      return truncateText(`${r.hospitalName}会诊报告`, 22);
+    }
+
+    // 默认标题
+    return 'AI 会诊报告';
+  };
+
   // 将 API 返回的数据映射为前端类型
   const mapApiReport = (r: any): AIConsultationReportItem => {
     // 如果 consultationSummary 为空，尝试从 modelAnalysis 提取摘要
@@ -78,7 +125,7 @@ export const ConsultScreen = () => {
     }
     return {
       id: r.id,
-      title: r.title || 'AI 会诊报告',
+      title: generateReportTitle(r),
       hospitalName: r.hospitalName || '',
       reportUrl: r.htmlReportUrl || r.reportUrl || '',
       createdAt: r.createdAt || r.created_at || '',
