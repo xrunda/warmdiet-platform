@@ -246,6 +246,21 @@ export function DoctorDashboard({ onTabChange, onSelectPatient }: DoctorDashboar
           position: 'relative',
           overflow: 'hidden',
         }}>
+          {/* 科技感背景图 */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            right: '38%',
+            width: 400,
+            height: 400,
+            opacity: 0.8,
+            backgroundImage: 'url(/resource/cyberDr.png)',
+            backgroundSize: 'contain',
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'top right',
+            pointerEvents: 'none',
+            zIndex: 0,
+          }} />
           <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at top right, rgba(255,255,255,0.2), transparent 35%)' }} />
           <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 24 }}>
             <div>
