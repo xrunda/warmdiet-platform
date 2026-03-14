@@ -10,6 +10,12 @@ import { BackButton, CloseButton } from '../common/ActionButtons';
 
 type TabType = 'vitals' | 'meals' | 'reports' | 'aiConsult' | 'orders' | 'medications' | 'healthProfile' | 'followup' | 'chat';
 
+type SourceMaterial = {
+  name: string;
+  type: string;
+  content: string;
+};
+
 type AIConsultationReport = {
   id: string;
   title: string;
@@ -19,8 +25,40 @@ type AIConsultationReport = {
   riskLevel: 'low' | 'medium' | 'high';
   tags: string[];
   summary: string;
-  sourceMaterials: string[];
+  sourceMaterials: SourceMaterial[];
 };
+
+/** 从素材项中提取可用的 URL（兼容对象和字符串两种格式） */
+function getMaterialUrl(item: SourceMaterial | string): string {
+  if (typeof item === 'string') return item;
+  return item?.content || '';
+}
+
+/** 从素材项中提取文件名 */
+function getMaterialName(item: SourceMaterial | string, index: number): string {
+  if (typeof item === 'string') return `素材 ${index + 1}`;
+  return item?.name || `素材 ${index + 1}`;
+}
+
+/** 判断素材是否为图片类型 */
+function isMaterialImage(item: SourceMaterial | string): boolean {
+  const url = getMaterialUrl(item);
+  if (typeof item !== 'string' && item?.type) {
+    return item.type.startsWith('image/');
+  }
+  return /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(url) ||
+    url.includes('/image') ||
+    url.startsWith('data:image');
+}
+
+/** 判断素材是否为 PDF */
+function isMaterialPdf(item: SourceMaterial | string): boolean {
+  const url = getMaterialUrl(item);
+  if (typeof item !== 'string' && item?.type) {
+    return item.type === 'application/pdf';
+  }
+  return /\.pdf$/i.test(url) || url.startsWith('data:application/pdf');
+}
 
 
 interface PatientDetailProps {
@@ -349,7 +387,7 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
   const [generatingReport, setGeneratingReport] = useState(false);
   const [aiConsultReports, setAiConsultReports] = useState<AIConsultationReport[]>([]);
   const [expandedAiReports, setExpandedAiReports] = useState<Set<string>>(new Set());
-  const [materialPreview, setMaterialPreview] = useState<{ materials: string[]; currentIndex: number; title: string } | null>(null);
+  const [materialPreview, setMaterialPreview] = useState<{ materials: (SourceMaterial | string)[]; currentIndex: number; title: string } | null>(null);
 
   useEffect(() => {
     if (initialPatient) {
@@ -1891,17 +1929,27 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                 }}
               >
                 {(() => {
-                  const materialUrl = materialPreview.materials[materialPreview.currentIndex];
-                  const isImage = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(materialUrl) ||
-                    materialUrl.includes('/image') ||
-                    materialUrl.startsWith('data:image');
-                  const isPdf = /\.pdf$/i.test(materialUrl);
+                  const currentItem = materialPreview.materials[materialPreview.currentIndex];
+                  const materialUrl = getMaterialUrl(currentItem);
+                  const materialName = getMaterialName(currentItem, materialPreview.currentIndex);
+                  const isImage = isMaterialImage(currentItem);
+                  const isPdf = isMaterialPdf(currentItem);
+
+                  if (!materialUrl) {
+                    return (
+                      <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+                        <div style={{ fontSize: 48, marginBottom: 12 }}>📄</div>
+                        <p style={{ margin: 0, fontSize: 14, color: '#64748b' }}>素材内容为空</p>
+                        <p style={{ margin: '8px 0 0', fontSize: 12, color: '#94a3b8' }}>{materialName}</p>
+                      </div>
+                    );
+                  }
 
                   if (isImage) {
                     return (
                       <img
                         src={materialUrl}
-                        alt={`素材 ${materialPreview.currentIndex + 1}`}
+                        alt={materialName}
                         style={{
                           maxWidth: '100%',
                           maxHeight: 'calc(92vh - 160px)',
@@ -1918,7 +1966,7 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                               <div style="text-align:center;padding:40px;color:#94a3b8;">
                                 <div style="font-size:48px;margin-bottom:12px;">📄</div>
                                 <p style="margin:0;font-size:14px;color:#64748b;">素材加载失败</p>
-                                <a href="${materialUrl}" target="_blank" rel="noreferrer" style="margin-top:8px;display:inline-block;font-size:13px;color:#6d28d9;">点击直接打开</a>
+                                <p style="margin:4px 0 0;font-size:12px;color:#94a3b8;">${materialName}</p>
                               </div>
                             `;
                             parent.appendChild(fallback);
@@ -1932,7 +1980,7 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                     return (
                       <iframe
                         src={materialUrl}
-                        title={`素材 ${materialPreview.currentIndex + 1}`}
+                        title={materialName}
                         style={{
                           width: '100%',
                           height: 'calc(92vh - 160px)',
@@ -1948,7 +1996,7 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                     <div style={{ textAlign: 'center' }}>
                       <img
                         src={materialUrl}
-                        alt={`素材 ${materialPreview.currentIndex + 1}`}
+                        alt={materialName}
                         style={{
                           maxWidth: '100%',
                           maxHeight: 'calc(92vh - 160px)',
@@ -2061,7 +2109,11 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                   flexShrink: 0,
                 }}
               >
-                {materialPreview.materials.map((url, idx) => (
+                {materialPreview.materials.map((item, idx) => {
+                  const thumbUrl = getMaterialUrl(item);
+                  const thumbName = getMaterialName(item, idx);
+                  const thumbIsImage = isMaterialImage(item);
+                  return (
                   <button
                     key={idx}
                     onClick={() =>
@@ -2089,9 +2141,10 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                         : 'none',
                     }}
                   >
+                    {thumbIsImage && thumbUrl ? (
                     <img
-                      src={url}
-                      alt={`缩略图 ${idx + 1}`}
+                      src={thumbUrl}
+                      alt={thumbName}
                       style={{
                         width: '100%',
                         height: '100%',
@@ -2105,8 +2158,12 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                         }
                       }}
                     />
+                    ) : (
+                      <span style={{ fontSize: 16 }}>📄</span>
+                    )}
                   </button>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
