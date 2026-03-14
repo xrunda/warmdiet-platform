@@ -52,6 +52,7 @@ import {
 import { cn } from './lib/utils';
 import { Meal, ChatMessage } from './types';
 import { AuthorizationManagement } from './AuthorizationManagement';
+import { LoginPage } from './LoginPage';
 import {
   fetchDashboard,
   fetchVitalMeasurements,
@@ -82,6 +83,7 @@ import {
   retryAIConsultationHtml,
   deleteAIConsultation,
   updateAIConsultation,
+  isLoggedIn,
 } from './api';
 
 type AlertItem = {
@@ -2773,9 +2775,11 @@ const LogScreen = () => {
 const SettingsScreen = ({
   elderMode,
   onElderModeChange,
+  onLogout,
 }: {
   elderMode: boolean;
   onElderModeChange: (value: boolean) => void;
+  onLogout?: () => void;
 }) => {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
@@ -3112,7 +3116,14 @@ const SettingsScreen = ({
           </div>
         </section>
 
-        <button className="w-full py-4 text-red-400 font-bold text-sm bg-white rounded-[22px] shadow-sm border border-red-50 active:bg-red-50 transition">
+        <button 
+          onClick={() => {
+            if (window.confirm('确定要退出登录吗？')) {
+              onLogout?.();
+            }
+          }}
+          className="w-full py-4 text-red-400 font-bold text-sm bg-white rounded-[22px] shadow-sm border border-red-50 active:bg-red-50 transition"
+        >
           退出登录
         </button>
       </main>
@@ -4162,6 +4173,25 @@ export default function App() {
   const [showNoteEntry, setShowNoteEntry] = useState(false);
   const [showShareReport, setShowShareReport] = useState(false);
   const [showRecordSheet, setShowRecordSheet] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // 检查登录状态
+    setLoggedIn(isLoggedIn());
+    setLoading(false);
+  }, []);
+
+  const handleLoginSuccess = () => {
+    setLoggedIn(true);
+  };
+
+  const handleLogout = () => {
+    import('./api').then(({ logout }) => {
+      logout();
+      setLoggedIn(false);
+    });
+  };
 
   useEffect(() => {
     document.documentElement.style.fontSize = elderMode ? '17px' : '16px';
@@ -4169,6 +4199,21 @@ export default function App() {
   }, [elderMode]);
 
   useEffect(() => { setShowQuickActions(false); }, [activeTab]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-brand-bg">
+        <div className="text-center">
+          <div className="w-8 h-8 border-[3px] border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-gray-400 mt-3">加载中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!loggedIn) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
 
   return (
     <div className={cn('h-screen flex flex-col overflow-hidden bg-brand-bg font-sans', elderMode && 'elder-mode')}>
@@ -4191,7 +4236,7 @@ export default function App() {
           )}
           {activeTab === 'report' && <ReportScreen />}
           {activeTab === 'consult' && <ConsultScreen />}
-          {activeTab === 'settings' && <SettingsScreen elderMode={elderMode} onElderModeChange={setElderMode} />}
+          {activeTab === 'settings' && <SettingsScreen elderMode={elderMode} onElderModeChange={setElderMode} onLogout={handleLogout} />}
         </motion.div>
       </AnimatePresence>
 

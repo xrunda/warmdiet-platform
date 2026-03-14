@@ -20,6 +20,7 @@ import aiConsultationRoutes from './routes/aiConsultations';
 import accessLogRoutes from './routes/accessLogs';
 import demoRoutes from './routes/demo';
 import patientRoutes from './routes/patients';
+import authRoutes from './routes/auth';
 
 export function createApp(): Application {
   const app = express();
@@ -62,6 +63,7 @@ export function createApp(): Application {
   app.use('/api/access-logs', accessLogRoutes);
   app.use('/api/demo', demoRoutes);
   app.use('/api/patients', patientRoutes);
+  app.use('/api/auth', authRoutes);
 
   // 404 处理
   app.use(notFoundHandler);

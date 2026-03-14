@@ -49,11 +49,13 @@ CREATE TABLE IF NOT EXISTS patient_accounts (
   gender TEXT NOT NULL CHECK(gender IN ('male', 'female')),
   phone TEXT,
   email TEXT UNIQUE,
+  password_hash TEXT,
   avatar TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE INDEX IF NOT EXISTS idx_patient_phone ON patient_accounts(phone);
 CREATE INDEX IF NOT EXISTS idx_patient_email ON patient_accounts(email);
 
 -- 授权记录表

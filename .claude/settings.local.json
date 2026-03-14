@@ -69,7 +69,12 @@
       "Bash(npm run lint 2>&1 | grep \"DoctorDashboard\\\\|error TS\" | head -20)",
       "Bash(npm run lint 2>&1 | grep \"^src/\" | head -20)",
       "Bash(lsof -ti:4000,4001 2>/dev/null | xargs -r kill || true && sleep 1)",
-      "Bash(npm run dev:server)"
+      "Bash(npm run dev:server)",
+      "Bash(sleep:*)",
+      "Bash(sqlite3:*)",
+      "Bash(pkill:*)",
+      "Bash(curl:*)",
+      "Bash(node:*)"
     ]
   }
 }

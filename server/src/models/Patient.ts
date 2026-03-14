@@ -19,6 +19,13 @@ export class PatientModel extends BaseModel<PatientAccount> {
   }
 
   /**
+   * 根据手机号查找患者
+   */
+  public findByPhone(phone: string): PatientAccount | undefined {
+    return this.findOne({ phone } as any);
+  }
+
+  /**
    * 搜索患者
    */
   public searchPatients(keyword: string): PatientAccount[] {

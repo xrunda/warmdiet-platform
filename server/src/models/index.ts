@@ -34,6 +34,7 @@ export function initModels(db: Database.Database) {
     healthCondition: new PatientHealthConditionModel(db),
     medication: new PatientMedicationModel(db),
     preference: new PatientPreferenceModel(db),
+    patientPreferences: new PatientPreferenceModel(db), // 别名，保持与 authController 一致
     medicalOrder: new PatientMedicalOrderModel(db),
     vitalMeasurement: new PatientVitalMeasurementModel(db),
     dietAlert: new DietAlertModel(db),

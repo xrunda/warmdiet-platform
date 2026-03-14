@@ -2,38 +2,132 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
-async function getDemoToken(): Promise<{ token: string; patientId: string }> {
-  const cached = localStorage.getItem('family_patient_token');
+// Token 管理
+const TOKEN_KEY = 'family_patient_token';
+
+interface AuthData {
+  token: string;
+  patientId: string;
+  name?: string;
+  phone?: string;
+  age?: number;
+  gender?: string;
+}
+
+function getStoredAuth(): AuthData | null {
+  const cached = localStorage.getItem(TOKEN_KEY);
   if (cached) {
     try {
       return JSON.parse(cached);
     } catch {
-      localStorage.removeItem('family_patient_token');
+      localStorage.removeItem(TOKEN_KEY);
     }
   }
+  return null;
+}
 
-  const res = await fetch(`${API_BASE_URL}/demo/patient-token`, {
+function setStoredAuth(data: AuthData): void {
+  localStorage.setItem(TOKEN_KEY, JSON.stringify(data));
+}
+
+function clearStoredAuth(): void {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+export function isLoggedIn(): boolean {
+  const auth = getStoredAuth();
+  return !!auth?.token;
+}
+
+export function getCurrentPatientId(): string | null {
+  const auth = getStoredAuth();
+  return auth?.patientId || null;
+}
+
+export function getCurrentUser(): { name?: string; phone?: string } | null {
+  const auth = getStoredAuth();
+  if (!auth) return null;
+  return { name: auth.name, phone: auth.phone };
+}
+
+// 登录
+export async function login(phone: string, password: string): Promise<AuthData> {
+  const res = await fetch(`${API_BASE_URL}/auth/login`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone, password }),
   });
   const json = await res.json();
   if (!json.success) {
-    throw new Error(json.error || '获取测试患者 token 失败');
+    throw new Error(json.error || '登录失败');
   }
-  localStorage.setItem('family_patient_token', JSON.stringify(json.data));
+  setStoredAuth(json.data);
   return json.data;
 }
 
+// 注册
+export async function register(data: {
+  phone: string;
+  password: string;
+  name: string;
+  age?: number;
+  gender?: string;
+}): Promise<AuthData> {
+  const res = await fetch(`${API_BASE_URL}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!json.success) {
+    throw new Error(json.error || '注册失败');
+  }
+  setStoredAuth(json.data);
+  return json.data;
+}
+
+// 登出
+export function logout(): void {
+  clearStoredAuth();
+}
+
+// 获取用户信息
+export async function fetchProfile(): Promise<{ name: string; phone: string; age: number; gender: string }> {
+  const auth = getStoredAuth();
+  if (!auth?.token) {
+    throw new Error('未登录');
+  }
+  const res = await fetch(`${API_BASE_URL}/auth/profile`, {
+    headers: { Authorization: `Bearer ${auth.token}` },
+  });
+  const json = await res.json();
+  if (!json.success) {
+    throw new Error(json.error || '获取用户信息失败');
+  }
+  return json.data;
+}
+
+// 内部请求方法
 async function request<T>(path: string, options: { method?: HttpMethod; body?: any } = {}): Promise<T> {
-  const { token } = await getDemoToken();
+  const auth = getStoredAuth();
+  if (!auth?.token) {
+    throw new Error('请先登录');
+  }
 
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: options.method || 'GET',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${auth.token}`,
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
+
+  // 401 时自动登出
+  if (res.status === 401) {
+    logout();
+    throw new Error('登录已过期，请重新登录');
+  }
 
   const json = await res.json();
 
@@ -47,17 +141,20 @@ async function request<T>(path: string, options: { method?: HttpMethod; body?: a
 // ===== Dashboard / Home =====
 
 export async function fetchDashboard() {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(`/patients/${patientId}/dashboard`);
 }
 
 export async function fetchLatestVitalMeasurements() {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(`/patients/${patientId}/vital-measurements/latest`);
 }
 
 export async function fetchVitalMeasurements(params?: { days?: number; type?: 'blood_pressure' | 'blood_glucose' }) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   const query = new URLSearchParams();
   if (params?.days) query.set('days', String(params.days));
   if (params?.type) query.set('type', params.type);
@@ -67,13 +164,15 @@ export async function fetchVitalMeasurements(params?: { days?: number; type?: 'b
 // ===== Meals =====
 
 export async function fetchPatientMeals(date?: string) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   const query = date ? `?startDate=${date}&endDate=${date}` : '';
   return request<any[]>(`/meals/patient/${patientId}${query}`);
 }
 
 export async function fetchPatientMealStats(days?: number) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   const query = days ? `?days=${days}` : '';
   return request<any>(`/meals/patient/${patientId}/stats${query}`);
 }
@@ -87,19 +186,22 @@ export async function createMeal(data: {
   calories: number;
   notes?: string;
 }) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(`/meals/patient/${patientId}`, { method: 'POST', body: data });
 }
 
 // ===== Health Reports =====
 
 export async function fetchHealthReports() {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any[]>(`/reports/patient/${patientId}`);
 }
 
 export async function fetchLatestHealthReport() {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(`/reports/patient/${patientId}/latest`);
 }
 
@@ -108,7 +210,8 @@ export async function fetchTomorrowMealGuide(payload?: {
   mealType?: '早餐' | '午餐' | '晚餐';
   nonce?: number;
 }) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(`/reports/patient/${patientId}/tomorrow-guide`, {
     method: 'POST',
     body: payload || { mode: 'set' },
@@ -118,51 +221,60 @@ export async function fetchTomorrowMealGuide(payload?: {
 // ===== Patient Profile =====
 
 export async function fetchPatientProfile() {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(`/patients/${patientId}`);
 }
 
 export async function updatePatientProfile(data: any) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(`/patients/${patientId}`, { method: 'PUT', body: data });
 }
 
 // ===== Health Conditions =====
 
 export async function fetchHealthConditions() {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any[]>(`/patients/${patientId}/health-conditions`);
 }
 
 export async function addHealthCondition(data: { conditionName: string; conditionType: string; diagnosedDate?: string; notes?: string }) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(`/patients/${patientId}/health-conditions`, { method: 'POST', body: data });
 }
 
 export async function removeHealthCondition(condId: string) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(`/patients/${patientId}/health-conditions/${condId}`, { method: 'DELETE' });
 }
 
 // ===== Medications =====
 
 export async function fetchMedications() {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any[]>(`/patients/${patientId}/medications`);
 }
 
 export async function addMedication(data: { name: string; dosage: string; frequency: string; timing: string; packageImage?: string; ocrText?: string }) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(`/patients/${patientId}/medications`, { method: 'POST', body: data });
 }
 
 export async function updateMedication(medId: string, data: { name: string; dosage: string; frequency: string; timing: string; packageImage?: string; ocrText?: string }) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(`/patients/${patientId}/medications/${medId}`, { method: 'PUT', body: data });
 }
 
 export async function recognizeMedicationImage(imageData: string) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(`/patients/${patientId}/medications/recognize-image`, {
     method: 'POST',
     body: { imageData },
@@ -170,26 +282,30 @@ export async function recognizeMedicationImage(imageData: string) {
 }
 
 export async function removeMedication(medId: string) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(`/patients/${patientId}/medications/${medId}`, { method: 'DELETE' });
 }
 
 // ===== Preferences =====
 
 export async function fetchPreferences() {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(`/patients/${patientId}/preferences`);
 }
 
 export async function updatePreferences(data: { tastePreferences: string[]; likedFoods: string[]; dislikedFoods: string[] }) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(`/patients/${patientId}/preferences`, { method: 'PUT', body: data });
 }
 
 // ===== Medical Orders =====
 
 export async function fetchMedicalOrders() {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any[]>(`/patients/${patientId}/medical-orders`);
 }
 
@@ -201,7 +317,8 @@ export async function createMedicalOrder(data: {
   originalImage?: string;
   rawOcrText?: string;
 }) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(`/patients/${patientId}/medical-orders`, { method: 'POST', body: data });
 }
 
@@ -213,12 +330,14 @@ export async function updateMedicalOrder(orderId: string, data: {
   originalImage?: string;
   rawOcrText?: string;
 }) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(`/patients/${patientId}/medical-orders/${orderId}`, { method: 'PUT', body: data });
 }
 
 export async function scanMedicalOrderImage(imageData: string, orderId?: string) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(
     orderId ? `/patients/${patientId}/medical-orders/${orderId}/scan` : `/patients/${patientId}/medical-orders/scan`,
     {
@@ -231,7 +350,8 @@ export async function scanMedicalOrderImage(imageData: string, orderId?: string)
 // ===== Diet Alerts =====
 
 export async function fetchDietAlerts(date?: string) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   const query = date ? `?date=${date}` : '';
   return request<any[]>(`/patients/${patientId}/diet-alerts${query}`);
 }
@@ -239,7 +359,8 @@ export async function fetchDietAlerts(date?: string) {
 // ===== Timeline =====
 
 export async function fetchTimeline(date?: string, limit?: number) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   const query = new URLSearchParams();
   if (date) query.set('date', date);
   if (limit) query.set('limit', String(limit));
@@ -249,7 +370,8 @@ export async function fetchTimeline(date?: string, limit?: number) {
 // ===== Conversation Logs =====
 
 export async function fetchConversationLogs(date?: string, limit?: number) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   const query = new URLSearchParams();
   if (date) query.set('date', date);
   if (limit) query.set('limit', String(limit));
@@ -257,14 +379,16 @@ export async function fetchConversationLogs(date?: string, limit?: number) {
 }
 
 export async function fetchConversationDates() {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<string[]>(`/patients/${patientId}/conversation-logs/dates`);
 }
 
 // ===== Authorizations =====
 
 export async function fetchPatientAuthorizationsDetailed() {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request(`/authorizations/patient/${patientId}/detailed`);
 }
 
@@ -279,7 +403,8 @@ export async function createAuthorization(payload: {
   dataRange: string;
   expiryDays: number;
 }) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request('/authorizations', {
     method: 'POST',
     body: {
@@ -305,7 +430,8 @@ export async function createAIConsultation(payload: {
   sourceType?: 'lab' | 'checkup' | 'imaging' | 'mixed';
   files: Array<{ name: string; type: 'image' | 'text'; content: string }>;
 }) {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(`/ai-consultations/patient/${patientId}`, {
     method: 'POST',
     body: payload,
@@ -313,12 +439,14 @@ export async function createAIConsultation(payload: {
 }
 
 export async function fetchAIConsultations() {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any[]>(`/ai-consultations/patient/${patientId}`);
 }
 
 export async function fetchLatestAIConsultation() {
-  const { patientId } = await getDemoToken();
+  const patientId = getCurrentPatientId();
+  if (!patientId) throw new Error('请先登录');
   return request<any>(`/ai-consultations/patient/${patientId}/latest`);
 }
 

@@ -23,11 +23,11 @@ INSERT INTO doctor_accounts (
 
 -- 插入测试患者（3名）
 INSERT INTO patient_accounts (
-  id, name, age, gender, phone, email, created_at, updated_at
+  id, name, age, gender, phone, email, password_hash, created_at, updated_at
 ) VALUES
-  ('patient_test_001', '李奶奶', 68, 'female', '13700137000', 'patient1@test.com', datetime('now'), datetime('now')),
-  ('patient_test_002', '张大爷', 72, 'male', '13700137001', 'patient2@test.com', datetime('now'), datetime('now')),
-  ('patient_test_003', '王阿姨', 65, 'female', '13700137002', 'patient3@test.com', datetime('now'), datetime('now'));
+  ('patient_test_001', '李奶奶', 68, 'female', '13700137000', 'patient1@test.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', datetime('now'), datetime('now')),
+  ('patient_test_002', '张大爷', 72, 'male', '13700137001', 'patient2@test.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', datetime('now'), datetime('now')),
+  ('patient_test_003', '王阿姨', 65, 'female', '13700137002', 'patient3@test.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', datetime('now'), datetime('now'));
 
 -- 插入测试授权
 INSERT INTO doctor_authorizations (

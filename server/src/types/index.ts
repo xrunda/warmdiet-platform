@@ -67,6 +67,7 @@ export interface PatientAccount {
   gender: Gender;
   phone?: string;
   email?: string;
+  passwordHash?: string;
   avatar?: string;
   createdAt: string;
   updatedAt: string;

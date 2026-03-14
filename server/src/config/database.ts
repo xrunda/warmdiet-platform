@@ -107,6 +107,12 @@ class DatabaseConfig {
     this.ensureColumn('patient_medical_orders', 'visit_date', 'TEXT');
     this.ensureColumn('patient_medical_orders', 'original_image', 'TEXT');
     this.ensureColumn('patient_medical_orders', 'raw_ocr_text', 'TEXT');
+
+    // 用户认证相关迁移
+    this.ensureColumn('patient_accounts', 'password_hash', 'TEXT');
+    
+    // 启用 WAL 模式以支持更好的并发
+    this.db!.pragma('journal_mode = WAL');
   }
 
   private ensureColumn(tableName: string, columnName: string, definition: string): void {
