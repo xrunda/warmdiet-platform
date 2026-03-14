@@ -3954,6 +3954,28 @@ const ConsultScreen = () => {
                             </button>
                             <button
                               onClick={() => {
+                                const text = `${report.title}\n\n${report.summary || ''}`;
+                                if (navigator.clipboard) {
+                                  navigator.clipboard.writeText(text).then(() => alert('报告摘要已复制')).catch(() => alert('复制失败'));
+                                } else {
+                                  const textarea = document.createElement('textarea');
+                                  textarea.value = text;
+                                  textarea.style.position = 'fixed';
+                                  textarea.style.opacity = '0';
+                                  document.body.appendChild(textarea);
+                                  textarea.select();
+                                  document.execCommand('copy');
+                                  document.body.removeChild(textarea);
+                                  alert('报告摘要已复制');
+                                }
+                                setMenuOpenId(null);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-gray-700 hover:bg-gray-50 transition text-left"
+                            >
+                              <Copy className="w-3.5 h-3.5 text-gray-400" /> 复制文字版
+                            </button>
+                            <button
+                              onClick={() => {
                                 const url = report.reportUrl || window.location.href;
                                 navigator.clipboard?.writeText(url).then(() => alert('链接已复制')).catch(() => alert(url));
                                 setMenuOpenId(null);
@@ -4028,9 +4050,6 @@ const ConsultScreen = () => {
                         <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', expandedSummaryIds.has(report.id) && 'rotate-180')} />
                         {expandedSummaryIds.has(report.id) ? '收起文字版' : '展开文字版'}
                       </button>
-                      {expandedSummaryIds.has(report.id) && report.summary && (
-                        <CopyTextButton text={`${report.title}\n\n${report.summary}`} />
-                      )}
                     </div>
                   </div>
                 )}

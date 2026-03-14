@@ -3,7 +3,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { UtensilsCrossed, FileText, Activity, Pill, CalendarDays, MessageSquare, AlertTriangle, RefreshCw, BrainCircuit, TrendingUp, Sparkles, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { UtensilsCrossed, FileText, Activity, Pill, CalendarDays, MessageSquare, AlertTriangle, RefreshCw, BrainCircuit, TrendingUp, Sparkles, ExternalLink, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Image } from 'lucide-react';
 import { api } from '../../services/api';
 import { generatePatientAiSummary } from '../../utils/aiInsights';
 import { BackButton, CloseButton } from '../common/ActionButtons';
@@ -349,6 +349,7 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
   const [generatingReport, setGeneratingReport] = useState(false);
   const [aiConsultReports, setAiConsultReports] = useState<AIConsultationReport[]>([]);
   const [expandedAiReports, setExpandedAiReports] = useState<Set<string>>(new Set());
+  const [materialPreview, setMaterialPreview] = useState<{ materials: string[]; currentIndex: number; title: string } | null>(null);
 
   useEffect(() => {
     if (initialPatient) {
@@ -972,7 +973,47 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                       </button>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ fontSize: 11, color: '#94a3b8' }}>素材 {report.sourceMaterials.length} 份</span>
+                        <button
+                          onClick={() => {
+                            if (report.sourceMaterials.length > 0) {
+                              setMaterialPreview({
+                                materials: report.sourceMaterials,
+                                currentIndex: 0,
+                                title: report.title,
+                              });
+                            }
+                          }}
+                          disabled={report.sourceMaterials.length === 0}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            padding: '4px 10px',
+                            borderRadius: 8,
+                            border: '1px solid #e2e8f0',
+                            background: report.sourceMaterials.length > 0 ? '#f8fafc' : 'transparent',
+                            color: report.sourceMaterials.length > 0 ? '#6d28d9' : '#94a3b8',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            cursor: report.sourceMaterials.length > 0 ? 'pointer' : 'default',
+                            transition: 'all 0.15s',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (report.sourceMaterials.length > 0) {
+                              e.currentTarget.style.background = '#f5f3ff';
+                              e.currentTarget.style.borderColor = '#c7d2fe';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (report.sourceMaterials.length > 0) {
+                              e.currentTarget.style.background = '#f8fafc';
+                              e.currentTarget.style.borderColor = '#e2e8f0';
+                            }
+                          }}
+                        >
+                          <FileText style={{ width: 12, height: 12 }} />
+                          素材 {report.sourceMaterials.length} 份
+                        </button>
                         {report.reportUrl && (
                           <a
                             href={report.reportUrl}
@@ -1690,6 +1731,387 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
         )}
         {renderTabContent()}
       </div>
+
+      {/* 素材预览弹窗 - 左右翻页 */}
+      {materialPreview && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setMaterialPreview(null);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 200,
+            background: 'rgba(15,23,42,0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 960,
+              maxHeight: '92vh',
+              background: '#ffffff',
+              borderRadius: 20,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 32px 64px rgba(15,23,42,0.24)',
+            }}
+          >
+            {/* 头部 */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '16px 20px',
+                borderBottom: '1px solid #e2e8f0',
+                background: 'linear-gradient(180deg, #faf5ff 0%, #ffffff 100%)',
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    background: '#f5f3ff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Image style={{ width: 18, height: 18, color: '#8b5cf6' }} />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1e293b' }}>
+                    会诊原始素材
+                  </h4>
+                  <p style={{ margin: '2px 0 0', fontSize: 12, color: '#64748b' }}>
+                    {materialPreview.title}
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: 999,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    background: '#f5f3ff',
+                    color: '#6d28d9',
+                  }}
+                >
+                  {materialPreview.currentIndex + 1} / {materialPreview.materials.length}
+                </span>
+                <CloseButton onClick={() => setMaterialPreview(null)} size={18} />
+              </div>
+            </div>
+
+            {/* 内容区域 */}
+            <div
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+                overflow: 'hidden',
+                background: '#f8fafc',
+                minHeight: 0,
+              }}
+            >
+              {/* 左翻页按钮 */}
+              <button
+                onClick={() =>
+                  setMaterialPreview((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          currentIndex:
+                            prev.currentIndex > 0
+                              ? prev.currentIndex - 1
+                              : prev.materials.length - 1,
+                        }
+                      : null
+                  )
+                }
+                disabled={materialPreview.materials.length <= 1}
+                style={{
+                  position: 'absolute',
+                  left: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  zIndex: 10,
+                  width: 44,
+                  height: 44,
+                  borderRadius: 999,
+                  border: 'none',
+                  background: materialPreview.materials.length > 1 ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.5)',
+                  boxShadow: materialPreview.materials.length > 1 ? '0 4px 16px rgba(15,23,42,0.15)' : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: materialPreview.materials.length > 1 ? 'pointer' : 'default',
+                  transition: 'all 0.2s',
+                  opacity: materialPreview.materials.length > 1 ? 1 : 0.4,
+                }}
+                onMouseEnter={(e) => {
+                  if (materialPreview.materials.length > 1) {
+                    e.currentTarget.style.background = '#f5f3ff';
+                    e.currentTarget.style.transform = 'translateY(-50%) scale(1.08)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (materialPreview.materials.length > 1) {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.95)';
+                    e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+                  }
+                }}
+              >
+                <ChevronLeft style={{ width: 22, height: 22, color: '#6d28d9' }} />
+              </button>
+
+              {/* 素材内容显示 */}
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '20px 64px',
+                  overflow: 'auto',
+                }}
+              >
+                {(() => {
+                  const materialUrl = materialPreview.materials[materialPreview.currentIndex];
+                  const isImage = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(materialUrl) ||
+                    materialUrl.includes('/image') ||
+                    materialUrl.startsWith('data:image');
+                  const isPdf = /\.pdf$/i.test(materialUrl);
+
+                  if (isImage) {
+                    return (
+                      <img
+                        src={materialUrl}
+                        alt={`素材 ${materialPreview.currentIndex + 1}`}
+                        style={{
+                          maxWidth: '100%',
+                          maxHeight: 'calc(92vh - 160px)',
+                          objectFit: 'contain',
+                          borderRadius: 8,
+                          boxShadow: '0 4px 24px rgba(15,23,42,0.1)',
+                        }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                          const parent = (e.target as HTMLImageElement).parentElement;
+                          if (parent) {
+                            const fallback = document.createElement('div');
+                            fallback.innerHTML = `
+                              <div style="text-align:center;padding:40px;color:#94a3b8;">
+                                <div style="font-size:48px;margin-bottom:12px;">📄</div>
+                                <p style="margin:0;font-size:14px;color:#64748b;">素材加载失败</p>
+                                <a href="${materialUrl}" target="_blank" rel="noreferrer" style="margin-top:8px;display:inline-block;font-size:13px;color:#6d28d9;">点击直接打开</a>
+                              </div>
+                            `;
+                            parent.appendChild(fallback);
+                          }
+                        }}
+                      />
+                    );
+                  }
+
+                  if (isPdf) {
+                    return (
+                      <iframe
+                        src={materialUrl}
+                        title={`素材 ${materialPreview.currentIndex + 1}`}
+                        style={{
+                          width: '100%',
+                          height: 'calc(92vh - 160px)',
+                          border: 'none',
+                          borderRadius: 8,
+                        }}
+                      />
+                    );
+                  }
+
+                  // 默认：尝试作为图片加载，失败则提供链接
+                  return (
+                    <div style={{ textAlign: 'center' }}>
+                      <img
+                        src={materialUrl}
+                        alt={`素材 ${materialPreview.currentIndex + 1}`}
+                        style={{
+                          maxWidth: '100%',
+                          maxHeight: 'calc(92vh - 160px)',
+                          objectFit: 'contain',
+                          borderRadius: 8,
+                          boxShadow: '0 4px 24px rgba(15,23,42,0.1)',
+                        }}
+                        onError={(e) => {
+                          const img = e.target as HTMLImageElement;
+                          img.style.display = 'none';
+                          const sibling = img.nextElementSibling as HTMLElement;
+                          if (sibling) sibling.style.display = 'block';
+                        }}
+                      />
+                      <div style={{ display: 'none', textAlign: 'center', padding: 40 }}>
+                        <div style={{ fontSize: 48, marginBottom: 12 }}>📄</div>
+                        <p style={{ margin: 0, fontSize: 14, color: '#64748b', marginBottom: 8 }}>
+                          无法直接预览此文件
+                        </p>
+                        <a
+                          href={materialUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            padding: '8px 16px',
+                            borderRadius: 10,
+                            background: '#6d28d9',
+                            color: '#fff',
+                            textDecoration: 'none',
+                            fontSize: 13,
+                            fontWeight: 600,
+                          }}
+                        >
+                          在新窗口打开
+                          <ExternalLink style={{ width: 14, height: 14 }} />
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* 右翻页按钮 */}
+              <button
+                onClick={() =>
+                  setMaterialPreview((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          currentIndex:
+                            prev.currentIndex < prev.materials.length - 1
+                              ? prev.currentIndex + 1
+                              : 0,
+                        }
+                      : null
+                  )
+                }
+                disabled={materialPreview.materials.length <= 1}
+                style={{
+                  position: 'absolute',
+                  right: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  zIndex: 10,
+                  width: 44,
+                  height: 44,
+                  borderRadius: 999,
+                  border: 'none',
+                  background: materialPreview.materials.length > 1 ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.5)',
+                  boxShadow: materialPreview.materials.length > 1 ? '0 4px 16px rgba(15,23,42,0.15)' : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: materialPreview.materials.length > 1 ? 'pointer' : 'default',
+                  transition: 'all 0.2s',
+                  opacity: materialPreview.materials.length > 1 ? 1 : 0.4,
+                }}
+                onMouseEnter={(e) => {
+                  if (materialPreview.materials.length > 1) {
+                    e.currentTarget.style.background = '#f5f3ff';
+                    e.currentTarget.style.transform = 'translateY(-50%) scale(1.08)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (materialPreview.materials.length > 1) {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.95)';
+                    e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+                  }
+                }}
+              >
+                <ChevronRight style={{ width: 22, height: 22, color: '#6d28d9' }} />
+              </button>
+            </div>
+
+            {/* 底部缩略图导航 */}
+            {materialPreview.materials.length > 1 && (
+              <div
+                style={{
+                  padding: '12px 20px',
+                  borderTop: '1px solid #e2e8f0',
+                  background: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  overflowX: 'auto',
+                  flexShrink: 0,
+                }}
+              >
+                {materialPreview.materials.map((url, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() =>
+                      setMaterialPreview((prev) =>
+                        prev ? { ...prev, currentIndex: idx } : null
+                      )
+                    }
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 10,
+                      border: idx === materialPreview.currentIndex
+                        ? '2px solid #8b5cf6'
+                        : '2px solid #e2e8f0',
+                      background: idx === materialPreview.currentIndex ? '#f5f3ff' : '#f8fafc',
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.15s',
+                      boxShadow: idx === materialPreview.currentIndex
+                        ? '0 2px 8px rgba(139,92,246,0.2)'
+                        : 'none',
+                    }}
+                  >
+                    <img
+                      src={url}
+                      alt={`缩略图 ${idx + 1}`}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                      }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        const parent = (e.target as HTMLImageElement).parentElement;
+                        if (parent) {
+                          parent.innerHTML = `<span style="font-size:16px;">📄</span>`;
+                        }
+                      }}
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
