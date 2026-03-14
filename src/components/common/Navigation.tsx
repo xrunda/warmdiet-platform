@@ -4,15 +4,14 @@
 
 import React from 'react';
 import {
-  Activity,
   Building2,
   CalendarDays,
   ChevronRight,
-  LogOut,
   ShieldCheck,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { LogoutButton } from './ActionButtons';
 
 interface NavItem {
   id: string;
@@ -29,7 +28,7 @@ interface NavigationProps {
 }
 
 export function Navigation({ items, activeTab, onTabChange, children }: NavigationProps) {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   const getPlanBadge = (plan: string): { label: string; className: string } => {
     const plans: Record<string, { label: string; className: string }> = {
@@ -59,7 +58,7 @@ export function Navigation({ items, activeTab, onTabChange, children }: Navigati
 
   return (
     <div className="grid min-h-screen grid-cols-[296px_minmax(0,1fr)] bg-[#edf3f6] text-slate-900">
-      <aside className="relative overflow-hidden border-r border-slate-200/70 bg-slate-950 text-slate-100">
+      <aside className="sticky top-0 h-screen overflow-hidden border-r border-slate-200/70 bg-slate-950 text-slate-100">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(45,212,191,0.24),_transparent_32%),linear-gradient(180deg,_rgba(15,23,42,0.96),_rgba(2,6,23,1))]" />
         <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-cyan-300/25 to-transparent" />
 
@@ -143,31 +142,11 @@ export function Navigation({ items, activeTab, onTabChange, children }: Navigati
             </nav>
           </div>
 
-          <div className="mt-auto space-y-4 px-2 pt-6">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl bg-cyan-400/10 text-cyan-200">
-                  <Activity className="h-[18px] w-[18px]" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-white">值班建议</p>
-                  <p className="mt-1 text-xs leading-5 text-slate-400">
-                    建议优先关注医生配额、患者授权与餐食记录同步情况。
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={logout}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:border-rose-300/20 hover:bg-rose-400/10 hover:text-white"
-            >
-              <LogOut className="h-[18px] w-[18px]" />
-              退出登录
-            </button>
+          <div className="mt-auto space-y-4 px-2 pt-6 pb-6">
+            <LogoutButton fullWidth />
 
             <p className="pb-1 text-center text-xs text-slate-500">
-              WarmDiet Clinical Workspace
+              版权所有 xRunda.com 2026
             </p>
           </div>
         </div>

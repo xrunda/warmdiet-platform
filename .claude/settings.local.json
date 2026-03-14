@@ -74,7 +74,8 @@
       "Bash(sqlite3:*)",
       "Bash(pkill:*)",
       "Bash(curl:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(npm run:*)"
     ]
   }
 }

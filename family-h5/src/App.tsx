@@ -329,6 +329,48 @@ function LoadingSpinner() {
   );
 }
 
+/** 一键复制按钮：点击后将文本写入剪贴板并显示短暂的"已复制"反馈 */
+function CopyTextButton({ text, label = '一键复制' }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // fallback for older browsers / WebView
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      alert('复制失败，请手动选择文字复制');
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className={cn(
+        'inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all',
+        copied
+          ? 'border-emerald-300 bg-emerald-50 text-emerald-600'
+          : 'border-indigo-200 bg-indigo-50 text-indigo-600 active:scale-[0.96]'
+      )}
+    >
+      {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+      {copied ? '已复制' : label}
+    </button>
+  );
+}
+
 const FOOD_LIBRARY = [
   { category: '主食', items: ['米饭', '面条', '粥', '馒头', '全麦面包', '杂粮粥', '小米粥', '红薯'] },
   { category: '蛋白质', items: ['鸡蛋', '蒸蛋', '豆腐', '鱼肉', '鸡胸肉', '虾仁', '牛奶', '豆浆'] },
@@ -3969,22 +4011,27 @@ const ConsultScreen = () => {
                         {renderFormattedTextH5(report.summary)}
                       </div>
                     )}
-                    <button
-                      onClick={() => setExpandedSummaryIds(prev => {
-                        const next = new Set(prev);
-                        if (next.has(report.id)) next.delete(report.id); else next.add(report.id);
-                        return next;
-                      })}
-                      className={cn(
-                        'mt-2 inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold border transition',
-                        expandedSummaryIds.has(report.id)
-                          ? 'border-indigo-200 bg-indigo-50 text-indigo-600'
-                          : 'border-gray-200 bg-gray-50 text-gray-500'
+                    <div className="mt-2 flex items-center gap-2">
+                      <button
+                        onClick={() => setExpandedSummaryIds(prev => {
+                          const next = new Set(prev);
+                          if (next.has(report.id)) next.delete(report.id); else next.add(report.id);
+                          return next;
+                        })}
+                        className={cn(
+                          'inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold border transition',
+                          expandedSummaryIds.has(report.id)
+                            ? 'border-indigo-200 bg-indigo-50 text-indigo-600'
+                            : 'border-gray-200 bg-gray-50 text-gray-500'
+                        )}
+                      >
+                        <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', expandedSummaryIds.has(report.id) && 'rotate-180')} />
+                        {expandedSummaryIds.has(report.id) ? '收起文字版' : '展开文字版'}
+                      </button>
+                      {expandedSummaryIds.has(report.id) && report.summary && (
+                        <CopyTextButton text={`${report.title}\n\n${report.summary}`} />
                       )}
-                    >
-                      <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', expandedSummaryIds.has(report.id) && 'rotate-180')} />
-                      {expandedSummaryIds.has(report.id) ? '收起文字版' : '展开文字版'}
-                    </button>
+                    </div>
                   </div>
                 )}
 

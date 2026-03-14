@@ -3,9 +3,10 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, UtensilsCrossed, FileText, Activity, Pill, CalendarDays, MessageSquare, AlertTriangle, RefreshCw, BrainCircuit, TrendingUp, Sparkles, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { UtensilsCrossed, FileText, Activity, Pill, CalendarDays, MessageSquare, AlertTriangle, RefreshCw, BrainCircuit, TrendingUp, Sparkles, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import { api } from '../../services/api';
 import { generatePatientAiSummary } from '../../utils/aiInsights';
+import { BackButton, CloseButton } from '../common/ActionButtons';
 
 type TabType = 'vitals' | 'meals' | 'reports' | 'aiConsult' | 'orders' | 'medications' | 'healthProfile' | 'followup' | 'chat';
 
@@ -709,7 +710,7 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                 <div style={{ width: '100%', maxWidth: 860, maxHeight: '88vh', overflow: 'auto', background: '#fff', borderRadius: 16, padding: 20 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <h4 style={{ margin: 0, color: '#1e293b' }}>{selectedMealDay.date} · 三餐明细</h4>
-                    <button onClick={() => setSelectedMealDay(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 18 }}>✕</button>
+                    <CloseButton onClick={() => setSelectedMealDay(null)} size={18} />
                   </div>
 
                   {['breakfast', 'lunch', 'dinner', 'snack'].map((mt) => {
@@ -831,7 +832,7 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                     <h4 style={{ margin: 0, color: '#1e293b' }}>
                       {(selectedReport.reportDate || '').slice(0, 10)} · AI 健康报告
                     </h4>
-                    <button onClick={() => setSelectedReport(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 18 }}>✕</button>
+                    <CloseButton onClick={() => setSelectedReport(null)} size={18} />
                   </div>
 
                   <div style={{ fontSize: 13, color: '#64748b', marginBottom: 10 }}>
@@ -1119,7 +1120,7 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                       <h4 style={{ margin: 0, color: '#1e293b' }}>医嘱原件</h4>
                       <p style={{ margin: '6px 0 0', fontSize: 12, color: '#64748b' }}>{selectedOrderImage.hospitalName || '医院'} · {selectedOrderImage.visitDate || '就诊日期未填写'}</p>
                     </div>
-                    <button onClick={() => setSelectedOrderImage(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 18 }}>✕</button>
+                    <CloseButton onClick={() => setSelectedOrderImage(null)} size={18} />
                   </div>
 
                   <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
@@ -1411,26 +1412,7 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
     <div style={{ minHeight: '100%', backgroundColor: '#f8fafc' }}>
       {/* 顶部操作栏 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '12px', flexWrap: 'wrap' }}>
-        <button
-          onClick={onBack}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 16px',
-            background: 'white',
-            border: '1px solid #e2e8f0',
-            borderRadius: '10px',
-            color: '#64748b',
-            fontSize: '14px',
-            fontWeight: '500',
-            cursor: 'pointer',
-          }}
-        >
-          <ArrowLeft style={{ width: '16px', height: '16px' }} />
-          返回患者列表
-        </button>
-        
+        {onBack && <BackButton onClick={onBack} label="返回患者列表" />}
       </div>
       
       <style>{`
