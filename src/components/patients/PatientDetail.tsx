@@ -224,7 +224,7 @@ function renderFormattedText(text: string) {
   if (!text) return null;
   // 按连续换行拆段落，单换行保留
   const lines = text.split(/\n/);
-  const elements: JSX.Element[] = [];
+  const elements: React.ReactElement[] = [];
   let listBuffer: string[] = [];
   let key = 0;
 
@@ -244,7 +244,7 @@ function renderFormattedText(text: string) {
 
   const renderInline = (line: string) => {
     // Bold: **text** or __text__
-    const parts: (string | JSX.Element)[] = [];
+    const parts: (string | React.ReactElement)[] = [];
     const boldRegex = /\*\*(.+?)\*\*/g;
     let lastIdx = 0;
     let match;
@@ -388,6 +388,7 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
   const [aiConsultReports, setAiConsultReports] = useState<AIConsultationReport[]>([]);
   const [expandedAiReports, setExpandedAiReports] = useState<Set<string>>(new Set());
   const [materialPreview, setMaterialPreview] = useState<{ materials: (SourceMaterial | string)[]; currentIndex: number; title: string } | null>(null);
+  const [isAiTimelineExpanded, setIsAiTimelineExpanded] = useState(false);
 
   useEffect(() => {
     if (initialPatient) {
@@ -1747,12 +1748,33 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
       <div style={{ background: 'white', borderRadius: '16px', padding: '24px', boxShadow: '0 1px 3px rgba(15,23,42,0.08)' }}>
         {activeTab === 'vitals' && aiTimeline.length > 0 && (
           <div style={{ marginBottom: 24, padding: 18, borderRadius: 16, background: '#faf5ff', border: '1px solid #e9d5ff' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-              <Sparkles style={{ width: 18, height: 18, color: '#9333ea' }} />
-              <h3 style={{ margin: 0, fontSize: 18, color: '#581c87' }}>AI 异常检测时间线</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Sparkles style={{ width: 18, height: 18, color: '#9333ea' }} />
+                <h3 style={{ margin: 0, fontSize: 18, color: '#581c87' }}>AI 异常检测时间线</h3>
+              </div>
+              <button
+                onClick={() => setIsAiTimelineExpanded((prev) => !prev)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 12px',
+                  borderRadius: 10,
+                  border: '1px solid #d8b4fe',
+                  background: '#ffffff',
+                  color: '#7c3aed',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {isAiTimelineExpanded ? <ChevronUp style={{ width: 14, height: 14 }} /> : <ChevronDown style={{ width: 14, height: 14 }} />}
+                {isAiTimelineExpanded ? '收起历史' : `展开历史（${Math.max(aiTimeline.length - 1, 0)}）`}
+              </button>
             </div>
             <div style={{ display: 'grid', gap: 12 }}>
-              {aiTimeline.map((item) => (
+              {(isAiTimelineExpanded ? aiTimeline : aiTimeline.slice(0, 1)).map((item) => (
                 <div key={item.id} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: 12, borderRadius: 12, background: 'white', border: '1px solid #f3e8ff' }}>
                   <div style={{ width: 36, height: 36, borderRadius: 12, background: item.level === 'high' ? '#fee2e2' : item.level === 'medium' ? '#fef3c7' : '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <TrendingUp style={{ width: 16, height: 16, color: item.level === 'high' ? '#b91c1c' : item.level === 'medium' ? '#b45309' : '#1d4ed8' }} />
