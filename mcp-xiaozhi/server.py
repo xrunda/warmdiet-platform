@@ -28,12 +28,12 @@ logger.info(
 
 def _safe_response(data: Dict[str, Any]) -> Dict[str, Any]:
     raw = json.dumps(data, ensure_ascii=False)
-    if len(raw.encode("utf-8")) <= 1000:
+    if len(raw.encode("utf-8")) <= 3000:
         return data
     return {
         "success": True,
         "message": "返回内容较长，已裁剪",
-        "preview": raw[:500],
+        "preview": raw[:1500],
     }
 
 
@@ -264,6 +264,14 @@ def record_vitals(
     - metric_type: blood_pressure 或 blood_glucose
     - 血压时提供 systolic_value + diastolic_value
     - 血糖时提供 glucose_value，可选 glucose_context（fasting/post_meal/random/before_sleep/unknown）
+
+    重要：当记录血糖后，返回结果中可能包含 follow_up 字段。
+    如果 follow_up.should_ask 为 true，你必须按照 follow_up.prompt_for_ai 中的指令，
+    用自然对话的方式逐个追问患者。追问时注意：
+    - 如果 urgency 为 high 或 advice.level 为 urgent，优先告知安全提醒
+    - 每次只问一个问题，不要一次问完所有问题
+    - 标记为"可以跳过"的问题，如果患者不想回答可以跳过
+    - 用温和关心的语气，不要像审问
     """
     logger.info(
         "[TOOL-IN] record_vitals metric_type=%s systolic=%s diastolic=%s glucose=%s context=%s",
@@ -285,8 +293,12 @@ def record_vitals(
             logger.error("[TOOL-ERR] record_vitals validation err=%s", msg)
             return {"success": False, "error": msg}
     else:
-        if glucose_value <= 0:
-            msg = "血糖参数无效：请提供大于 0 的 glucose_value"
+        is_follow_up_supplement = glucose_value <= 0 and (
+            (isinstance(glucose_context, str) and glucose_context.strip().lower() not in ("", "unknown"))
+            or (isinstance(source_text, str) and source_text.strip())
+        )
+        if glucose_value <= 0 and not is_follow_up_supplement:
+            msg = "血糖参数无效：请提供大于 0 的 glucose_value，或提供追问补录信息（如 glucose_context）"
             logger.error("[TOOL-ERR] record_vitals validation err=%s", msg)
             return {"success": False, "error": msg}
     payload: Dict[str, Any] = {
@@ -306,7 +318,7 @@ def record_vitals(
     else:
         payload.update(
             {
-                "glucoseValue": glucose_value,
+                "glucoseValue": glucose_value if glucose_value > 0 else None,
                 "glucoseContext": glucose_context,
                 "unit": "mmol/L",
             }
@@ -320,7 +332,64 @@ def record_vitals(
     try:
         result = api_client.record_vitals(payload)
         logger.info("[TOOL-OK] record_vitals metric_type=%s", metric_type)
-        return _safe_response({"success": True, "result": result})
+
+        response: Dict[str, Any] = {"success": True, "result": result}
+
+        # 血糖记录后自动调用追问 SOP
+        if metric_type == "blood_glucose" and glucose_value > 0:
+            try:
+                follow_up = api_client.get_glucose_follow_up(
+                    glucose_value=glucose_value,
+                    glucose_context=glucose_context,
+                    measured_at=measured_at,
+                )
+                if follow_up and follow_up.get("shouldAskFollowUp"):
+                    questions = follow_up.get("questions", [])
+                    advice = follow_up.get("advice", {})
+                    urgency = follow_up.get("urgency", "low")
+
+                    # 构建给 AI 的追问指令
+                    follow_up_texts = []
+                    if advice and advice.get("level") == "urgent":
+                        follow_up_texts.append(f"⚠️ 紧急提醒：{advice.get('summary', '')}")
+                    elif advice and advice.get("level") == "attention":
+                        follow_up_texts.append(f"⚡ 注意：{advice.get('summary', '')}")
+
+                    for q in questions:
+                        opts = "、".join(q.get("options", []))
+                        skip_hint = "（可以跳过）" if q.get("allowSkip") else ""
+                        follow_up_texts.append(f"请追问患者：{q['question']} 选项：{opts}{skip_hint}")
+
+                    response["follow_up"] = {
+                        "should_ask": True,
+                        "urgency": urgency,
+                        "intent": follow_up.get("intent", ""),
+                        "summary": follow_up.get("summary", ""),
+                        "advice": advice,
+                        "questions": questions,
+                        "prompt_for_ai": "\n".join(follow_up_texts),
+                    }
+                    response["message"] = (
+                        f"血糖已记录。{follow_up.get('summary', '')}\n"
+                        + "\n".join(follow_up_texts)
+                    )
+                    logger.info(
+                        "[FOLLOW-UP] glucose=%.1f context=%s urgency=%s intent=%s questions=%d",
+                        glucose_value, glucose_context, urgency,
+                        follow_up.get("intent", ""), len(questions),
+                    )
+                else:
+                    response["follow_up"] = {"should_ask": False}
+                    response["message"] = "血糖已记录，数值在合理范围内。"
+            except Exception as fu_err:
+                logger.warning("[FOLLOW-UP-ERR] glucose follow-up failed: %s", fu_err)
+                response["follow_up"] = {"should_ask": False, "error": str(fu_err)}
+
+        elif metric_type == "blood_glucose":
+            response["follow_up"] = {"should_ask": False}
+            response["message"] = "血糖追问信息已补充保存。"
+
+        return _safe_response(response)
     except WarmDietApiError as ex:
         logger.error("[TOOL-ERR] record_vitals err=%s", ex)
         return {"success": False, "error": str(ex)}

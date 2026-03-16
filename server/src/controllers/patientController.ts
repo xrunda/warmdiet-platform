@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { AppError, asyncHandler } from '../middleware/errorHandler';
 import type { Models } from '../models';
 import { authService } from '../services/authService';
+import { buildGlucoseFollowUp } from '../services/glucoseFollowUpService';
 import { ocrService } from '../services/ocrService';
 import { extractVitalMeasurementsFromText } from '../services/vitalSignParser';
 import { ApiResponse } from '../types';
@@ -75,6 +76,12 @@ const appendConversationLogSchema = z.object({
   timestamp: z.string().optional(),
   logDate: z.string().optional(),
   extra: z.any().optional(),
+});
+
+const glucoseFollowUpQuerySchema = z.object({
+  glucoseValue: z.coerce.number().min(1).max(40),
+  glucoseContext: z.enum(['fasting', 'post_meal', 'random', 'before_sleep', 'unknown']).optional(),
+  measuredAt: z.string().optional(),
 });
 
 const preferenceSchema = z.object({
@@ -732,6 +739,41 @@ export class PatientController {
     });
   });
 
+  // --- Glucose Follow-Up (血糖追问 SOP) ---
+
+  public getGlucoseFollowUp = asyncHandler(async (req: Request, res: Response) => {
+    const patientId = req.params.id;
+    const query = glucoseFollowUpQuerySchema.parse(req.query);
+    this.ensurePatientExists(patientId);
+
+    // 查询近 14 天血糖记录，用于判断连续异常趋势
+    const recentGlucoseRecords = this.models.vitalMeasurement
+      .findByPatientId(patientId, 14, 'blood_glucose')
+      .slice(0, 20);
+
+    const recentHighCount = recentGlucoseRecords.filter((item) => {
+      const value = Number(item.glucoseValue || 0);
+      const threshold = item.glucoseContext === 'fasting' ? 7 : item.glucoseContext === 'post_meal' ? 10 : 11.1;
+      return value >= threshold;
+    }).length;
+
+    const recentLowCount = recentGlucoseRecords.filter((item) => Number(item.glucoseValue || 0) < 3.9).length;
+
+    const result = buildGlucoseFollowUp({
+      glucoseValue: query.glucoseValue,
+      glucoseContext: query.glucoseContext,
+      measuredAt: query.measuredAt,
+      recentHighCount,
+      recentLowCount,
+    });
+
+    res.json({
+      success: true,
+      data: result,
+      message: result.shouldAskFollowUp ? '已生成血糖追问建议' : '当前无需追加追问',
+    });
+  });
+
   public createVitalMeasurement = asyncHandler(async (req: Request, res: Response) => {
     const patientId = req.params.id;
     const data = createVitalMeasurementSchema.parse(req.body);
@@ -742,7 +784,31 @@ export class PatientController {
     }
 
     if (data.metricType === 'blood_glucose' && data.glucoseValue == null) {
-      throw new AppError('血糖记录需提供血糖值', 400);
+      const canSupplement = data.glucoseContext && data.glucoseContext !== 'unknown';
+      if (!canSupplement) {
+        throw new AppError('血糖记录需提供血糖值', 400);
+      }
+
+      const pending = this.models.vitalMeasurement.findLatestUnknownGlucoseByPatientId(patientId);
+      if (!pending) {
+        throw new AppError('未找到可补充的血糖记录，请重新上报完整血糖值', 400);
+      }
+
+      const mergedSourceText = [pending.sourceText, data.sourceText].filter(Boolean).join(' | ');
+      const mergedNotes = [pending.notes, data.notes].filter(Boolean).join('；');
+
+      const updated = this.models.vitalMeasurement.update(pending.id, {
+        glucoseContext: data.glucoseContext,
+        sourceText: mergedSourceText || undefined,
+        notes: mergedNotes || undefined,
+      } as any);
+
+      res.status(201).json({
+        success: true,
+        data: this.normalizeVitalSummaryItem(updated),
+        message: '血糖追问信息已补充',
+      });
+      return;
     }
 
     const dt = this.buildDateAndTime(data.measuredAt?.split('T')[1], data.measurementDate || data.measuredAt?.split('T')[0]);

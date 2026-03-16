@@ -95,6 +95,19 @@ export class PatientVitalMeasurementModel extends BaseModel<PatientVitalMeasurem
   public findBySourceLog(metricType: string, sourceLogId: string): PatientVitalMeasurement | undefined {
     return this.findOne({ metricType: metricType as any, sourceLogId } as any);
   }
+
+  public findLatestUnknownGlucoseByPatientId(patientId: string): PatientVitalMeasurement | undefined {
+    const sql = `
+      SELECT * FROM patient_vital_measurements
+      WHERE patient_id = ?
+        AND metric_type = 'blood_glucose'
+        AND glucose_context = 'unknown'
+      ORDER BY measured_at DESC, created_at DESC
+      LIMIT 1
+    `;
+    const rows = this.query(sql, [patientId]);
+    return rows[0];
+  }
 }
 
 export class DietAlertModel extends BaseModel<DietAlert> {

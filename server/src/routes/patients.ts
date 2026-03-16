@@ -169,6 +169,13 @@ router.get('/:id/vital-measurements/latest', authenticateDoctorOrHospitalOrPatie
 router.get('/:id/vital-measurements', authenticateDoctorOrHospitalOrPatient, (req, res, next) => getModels().controller.getVitalMeasurements(req, res, next));
 
 /**
+ * @route   GET /api/patients/:id/glucose-follow-up
+ * @desc    根据血糖值动态生成低打扰追问建议（血糖问诊 SOP）
+ * @access  Private (Patient / Doctor / Hospital)
+ */
+router.get('/:id/glucose-follow-up', authenticateDoctorOrHospitalOrPatient, (req, res, next) => getModels().controller.getGlucoseFollowUp(req, res, next));
+
+/**
  * @route   POST /api/patients/:id/vital-measurements
  * @desc    写入患者血压/血糖记录
  * @access  Private (Patient)

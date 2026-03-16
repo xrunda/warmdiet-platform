@@ -55,6 +55,13 @@ class WarmDietApiClient:
     def get_today_summary(self) -> Dict[str, Any]:
         return self._request("GET", f"/patients/{self.patient_id}/dashboard")
 
+    def get_glucose_follow_up(self, glucose_value: float, glucose_context: str = "unknown", measured_at: str = "") -> Dict[str, Any]:
+        """根据血糖值获取低打扰追问建议"""
+        params = f"glucoseValue={glucose_value}&glucoseContext={glucose_context}"
+        if measured_at:
+            params += f"&measuredAt={measured_at}"
+        return self._request("GET", f"/patients/{self.patient_id}/glucose-follow-up?{params}")
+
     def get_meal_suggestion(self, mode: str = "set", meal_type: str | None = None) -> Dict[str, Any]:
         """获取用餐指引建议"""
         import time
