@@ -257,6 +257,7 @@ def record_vitals(
     glucose_context: str = "unknown",
     measured_at: str = "",
     source_text: str = "",
+    notes: str = "",
 ) -> dict:
     """当用户主动上报血压或血糖时，使用该工具写入生命体征。
 
@@ -264,6 +265,7 @@ def record_vitals(
     - metric_type: blood_pressure 或 blood_glucose
     - 血压时提供 systolic_value + diastolic_value
     - 血糖时提供 glucose_value，可选 glucose_context（fasting/post_meal/random/before_sleep/unknown）
+    - notes: 可选，补录细节（如餐后多久、服用药物名称等）
 
     重要：当记录血糖后，返回结果中可能包含 follow_up 字段。
     如果 follow_up.should_ask 为 true，你必须按照 follow_up.prompt_for_ai 中的指令，
@@ -274,12 +276,13 @@ def record_vitals(
     - 用温和关心的语气，不要像审问
     """
     logger.info(
-        "[TOOL-IN] record_vitals metric_type=%s systolic=%s diastolic=%s glucose=%s context=%s",
+        "[TOOL-IN] record_vitals metric_type=%s systolic=%s diastolic=%s glucose=%s context=%s notes=%s",
         metric_type,
         systolic_value,
         diastolic_value,
         glucose_value,
         glucose_context,
+        notes,
     )
 
     if metric_type not in ("blood_pressure", "blood_glucose"):
@@ -305,6 +308,7 @@ def record_vitals(
         "metricType": metric_type,
         "sourceType": settings.voice_source_type,
         "sourceText": source_text.strip() if isinstance(source_text, str) and source_text.strip() else None,
+        "notes": notes.strip() if isinstance(notes, str) and notes.strip() else None,
     }
 
     if metric_type == "blood_pressure":

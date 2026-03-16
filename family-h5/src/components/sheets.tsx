@@ -1199,7 +1199,14 @@ export function VitalSignsSheet({
                       <span className="pb-1 text-sm font-semibold text-gray-400">{item.unit}</span>
                     </div>
                     {!isPressure ? (
-                      <p className="mt-1 text-xs text-gray-500">测量场景：{item.glucoseContextLabel || '未标注'}</p>
+                      <>
+                        <p className="mt-1 text-xs text-gray-500">测量场景：{item.glucoseContextLabel || '未标注'}</p>
+                        {item.hasFollowUpInfo && item.followUpInfo ? (
+                          <p className="mt-1.5 rounded-lg bg-sky-50 px-2 py-1 text-[11px] font-medium text-sky-700">
+                            补录信息：{item.followUpInfo.replace(/^补录[:：]\s*/, '')}
+                          </p>
+                        ) : null}
+                      </>
                     ) : null}
                   </div>
                   <span className={cn('rounded-full px-3 py-1 text-xs font-bold', tone.pill)}>{tone.badge}</span>
@@ -1297,6 +1304,11 @@ export function VitalSignsSheet({
                                           {isPressure ? '血压' : `血糖${item.glucoseContextLabel ? `·${item.glucoseContextLabel}` : ''}`}
                                         </span>
                                         <span className="text-[11px] text-gray-400">{formatTime(item.measuredAt)}</span>
+                                        {!isPressure && item.hasFollowUpInfo && item.followUpInfo ? (
+                                          <span className="mt-1 inline-flex rounded-md bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700">
+                                            补录：{item.followUpInfo.replace(/^补录[:：]\s*/, '')}
+                                          </span>
+                                        ) : null}
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -1432,13 +1444,28 @@ export function RecordSheet({ open, onClose }: { open: boolean; onClose: () => v
               }
 
               if (item.type === 'vital') {
+                const isPressure = item.data?.metricType === 'blood_pressure';
+                const fallbackFollowUp = [item.data?.notes, item.data?.sourceText]
+                  .filter((text: any) => typeof text === 'string' && /补录|服药|吃药|未服|漏服|场景|餐后|空腹|睡前|随机|降糖药|降压药/.test(text))
+                  .map((text: string) => text.replace(/\[(追问)?补录\]/g, '').trim())
+                  .filter(Boolean)
+                  .join('；');
+                const followUpText = (item.data?.followUpInfo || fallbackFollowUp || '').replace(/^补录[:：]\s*/, '');
                 return (
                   <div key={item.id} className="rounded-[20px] border border-sky-100 bg-[linear-gradient(135deg,#f8fbff_0%,#eef5ff_100%)] p-4 shadow-sm">
                     <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-sm font-bold text-gray-800">{item.data?.label || '指标记录'}</span>
+                      <span className="text-sm font-bold text-gray-800">
+                        {item.data?.label || '指标记录'}
+                        {!isPressure && item.data?.contextLabel ? ` · ${item.data.contextLabel}` : ''}
+                      </span>
                       <span className="text-xs text-gray-400">{timeLabel}</span>
                     </div>
                     <p className="text-sm text-gray-700">{item.data?.value} {item.data?.unit || ''}</p>
+                    {!isPressure && followUpText ? (
+                      <p className="mt-2 inline-flex rounded-lg bg-sky-50 px-2 py-1 text-[11px] font-medium text-sky-700">
+                        补录：{followUpText}
+                      </p>
+                    ) : null}
                   </div>
                 );
               }

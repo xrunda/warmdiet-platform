@@ -420,6 +420,11 @@ export const HomeScreen = ({
                           {item.value}
                           <span className="ml-1 text-xs font-semibold text-slate-400">{item.unit}</span>
                         </p>
+                        {!isPressure && item.hasFollowUpInfo && item.followUpInfo ? (
+                          <p className="mt-1.5 inline-flex max-w-[220px] rounded-lg bg-sky-50 px-2 py-1 text-[11px] font-medium text-sky-700">
+                            补录：{item.followUpInfo.replace(/^补录[:：]\s*/, '')}
+                          </p>
+                        ) : null}
                         <p className="mt-1 text-xs text-slate-400">{formatMeasuredTime(item.measuredAt)} · 来自小爱语音</p>
                       </div>
                     </div>

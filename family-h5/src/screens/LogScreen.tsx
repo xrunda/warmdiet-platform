@@ -22,6 +22,25 @@ import {
 import { ChatMessage } from '../types';
 import { fetchTimeline } from '../api';
 
+function normalizeDateKey(input?: string) {
+  if (!input || typeof input !== 'string') return '';
+  const raw = input.trim();
+  if (!raw) return '';
+  const datePart = raw.includes('T') ? raw.split('T')[0] : raw;
+  const match = datePart.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (match) {
+    const month = match[2].padStart(2, '0');
+    const day = match[3].padStart(2, '0');
+    return `${match[1]}-${month}-${day}`;
+  }
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return '';
+  const y = parsed.getFullYear();
+  const m = `${parsed.getMonth() + 1}`.padStart(2, '0');
+  const d = `${parsed.getDate()}`.padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export const LogScreen = () => {
   const [loading, setLoading] = useState(true);
   const [dates, setDates] = useState<string[]>([]);
@@ -34,7 +53,7 @@ export const LogScreen = () => {
     // 先加载全部时间线获取所有可用日期
     fetchTimeline(undefined, 1000)
       .then((items: any[]) => {
-        const allDates = Array.from(new Set((items || []).map((it: any) => it.logDate).filter(Boolean))).sort();
+        const allDates = Array.from(new Set((items || []).map((it: any) => normalizeDateKey(it.logDate)).filter(Boolean))).sort();
         setDates(allDates);
         setDateIndex(Math.max(0, allDates.length - 1));
         setTimelineItems(items || []);
@@ -45,8 +64,8 @@ export const LogScreen = () => {
               id: it.id,
               role: it.data?.role,
               content: it.data?.content,
-              timestamp: formatChatTimestamp(it.logDate, it.timestamp),
-              logDate: it.logDate,
+              timestamp: formatChatTimestamp(normalizeDateKey(it.logDate), it.timestamp),
+              logDate: normalizeDateKey(it.logDate),
               extra: it.data?.extra || undefined,
             }))
         );
@@ -74,9 +93,9 @@ export const LogScreen = () => {
               role: it.data?.role,
               content: it.data?.content,
               timestamp: viewMode === 'all'
-                ? formatChatTimestamp(it.logDate, it.timestamp)
+                ? formatChatTimestamp(normalizeDateKey(it.logDate), it.timestamp)
                 : (it.timestamp || '').slice(0, 5),
-              logDate: it.logDate,
+              logDate: normalizeDateKey(it.logDate),
               extra: it.data?.extra || undefined,
             }))
         );
@@ -126,9 +145,9 @@ export const LogScreen = () => {
                           role: it.data?.role,
                           content: it.data?.content,
                           timestamp: viewMode === 'all'
-                            ? formatChatTimestamp(it.logDate, it.timestamp)
+                            ? formatChatTimestamp(normalizeDateKey(it.logDate), it.timestamp)
                             : (it.timestamp || '').slice(0, 5),
-                          logDate: it.logDate,
+                          logDate: normalizeDateKey(it.logDate),
                           extra: it.data?.extra || undefined,
                         }))
                     );
@@ -299,6 +318,12 @@ export const LogScreen = () => {
             if (item.type === 'vital') {
               const isPressure = item.data.metricType === 'blood_pressure';
               const statusColor = item.data.status === 'high' ? 'text-red-600' : item.data.status === 'low' ? 'text-blue-600' : 'text-emerald-600';
+              const fallbackFollowUp = [item.data?.notes, item.data?.sourceText]
+                .filter((text: any) => typeof text === 'string' && /补录|服药|吃药|未服|场景|餐后|空腹|睡前|随机/.test(text))
+                .map((text: string) => text.replace(/\[(追问)?补录\]/g, '').trim())
+                .filter(Boolean)
+                .join('；');
+              const followUpText = (item.data?.followUpInfo || fallbackFollowUp || '').replace(/^补录[:：]\s*/, '');
               return (
                 <div key={item.id} className="rounded-[20px] border border-sky-100 bg-[linear-gradient(135deg,#f8fbff_0%,#eef5ff_100%)] p-4 shadow-sm">
                   <div className="flex items-center gap-2 mb-2">
@@ -314,6 +339,11 @@ export const LogScreen = () => {
                     <span className={cn('text-2xl font-black', statusColor)}>{item.data.value}</span>
                     <span className="text-sm text-gray-400">{item.data.unit}</span>
                   </div>
+                  {!isPressure && followUpText ? (
+                    <div className="mt-2 inline-flex rounded-lg bg-sky-50 px-2 py-1 text-[11px] font-medium text-sky-700">
+                      补录：{followUpText}
+                    </div>
+                  ) : null}
                 </div>
               );
             }

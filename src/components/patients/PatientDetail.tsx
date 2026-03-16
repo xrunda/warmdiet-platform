@@ -178,6 +178,9 @@ type VitalMeasurement = {
   diastolic?: number;
   value?: number;
   unit?: string;
+  glucoseContextLabel?: string;
+  followUpInfo?: string;
+  hasFollowUpInfo?: boolean;
   measuredAt: string;
 };
 
@@ -187,6 +190,9 @@ type VitalApiItem = {
   diastolicValue?: number;
   glucoseValue?: number;
   unit?: string;
+  glucoseContextLabel?: string;
+  followUpInfo?: string;
+  hasFollowUpInfo?: boolean;
   measuredAt?: string;
 };
 
@@ -457,6 +463,9 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
           type: 'blood_sugar',
           value: v.glucoseValue,
           unit: v.unit || 'mmol/L',
+          glucoseContextLabel: v.glucoseContextLabel,
+          followUpInfo: v.followUpInfo,
+          hasFollowUpInfo: v.hasFollowUpInfo,
           measuredAt: v.measuredAt || new Date().toISOString(),
         };
       });
@@ -585,7 +594,7 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
           summaryParts.push(`血压 ${bp.systolic ?? '--'}/${bp.diastolic ?? '--'} ${bp.unit || 'mmHg'}`);
         }
         if (bg) {
-          summaryParts.push(`血糖 ${(bg.value ?? '--')} ${bg.unit || 'mmol/L'}`);
+          summaryParts.push(`血糖 ${(bg.value ?? '--')} ${bg.unit || 'mmol/L'}${bg.glucoseContextLabel ? `（${bg.glucoseContextLabel}）` : ''}`);
         }
         return {
           date,
@@ -1415,14 +1424,19 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                           label: '血压',
                           value: day.bp ? `${day.bp.systolic ?? '--'}/${day.bp.diastolic ?? '--'} ${day.bp.unit || 'mmHg'}` : '未采集',
                           updatedAt: day.bp ? formatDateTime(day.bp.measuredAt) : undefined,
+                          followUpInfo: undefined as string | undefined,
                         }, {
                           label: '血糖',
-                          value: day.bg ? `${day.bg.value ?? '--'} ${day.bg.unit || 'mmol/L'}` : '未采集',
+                          value: day.bg
+                            ? `${day.bg.value ?? '--'} ${day.bg.unit || 'mmol/L'}${day.bg.glucoseContextLabel ? ` · ${day.bg.glucoseContextLabel}` : ''}`
+                            : '未采集',
                           updatedAt: day.bg ? formatDateTime(day.bg.measuredAt) : undefined,
+                          followUpInfo: day.bg?.hasFollowUpInfo ? day.bg?.followUpInfo : undefined,
                         }, {
                           label: '评分',
                           value: `${day.healthScore} / 100`,
                           updatedAt: undefined as string | undefined,
+                          followUpInfo: undefined as string | undefined,
                         }].map((metric) => (
                           <div
                             key={metric.label}
@@ -1439,6 +1453,22 @@ export function PatientDetail({ patientId, initialPatient, onBack }: PatientDeta
                             <p style={{ margin: '6px 0 0 0', fontSize: 16, fontWeight: 600, color: '#1e293b' }}>{metric.value}</p>
                             {metric.updatedAt && (
                               <p style={{ margin: '4px 0 0 0', fontSize: 11, color: '#94a3b8' }}>更新：{metric.updatedAt}</p>
+                            )}
+                            {metric.followUpInfo && (
+                              <p
+                                style={{
+                                  margin: '6px 0 0 0',
+                                  fontSize: 11,
+                                  color: '#0369a1',
+                                  background: '#f0f9ff',
+                                  border: '1px solid #bae6fd',
+                                  borderRadius: 8,
+                                  padding: '4px 8px',
+                                  lineHeight: 1.6,
+                                }}
+                              >
+                                补录信息：{metric.followUpInfo.replace(/^补录[:：]\s*/, '')}
+                              </p>
                             )}
                           </div>
                         ))}

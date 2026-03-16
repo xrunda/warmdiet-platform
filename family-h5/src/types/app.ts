@@ -28,6 +28,10 @@ export type VitalSummaryItem = {
   sourceType: string;
   status: VitalStatus;
   glucoseContextLabel?: string;
+  notes?: string;
+  sourceText?: string;
+  followUpInfo?: string;
+  hasFollowUpInfo?: boolean;
 };
 
 export type VitalSummary = {

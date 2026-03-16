@@ -55,8 +55,22 @@ export function formatTrendDay(dateStr: string): string {
 }
 
 export function formatDateLabel(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  return `${d.getMonth() + 1}月${d.getDate()}日`;
+  if (!dateStr || typeof dateStr !== 'string') return '--月--日';
+
+  const normalized = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+  const ymdMatch = normalized.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (ymdMatch) {
+    const month = Number(ymdMatch[2]);
+    const day = Number(ymdMatch[3]);
+    if (!Number.isNaN(month) && !Number.isNaN(day)) return `${month}月${day}日`;
+  }
+
+  const parsed = new Date(dateStr);
+  if (!Number.isNaN(parsed.getTime())) {
+    return `${parsed.getMonth() + 1}月${parsed.getDate()}日`;
+  }
+
+  return '--月--日';
 }
 
 export function formatChatTimestamp(logDate?: string, timestamp?: string) {
