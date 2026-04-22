@@ -120,6 +120,20 @@ VITE_API_URL=http://localhost:4000/api
 npm run dev:all
 ```
 
+#### Agent 启动/重启速查
+
+给本地开发或 Agent 使用时，直接按下面规则执行即可：
+
+- **首次启动**：在仓库根目录执行 `npm install` 后，运行 `npm run dev:all`
+- **重启全部服务**：直接再次运行 `npm run dev:all`
+- **停止全部服务**：运行 `npm run kill-ports`
+- **启动后验证**：
+  - 后端健康检查：`http://localhost:4000/health`
+  - 医院端前端：`http://localhost:4001`
+  - 家属端 H5：`http://localhost:4100`
+
+> `npm run dev:all` 已经内置 `npm run kill-ports`，所以**重启时不需要手动先杀端口**。
+
 该命令会自动：
 
 - 释放端口 `4000 / 4001 / 4100`（`npm run kill-ports`）
@@ -151,6 +165,43 @@ npm run dev:all
 > WARMDIET_PATIENT_ID=patient_test_001
 > VOICE_SOURCE_TYPE=xiaoai_voice
 > ```
+
+#### 本地测试登录（供 Agent/开发联调）
+
+- **医院端测试账号**
+
+  ```text
+  统一社会信用代码: 91110000MD0010209
+  密码: password123
+  ```
+
+- **家属端 H5 推荐使用 Demo Token 登录**
+
+  本地开发时，优先调用后端 Demo 接口获取测试患者 `patient_test_001` 的 token，而不是依赖手工输入测试密码。
+
+  ```bash
+  curl -X POST http://localhost:4000/api/demo/patient-token
+  ```
+
+  返回结果形如：
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "token": "<jwt>",
+      "patientId": "patient_test_001"
+    }
+  }
+  ```
+
+  家属端前端将登录态存放在浏览器 localStorage：
+
+  ```text
+  key: family_patient_token
+  ```
+
+  需要模拟家属端登录时，可将返回的 `data` 原样写入该 key。
 
 ### MCP 链路日志排障（语音说了但没落库）
 
