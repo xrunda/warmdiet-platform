@@ -146,7 +146,7 @@ export function Navigation({ items, activeTab, onTabChange, children }: Navigati
             <LogoutButton fullWidth />
 
             <p className="pb-1 text-center text-xs text-slate-500">
-              版权所有 xRunda.com 2026
+              版权所有 xRuns.cn 2026
             </p>
           </div>
         </div>
