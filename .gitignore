@@ -46,3 +46,9 @@ tmp/
 temp/
 .alma-snapshots
 /docs
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
