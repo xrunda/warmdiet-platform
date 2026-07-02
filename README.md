@@ -1,6 +1,6 @@
 # 三餐管家 (WarmDiet Platform)
 
-> 面向老年患者的医疗健康管理平台 —— 患者日常餐食记录 + 医生授权随诊管理。开源 open-core 版本。
+> 面向老年患者的医疗健康管理平台 —— 患者日常餐食记录 + 医生授权随诊管理。Public open-core 开源版本。
 
 <div align="center">
   <img
@@ -16,6 +16,13 @@
 
 https://github.com/user-attachments/assets/fd77a845-d376-4286-abd9-9a3bea5c7ca3
 
+### 短视频推广素材
+
+- 竖屏 90 秒推广片：[`resource/warmdiet-open-source-vertical-promo.mp4`](./resource/warmdiet-open-source-vertical-promo.mp4)
+- Remotion 工程：[`promo-video/`](./promo-video/)
+
+该视频面向医院试点方与投资人，展示医院端、患者家属端、授权机制、open-core 开源边界与在线 Demo 体验入口。
+
 ## 🌐 在线体验
 
 平台已部署在 Cloudflare，可直接访问在线 Demo（内置测试数据，**任意密码即可登录**）：
@@ -25,7 +32,7 @@ https://github.com/user-attachments/assets/fd77a845-d376-4286-abd9-9a3bea5c7ca3
 | 🏥 医院 / 医生端 | https://warmdiet-platform.xruns.dev/ | 工作台、患者管理、授权管理 |
 | 👨‍👩‍👧 家属 / 患者端 H5 | https://warmdiet-platform.xruns.dev/family/ | 首页、餐食记录、健康报告、AI 咨询 |
 
-> 在线 Demo 使用内置内存数据，不连接真实数据库，也不包含任何真实患者数据。刷新页面数据可能重置。
+> 在线 Demo 使用内置 Demo 数据，不连接真实数据库，也不包含任何真实患者数据。Cloudflare Worker 侧数据为内存态；家属端会对手动补录餐食做浏览器本地缓存，以保证演示刷新体验。
 
 **Demo 测试账号**
 
@@ -38,7 +45,7 @@ https://github.com/user-attachments/assets/fd77a845-d376-4286-abd9-9a3bea5c7ca3
 
 「三餐管家」帮助老年患者记录日常餐食，并根据《个人信息保护法》要求，通过**患者主动授权**机制，让主治医生在授权范围内安全查看患者数据，用于随诊健康管理。
 
-本仓库是 **open-core 开源版**，聚焦可手动操作的产品面：医院端控制台、家属端 H5 手动补录、患者授权流程、基础健康报告与 Demo 后端。小爱/小智硬件语音链路、MCP bridge、AI 餐食识别、私有 prompt 与模型编排等属于闭源 Enterprise / AI Core 能力，不包含在本仓库中。开源边界详见 [OPEN_SOURCE_BOUNDARY.md](./OPEN_SOURCE_BOUNDARY.md)。
+本仓库是 **public open-core 开源版**，聚焦可手动操作的产品面：医院端控制台、家属端 H5 手动补录、患者授权流程、基础健康报告与 Demo 后端。小爱/小智硬件语音链路、MCP bridge、AI 餐食识别、私有 prompt 与模型编排等属于闭源 Enterprise / AI Core 能力，不包含在本仓库中。开源边界详见 [OPEN_SOURCE_BOUNDARY.md](./OPEN_SOURCE_BOUNDARY.md)。
 
 ## 🎯 核心功能
 
