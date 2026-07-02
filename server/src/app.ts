@@ -5,6 +5,9 @@
 import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { config } from './config/env';
 import { getLoggerMiddleware } from './middleware/requestLogger';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
@@ -21,6 +24,17 @@ import accessLogRoutes from './routes/accessLogs';
 import demoRoutes from './routes/demo';
 import patientRoutes from './routes/patients';
 import authRoutes from './routes/auth';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const staticDirCandidates = [
+  process.env.STATIC_DIR,
+  path.resolve(__dirname, '../../public'),
+  path.resolve(__dirname, '../../dist'),
+].filter(Boolean) as string[];
+
+const staticDir = staticDirCandidates.find((dir) => fs.existsSync(path.join(dir, 'index.html')));
+const staticIndex = staticDir ? path.join(staticDir, 'index.html') : undefined;
 
 export function createApp(): Application {
   const app = express();
@@ -64,6 +78,19 @@ export function createApp(): Application {
   app.use('/api/demo', demoRoutes);
   app.use('/api/patients', patientRoutes);
   app.use('/api/auth', authRoutes);
+
+  if (staticDir && staticIndex) {
+    app.use(express.static(staticDir));
+
+    app.get('*', (req: Request, res: Response, next: NextFunction) => {
+      if (req.path.startsWith('/api')) {
+        next();
+        return;
+      }
+
+      res.sendFile(staticIndex);
+    });
+  }
 
   // 404 处理
   app.use(notFoundHandler);

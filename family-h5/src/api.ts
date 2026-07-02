@@ -1,3 +1,5 @@
+import { notifyAuthExpired, shouldRefreshDemoSession } from './authSession';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -108,7 +110,21 @@ export async function fetchProfile(): Promise<{ name: string; phone: string; age
 }
 
 // 内部请求方法
-async function request<T>(path: string, options: { method?: HttpMethod; body?: any } = {}): Promise<T> {
+async function refreshDemoAuth(): Promise<AuthData> {
+  const res = await fetch(`${API_BASE_URL}/demo/patient-token`, { method: 'POST' });
+  const json = await res.json();
+  if (!json.success) {
+    throw new Error(json.error || '刷新测试患者登录状态失败');
+  }
+  setStoredAuth(json.data);
+  return json.data;
+}
+
+async function request<T>(
+  path: string,
+  options: { method?: HttpMethod; body?: any } = {},
+  allowDemoRefresh = true
+): Promise<T> {
   const auth = getStoredAuth();
   if (!auth?.token) {
     throw new Error('请先登录');
@@ -125,7 +141,12 @@ async function request<T>(path: string, options: { method?: HttpMethod; body?: a
 
   // 401 时自动登出
   if (res.status === 401) {
+    if (allowDemoRefresh && shouldRefreshDemoSession(auth.patientId, import.meta.env.DEV)) {
+      await refreshDemoAuth();
+      return request<T>(path, options, false);
+    }
     logout();
+    notifyAuthExpired();
     throw new Error('登录已过期，请重新登录');
   }
 

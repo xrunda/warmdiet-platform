@@ -17,6 +17,7 @@ import { ReportScreen } from './screens/ReportScreen';
 import { ConsultScreen } from './screens/ConsultScreen';
 import { LoginPage } from './LoginPage';
 import { isLoggedIn } from './api';
+import { subscribeToAuthExpired } from './authSession';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
@@ -33,6 +34,8 @@ export default function App() {
     setLoggedIn(isLoggedIn());
     setLoading(false);
   }, []);
+
+  useEffect(() => subscribeToAuthExpired(() => setLoggedIn(false)), []);
 
   const handleLoginSuccess = () => {
     setLoggedIn(true);

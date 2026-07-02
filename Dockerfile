@@ -1,50 +1,22 @@
-# 阶段 1: 构建前端
-FROM node:18-alpine AS frontend-builder
+FROM node:22-bookworm-slim
 
 WORKDIR /app
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
 RUN npm ci
 
 COPY . .
-RUN npm run build
+RUN npm run build \
+  && mkdir -p /app/server/data
 
-# 阶段 2: 构建后端
-FROM node:18-alpine AS backend-builder
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci --production
-
-COPY server ./server
-COPY tsconfig.json ./
-
-# 编译 TypeScript
-RUN npx tsc --project tsconfig.json
-
-# 阶段 3: 生产镜像（包含前后端）
-FROM node:18-alpine AS production
-
-WORKDIR /app
-
-# 安装生产依赖
-COPY package*.json ./
-RUN npm ci --production && npm cache clean --force
-
-# 复制编译后的后端代码
-COPY --from=backend-builder /app/dist ./server/dist
-COPY --from=backend-builder /app/server ./server
-
-# 复制构建后的前端
-COPY --from=frontend-builder /app/dist ./public
-
-# 暴露端口
-EXPOSE 3001
-
-# 设置环境变量
 ENV NODE_ENV=production
 ENV PORT=3001
+ENV DATABASE_PATH=/app/server/data/warmdiet.db
 
-# 启动应用
-CMD ["node", "server/dist/index.js"]
+EXPOSE 3001
+
+CMD ["npm", "run", "start:container"]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from urllib.parse import urlsplit
 from typing import Any, Dict, Optional
 
 import requests
@@ -20,16 +21,54 @@ class WarmDietApiClient:
         self.base_url = settings.api_base_url
         self.patient_id = settings.patient_id
         self.session = requests.Session()
+        self._refreshed_demo_token = False
 
         headers = {"Content-Type": "application/json"}
         if settings.patient_token:
             headers["Authorization"] = f"Bearer {settings.patient_token}"
         self.session.headers.update(headers)
 
+    def _maybe_refresh_demo_token(self) -> bool:
+        if self._refreshed_demo_token:
+            return False
+
+        parsed = urlsplit(self.base_url)
+        if parsed.hostname not in {"localhost", "127.0.0.1"}:
+            return False
+
+        demo_url = f"{parsed.scheme}://{parsed.netloc}/api/demo/patient-token"
+        logger.info("[API-AUTH] refreshing demo token via %s", demo_url)
+
+        try:
+            resp = requests.post(demo_url, timeout=10)
+            payload = resp.json()
+        except Exception as ex:  # noqa: BLE001
+            logger.error("[API-AUTH] failed to refresh demo token: %s", ex)
+            return False
+
+        token = payload.get("data", {}).get("token")
+        patient_id = payload.get("data", {}).get("patientId")
+        if not resp.ok or not payload.get("success") or not token:
+            logger.error("[API-AUTH] demo token refresh rejected: status=%s body=%s", resp.status_code, payload)
+            return False
+
+        if patient_id and patient_id != self.patient_id:
+            logger.warning("[API-AUTH] demo token patient mismatch: expected=%s actual=%s", self.patient_id, patient_id)
+            return False
+
+        self.session.headers["Authorization"] = f"Bearer {token}"
+        self._refreshed_demo_token = True
+        logger.info("[API-AUTH] demo token refreshed for patient=%s", self.patient_id)
+        return True
+
     def _request(self, method: str, path: str, json_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         url = f"{self.base_url}{path}"
         logger.info("[API-REQ] %s %s payload=%s", method, path, json_data)
         resp = self.session.request(method=method, url=url, json=json_data, timeout=15)
+
+        if resp.status_code == 401 and self._maybe_refresh_demo_token():
+            logger.info("[API-RETRY] %s %s after demo token refresh", method, path)
+            resp = self.session.request(method=method, url=url, json=json_data, timeout=15)
 
         try:
             payload = resp.json()

@@ -17,6 +17,7 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "server": "node server/dist/index.js",
+    "start:container": "tsx server/src/index.ts",
     "init-db": "node server/scripts/init-seed.cjs",
     "report:html": "node docs/md-to-html-report.cjs"
   },
