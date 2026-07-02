@@ -1,0 +1,245 @@
+/**
+ * 医生列表 - 纯 CSS 版本
+ */
+
+import { useState, useEffect } from 'react';
+import { api } from '../../services/api';
+
+interface Doctor {
+  id: string;
+  name: string;
+  department: string;
+  accountStatus: string;
+}
+
+export function DoctorList() {
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [filteredDoctors, setFilteredDoctors] = useState<Doctor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+  const departments = [
+    { id: 'all', name: '全部科室' },
+    { id: '内科', name: '内科' },
+    { id: '外科', name: '外科' },
+    { id: '儿科', name: '儿科' },
+    { id: '妇科', name: '妇科' },
+    { id: '中医科', name: '中医科' },
+    { id: '口腔科', name: '口腔科' },
+  ];
+
+  useEffect(() => {
+    loadDoctors();
+  }, []);
+
+  useEffect(() => {
+    filterDoctors();
+  }, [doctors, searchTerm, statusFilter, departmentFilter]);
+
+  const loadDoctors = async () => {
+    try {
+      const response: any = await api.getDoctors();
+      if (response.success) {
+        setDoctors(response.data || []);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filterDoctors = () => {
+    let filtered = doctors;
+
+    if (searchTerm) {
+      filtered = filtered.filter(doc =>
+        doc.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(doc => doc.accountStatus === statusFilter);
+    }
+
+    if (departmentFilter !== 'all') {
+      filtered = filtered.filter(doc => doc.department === departmentFilter);
+    }
+
+    setFilteredDoctors(filtered);
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusMap = {
+      active: { label: '活跃', color: '#dcfce7', text: '#16a34a' },
+      inactive: { label: '已暂停', color: '#fee2e2', text: '#dc2626' },
+      pending: { label: '待审核', color: '#fef3c7', text: '#d97706' },
+    };
+    const statusInfo = statusMap[status as keyof typeof statusMap] || statusMap.active;
+    return statusInfo;
+  };
+
+  return (
+    <div style={{ minHeight: '100%', backgroundColor: '#f8fafc', padding: '24px' }}>
+      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>医生管理</h1>
+          <p style={{ color: '#64748b', marginTop: '4px', fontSize: '14px', marginBottom: 0 }}>
+            管理您的医生团队 ({doctors.length} 位医生)
+          </p>
+        </div>
+        <button style={{
+          padding: '10px 20px',
+          background: 'linear-gradient(135deg, #10b981, #06b6d4)',
+          color: 'white',
+          border: 'none',
+          borderRadius: '8px',
+          fontWeight: 500,
+          cursor: 'pointer'
+        }}>
+          + 添加医生
+        </button>
+      </div>
+
+      {/* 筛选和搜索 */}
+      <div style={{ background: 'white', borderRadius: '12px', padding: '24px', marginBottom: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0' }}>
+        <div style={{ display: 'flex', gap: '16px' }}>
+          <div style={{ flex: 1 }}>
+            <input
+              type="text"
+              placeholder="搜索医生姓名..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px 16px 12px 16px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                fontSize: '14px'
+              }}
+            />
+          </div>
+
+          <div style={{ width: '192px' }}>
+            <select
+              value={departmentFilter}
+              onChange={(e) => setDepartmentFilter(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                fontSize: '14px',
+                color: '#64748b'
+              }}
+            >
+              {departments.map(dept => (
+                <option key={dept.id} value={dept.id}>{dept.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ width: '160px' }}>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                fontSize: '14px',
+                color: '#64748b'
+              }}
+            >
+              <option value="all">全部状态</option>
+              <option value="active">活跃</option>
+              <option value="inactive">已暂停</option>
+              <option value="pending">待审核</option>
+            </select>
+          </div>
+
+          {(searchTerm || statusFilter !== 'all' || departmentFilter !== 'all') && (
+            <button
+              onClick={() => { setSearchTerm(''); setStatusFilter('all'); setDepartmentFilter('all'); }}
+              style={{
+                padding: '12px 16px',
+                color: '#64748b',
+                background: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: 'pointer'
+              }}
+            >
+              清除筛选
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 医生列表 */}
+      <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+        {loading ? (
+          <div style={{ padding: '64px', textAlign: 'center', color: '#94a3b8' }}>加载中...</div>
+        ) : filteredDoctors.length === 0 ? (
+          <div style={{ padding: '64px', textAlign: 'center', color: '#94a3b8' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>👨‍⚕️</div>
+            <h3 style={{ color: '#1e293b', fontSize: '18px', fontWeight: 600, marginBottom: '8px' }}>
+              {searchTerm || statusFilter !== 'all' || departmentFilter !== 'all' ? '未找到匹配的医生' : '暂无医生'}
+            </h3>
+            <p style={{ color: '#64748b' }}>
+              {searchTerm || statusFilter !== 'all' || departmentFilter !== 'all' ? '请尝试调整筛选条件' : '暂无医生，请点击"添加医生"添加'}
+            </p>
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '14px' }}>医生姓名</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '14px' }}>科室</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '14px' }}>状态</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#475569', fontSize: '14px' }}>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredDoctors.map((doctor, idx) => {
+                const statusBadge = getStatusBadge(doctor.accountStatus);
+                return (
+                  <tr key={doctor.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '16px', color: '#1e293b', fontWeight: 500 }}>{doctor.name}</td>
+                    <td style={{ padding: '16px', color: '#64748b' }}>{doctor.department}</td>
+                    <td style={{ padding: '16px' }}>
+                      <span style={{
+                        padding: '4px 10px',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        background: statusBadge.color,
+                        color: statusBadge.text,
+                        fontWeight: 600
+                      }}>
+                        {statusBadge.label}
+                      </span>
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'right' }}>
+                      <button style={{ color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', marginRight: '12px', fontSize: '14px' }}>编辑</button>
+                      <button style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }}>删除</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}

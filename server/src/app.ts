@@ -1,0 +1,111 @@
+/**
+ * Express 应用配置
+ */
+
+import express, { Application, Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { config } from './config/env';
+import { getLoggerMiddleware } from './middleware/requestLogger';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { dataSanitizer } from './middleware/sanitizer';
+
+// 导入路由
+import hospitalRoutes from './routes/hospitals';
+import doctorRoutes from './routes/doctors';
+import authorizationRoutes from './routes/authorizations';
+import mealRoutes from './routes/meals';
+import reportRoutes from './routes/reports';
+import aiConsultationRoutes from './routes/aiConsultations';
+import accessLogRoutes from './routes/accessLogs';
+import demoRoutes from './routes/demo';
+import patientRoutes from './routes/patients';
+import authRoutes from './routes/auth';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const staticDirCandidates = [
+  process.env.STATIC_DIR,
+  path.resolve(__dirname, '../../public'),
+  path.resolve(__dirname, '../../dist'),
+].filter(Boolean) as string[];
+
+const staticDir = staticDirCandidates.find((dir) => fs.existsSync(path.join(dir, 'index.html')));
+const staticIndex = staticDir ? path.join(staticDir, 'index.html') : undefined;
+const familyStaticDir = staticDir ? path.join(staticDir, 'family') : undefined;
+const familyStaticIndex = familyStaticDir ? path.join(familyStaticDir, 'index.html') : undefined;
+
+export function createApp(): Application {
+  const app = express();
+
+  // 安全中间件
+  app.use(helmet());
+
+  // CORS 配置
+  app.use(cors({
+    origin: config.corsOrigin,
+    credentials: true,
+  }));
+
+  // 请求解析
+  app.use(express.json({ limit: '12mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '12mb' }));
+
+  // 日志中间件
+  app.use(getLoggerMiddleware());
+
+  // 数据脱敏中间件（对医生请求自动脱敏）
+  app.use(dataSanitizer);
+
+  // 健康检查
+  app.get('/health', (req, res) => {
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      environment: config.nodeEnv,
+    });
+  });
+
+  // API 路由
+  app.use('/api/hospitals', hospitalRoutes);
+  app.use('/api/doctors', doctorRoutes);
+  app.use('/api/authorizations', authorizationRoutes);
+  app.use('/api/meals', mealRoutes);
+  app.use('/api/reports', reportRoutes);
+  app.use('/api/ai-consultations', aiConsultationRoutes);
+  app.use('/api/access-logs', accessLogRoutes);
+  app.use('/api/demo', demoRoutes);
+  app.use('/api/patients', patientRoutes);
+  app.use('/api/auth', authRoutes);
+
+  if (staticDir && staticIndex) {
+    app.use(express.static(staticDir));
+
+    if (familyStaticDir && fs.existsSync(familyStaticIndex || '')) {
+      app.use('/family', express.static(familyStaticDir));
+      app.get('/family/*', (req: Request, res: Response) => {
+        res.sendFile(familyStaticIndex!);
+      });
+    }
+
+    app.get('*', (req: Request, res: Response, next: NextFunction) => {
+      if (req.path.startsWith('/api')) {
+        next();
+        return;
+      }
+
+      res.sendFile(staticIndex);
+    });
+  }
+
+  // 404 处理
+  app.use(notFoundHandler);
+
+  // 错误处理
+  app.use(errorHandler);
+
+  return app;
+}

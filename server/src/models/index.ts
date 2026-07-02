@@ -1,0 +1,63 @@
+/**
+ * 模型导出
+ */
+
+import Database from 'better-sqlite3';
+import { HospitalModel } from './Hospital';
+import { DoctorModel } from './Doctor';
+import { PatientModel } from './Patient';
+import { AuthorizationModel } from './Authorization';
+import { MealRecordModel } from './MealRecord';
+import { HealthReportModel } from './HealthReport';
+import { AccessLogModel } from './AccessLog';
+import { AIConsultationReportModel } from './AIConsultationReport';
+import {
+  PatientHealthConditionModel,
+  PatientMedicationModel,
+  PatientPreferenceModel,
+  PatientMedicalOrderModel,
+  PatientVitalMeasurementModel,
+  DietAlertModel,
+  ConversationLogModel,
+} from './PatientProfile';
+
+export function initModels(db: Database.Database) {
+  return {
+    hospital: new HospitalModel(db),
+    doctor: new DoctorModel(db),
+    patient: new PatientModel(db),
+    authorization: new AuthorizationModel(db),
+    mealRecord: new MealRecordModel(db),
+    healthReport: new HealthReportModel(db),
+    accessLog: new AccessLogModel(db),
+    aiConsultationReport: new AIConsultationReportModel(db),
+    healthCondition: new PatientHealthConditionModel(db),
+    medication: new PatientMedicationModel(db),
+    preference: new PatientPreferenceModel(db),
+    patientPreferences: new PatientPreferenceModel(db), // 别名，保持与 authController 一致
+    medicalOrder: new PatientMedicalOrderModel(db),
+    vitalMeasurement: new PatientVitalMeasurementModel(db),
+    dietAlert: new DietAlertModel(db),
+    conversationLog: new ConversationLogModel(db),
+  };
+}
+
+export type Models = ReturnType<typeof initModels>;
+
+export {
+  HospitalModel,
+  DoctorModel,
+  PatientModel,
+  AuthorizationModel,
+  MealRecordModel,
+  HealthReportModel,
+  AccessLogModel,
+  AIConsultationReportModel,
+  PatientHealthConditionModel,
+  PatientMedicationModel,
+  PatientPreferenceModel,
+  PatientMedicalOrderModel,
+  PatientVitalMeasurementModel,
+  DietAlertModel,
+  ConversationLogModel,
+};

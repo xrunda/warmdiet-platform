@@ -1,0 +1,142 @@
+/**
+ * 数据库配置和初始化
+ */
+
+import Database from 'better-sqlite3';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { config } from './env';
+
+// ES module 中获取 __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+class DatabaseConfig {
+  private db: Database.Database | null = null;
+
+  /**
+   * 初始化数据库
+   */
+  public initialize(): Database.Database {
+    // 确保数据目录存在
+    const dbDir = path.dirname(config.databasePath);
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
+
+    // 创建数据库连接
+    this.db = new Database(config.databasePath);
+
+    // 启用外键约束
+    this.db.pragma('foreign_keys = ON');
+
+    // 创建表结构
+    this.createTables();
+
+    console.log('✅ Database initialized:', config.databasePath);
+
+    return this.db;
+  }
+
+  /**
+   * 获取数据库实例
+   */
+  public getDatabase(): Database.Database {
+    if (!this.db) {
+      throw new Error('Database not initialized. Call initialize() first.');
+    }
+    return this.db;
+  }
+
+  /**
+   * 创建表结构
+   */
+  private createTables(): void {
+    const schemaPath = path.join(__dirname, '../../database/schema.sql');
+
+    if (!fs.existsSync(schemaPath)) {
+      console.warn('⚠️ Schema file not found:', schemaPath);
+      return;
+    }
+
+    const schema = fs.readFileSync(schemaPath, 'utf-8');
+
+    // 执行 SQL 脚本
+    this.db!.exec(schema);
+    this.runMigrations();
+
+    console.log('✅ Tables created successfully');
+
+    // 运行种子数据
+    this.seedData();
+  }
+
+  /**
+   * 插入种子数据
+   */
+  private seedData(): void {
+    const seedsPath = path.join(__dirname, '../../database/seeds.sql');
+
+    if (!fs.existsSync(seedsPath)) {
+      console.warn('⚠️ Seeds file not found:', seedsPath);
+      return;
+    }
+
+    // 检查是否已有数据
+    const count = this.db!.prepare('SELECT COUNT(*) as count FROM hospital_accounts').get() as { count: number };
+    if (count.count > 0) {
+      console.log('✅ Database already seeded, skipping...');
+      return;
+    }
+
+    const seeds = fs.readFileSync(seedsPath, 'utf-8');
+    this.db!.exec(seeds);
+    console.log('✅ Seed data inserted successfully');
+  }
+
+  /**
+   * 兼容历史数据库的轻量字段迁移
+   */
+  private runMigrations(): void {
+    this.ensureColumn('patient_medications', 'package_image', 'TEXT');
+    this.ensureColumn('patient_medications', 'ocr_text', 'TEXT');
+    this.ensureColumn('patient_medications', 'image_uploaded_at', 'TEXT');
+
+    this.ensureColumn('patient_medical_orders', 'hospital_name', 'TEXT');
+    this.ensureColumn('patient_medical_orders', 'visit_date', 'TEXT');
+    this.ensureColumn('patient_medical_orders', 'original_image', 'TEXT');
+    this.ensureColumn('patient_medical_orders', 'raw_ocr_text', 'TEXT');
+
+    // 用户认证相关迁移
+    this.ensureColumn('patient_accounts', 'password_hash', 'TEXT');
+    
+    // 启用 WAL 模式以支持更好的并发
+    this.db!.pragma('journal_mode = WAL');
+  }
+
+  private ensureColumn(tableName: string, columnName: string, definition: string): void {
+    const columns = this.db!.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
+    if (columns.some((column) => column.name === columnName)) {
+      return;
+    }
+
+    this.db!.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+    console.log(`✅ Migrated ${tableName}.${columnName}`);
+  }
+
+  /**
+   * 关闭数据库连接
+   */
+  public close(): void {
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+      console.log('✅ Database closed');
+    }
+  }
+}
+
+// 导出单例
+export const databaseConfig = new DatabaseConfig();
+export const db = databaseConfig.getDatabase.bind(databaseConfig);

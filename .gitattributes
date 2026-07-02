@@ -1,0 +1,17 @@
+# Exclude private / enterprise-only assets from source archives.
+mcp-xiaozhi/** export-ignore
+k8s/secret.yaml export-ignore
+private/** export-ignore
+enterprise/** export-ignore
+ai-core/** export-ignore
+prompts/private/** export-ignore
+docs/private/** export-ignore
+docs/md/** export-ignore
+AI_DOCTOR_COLLABORATION_PLAN.md export-ignore
+GLUCOSE_FOLLOWUP_SOP.md export-ignore
+medical_diagnosis_assistant.md export-ignore
+*.db export-ignore
+*.db-shm export-ignore
+*.db-wal export-ignore
+*.env export-ignore
+*.env.local export-ignore

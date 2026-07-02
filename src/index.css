@@ -1,0 +1,8 @@
+@import 'tailwindcss';
+
+/* 可以在 Tailwind 之后追加少量自定义全局样式 */
+html,
+body,
+#root {
+  height: 100%;
+}

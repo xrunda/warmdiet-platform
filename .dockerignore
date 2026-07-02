@@ -1,0 +1,73 @@
+# 依赖
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 构建输出
+dist
+build
+*.tsbuildinfo
+
+# 环境配置
+.env
+.env.local
+.env.*.local
+
+# 编辑器
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 日志
+logs
+*.log
+
+# 测试
+coverage
+.nyc_output
+
+# 数据库文件（开发环境）
+server/data/*.db
+server/data/*.db-journal
+server/data/*.db-wal
+server/data/*.db-shm
+backups
+*.db
+*.db-shm
+*.db-wal
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*
+.docker
+
+# 文档
+*.md
+!README.md
+
+# CI/CD
+.github
+
+# Private / enterprise-only assets
+mcp-xiaozhi
+k8s/secret.yaml
+private
+enterprise
+ai-core
+prompts/private
+docs/private
+docs/md
+AI_DOCTOR_COLLABORATION_PLAN.md
+GLUCOSE_FOLLOWUP_SOP.md
+medical_diagnosis_assistant.md
