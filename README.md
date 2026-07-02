@@ -279,6 +279,14 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 4. 推送分支 `git push origin feature/AmazingFeature`
 5. 开启 Pull Request
 
+## 📮 联系作者
+
+对项目有任何问题、合作或部署咨询，欢迎扫码联系：
+
+<div align="center">
+  <img src="resource/contact-qr.png" alt="联系作者二维码" width="240" />
+</div>
+
 ## 📄 许可证
 
 [MIT License](./LICENSE)
