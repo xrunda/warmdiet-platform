@@ -20,6 +20,7 @@ const scenes = [
     eyebrow: "医疗随诊的新入口",
     title: "把老人每天三餐，变成医生看得懂的健康数据",
     subtitle: "WarmDiet 三餐管家 · 医院端 + 患者家属端",
+    points: ["家属补录三餐", "医生查看趋势", "患者授权保护"],
     image: "screenshots/family-home.png",
     mode: "phone",
   },
@@ -29,6 +30,7 @@ const scenes = [
     eyebrow: "患者 / 家属端 H5",
     title: "家属手动补录，老人模式清晰可用",
     subtitle: "早餐、午餐、晚餐、用药、健康档案，都能在手机上完成。",
+    points: ["按钮更大", "流程更短", "刷新也能保留记录"],
     image: "screenshots/family-settings.png",
     mode: "phone",
   },
@@ -38,6 +40,7 @@ const scenes = [
     eyebrow: "授权优先",
     title: "数据不是自动流向医院，而是患者主动授权",
     subtitle: "授权范围、有效期、撤销能力，让随诊管理有边界。",
+    points: ["先授权再查看", "可设置有效期", "患者可撤销"],
     image: "screenshots/family-report.png",
     mode: "phone",
   },
@@ -47,6 +50,7 @@ const scenes = [
     eyebrow: "医院 / 医生工作台",
     title: "医生看到的不是聊天记录，而是可追踪的风险线索",
     subtitle: "患者列表、餐食记录、健康报告、风险提醒，集中在一个工作台。",
+    points: ["患者列表", "风险提醒", "饮食趋势"],
     image: "screenshots/hospital-dashboard.png",
     mode: "desktop",
   },
@@ -56,6 +60,7 @@ const scenes = [
     eyebrow: "Demo 已上线",
     title: "一个仓库，同时跑医院端、家属端和 Cloudflare Demo API",
     subtitle: "医院端：warmdiet-platform.xruns.dev  家属端：/family/",
+    points: ["医院端 Web", "家属端 H5", "Demo API"],
     image: "screenshots/hospital-patients.png",
     mode: "desktop",
   },
@@ -65,6 +70,7 @@ const scenes = [
     eyebrow: "Open-Core 开源策略",
     title: "基础产品开源，Enterprise / AI Core 保持商业化空间",
     subtitle: "开源医院端、家属端、授权流程和 Demo 后端；闭源硬件语音链路、MCP bridge、AI 餐食识别与模型编排。",
+    points: ["基础产品开源", "AI Core 闭源", "企业交付可持续"],
     image: "screenshots/family-consult.png",
     mode: "phone",
   },
@@ -74,6 +80,7 @@ const scenes = [
     eyebrow: "面向医院与投资人",
     title: "它不是一个记账式饮食 App，而是慢病随诊的数据连接层",
     subtitle: "先用 Demo 获客和试点，再逐步接入真实数据库、医院流程和 AI 能力。",
+    points: ["院外数据入口", "慢病随诊场景", "可试点可商业化"],
     image: "screenshots/hospital-dashboard.png",
     mode: "desktop",
   },
@@ -83,6 +90,7 @@ const scenes = [
     eyebrow: "现在已经开源",
     title: "WarmDiet Platform",
     subtitle: "GitHub: xrunda/warmdiet-platform · 线上 Demo 可直接体验",
+    points: ["GitHub 已开源", "线上 Demo 可体验", "欢迎医院试点"],
     image: "screenshots/family-home.png",
     mode: "phone",
   },
@@ -115,8 +123,8 @@ function useSceneProgress(durationSeconds: number) {
 }
 
 const phoneStyle: React.CSSProperties = {
-  width: 460,
-  height: 995,
+  width: 510,
+  height: 1104,
   borderRadius: 44,
   overflow: "hidden",
   boxShadow: "0 36px 90px rgba(15, 23, 42, 0.34)",
@@ -125,8 +133,8 @@ const phoneStyle: React.CSSProperties = {
 };
 
 const desktopStyle: React.CSSProperties = {
-  width: 900,
-  height: 750,
+  width: 960,
+  height: 800,
   borderRadius: 34,
   overflow: "hidden",
   boxShadow: "0 36px 90px rgba(15, 23, 42, 0.28)",
@@ -160,10 +168,10 @@ function ProductFrame({
     extrapolateRight: "clamp",
   });
   const frameStyle = mode === "phone" ? phoneStyle : desktopStyle;
-  const position: React.CSSProperties =
+const position: React.CSSProperties =
     side === "right"
-      ? { right: mode === "phone" ? 68 : -230, top: mode === "phone" ? 430 : 640 }
-      : { left: 70, top: mode === "phone" ? 430 : 640 };
+      ? { right: mode === "phone" ? -26 : -80, top: mode === "phone" ? 590 : 850 }
+      : { left: 70, top: mode === "phone" ? 560 : 720 };
 
   return (
     <div
@@ -226,6 +234,80 @@ function MetricStrip({ items }: { items: Array<[string, string]> }) {
           >
             <div style={{ fontSize: 44, fontWeight: 900, color: "#ffffff", lineHeight: 1 }}>{value}</div>
             <div style={{ marginTop: 9, fontSize: 20, color: "rgba(255,255,255,0.72)", lineHeight: 1.25 }}>{label}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function FeatureStack({ items, compact = false }: { items: readonly string[]; compact?: boolean }) {
+  const frame = useCurrentFrame();
+  const { fps: currentFps } = useVideoConfig();
+
+  return (
+    <div
+      style={{
+        display: "grid",
+        gap: compact ? 14 : 18,
+        marginTop: compact ? 28 : 38,
+        maxWidth: compact ? 390 : 650,
+      }}
+    >
+      {items.map((item, index) => {
+        const opacity = interpolate(frame, [(0.42 + index * 0.16) * currentFps, (0.86 + index * 0.16) * currentFps], [0, 1], {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+        });
+        const y = interpolate(frame, [(0.42 + index * 0.16) * currentFps, (0.86 + index * 0.16) * currentFps], [28, 0], {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+          easing: sceneEase,
+        });
+
+        return (
+          <div
+            key={item}
+            style={{
+              opacity,
+              transform: `translateY(${y}px)`,
+              display: "flex",
+              alignItems: "center",
+              gap: 18,
+              border: "1px solid rgba(255,255,255,0.24)",
+              background: "rgba(255,255,255,0.14)",
+              borderRadius: 24,
+              padding: compact ? "17px 18px" : "22px 24px",
+              boxShadow: "0 22px 52px rgba(2,6,23,0.18)",
+            }}
+          >
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 14,
+                background: "rgba(167,243,208,0.18)",
+                color: "#a7f3d0",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 26,
+                fontWeight: 950,
+                flexShrink: 0,
+              }}
+            >
+              {index + 1}
+            </div>
+            <div
+              style={{
+                fontSize: compact ? 25 : 31,
+                lineHeight: 1.2,
+                color: "#ffffff",
+                fontWeight: 900,
+              }}
+            >
+              {item}
+            </div>
           </div>
         );
       })}
@@ -313,8 +395,8 @@ function SceneCard({
       <div
         style={{
           position: "absolute",
-          left: 64,
-          right: isDesktop ? 64 : 400,
+          left: 60,
+          right: isDesktop ? 60 : 430,
           top: isDesktop ? 160 : 186,
           opacity: titleOpacity,
           transform: `translateY(${titleY}px)`,
@@ -329,7 +411,7 @@ function SceneCard({
             background: "rgba(255,255,255,0.10)",
             borderRadius: 999,
             padding: "11px 18px",
-            fontSize: 19,
+            fontSize: 22,
             fontWeight: 900,
             color: "#a7f3d0",
           }}
@@ -340,10 +422,10 @@ function SceneCard({
         <h1
           style={{
             margin: "34px 0 0",
-            fontSize: isDesktop ? 66 : 64,
-            lineHeight: 1.08,
+            fontSize: isDesktop ? 72 : index === 5 ? 60 : 70,
+            lineHeight: 1.06,
             letterSpacing: 0,
-            maxWidth: isDesktop ? 910 : 610,
+            maxWidth: isDesktop ? 960 : 560,
             fontWeight: 950,
           }}
         >
@@ -353,14 +435,15 @@ function SceneCard({
           style={{
             marginTop: 26,
             maxWidth: isDesktop ? 840 : 610,
-            fontSize: 30,
-            lineHeight: 1.42,
-            color: "rgba(255,255,255,0.78)",
-            fontWeight: 600,
+            fontSize: isDesktop ? 34 : 31,
+            lineHeight: 1.38,
+            color: "rgba(255,255,255,0.84)",
+            fontWeight: 750,
           }}
         >
           {scene.subtitle}
         </p>
+        <FeatureStack items={scene.points} compact={!isDesktop} />
         {index === 0 && (
           <MetricStrip
             items={[
@@ -393,8 +476,8 @@ function SceneCard({
           borderRadius: 28,
           background: "rgba(2,6,23,0.34)",
           backdropFilter: "blur(20px)",
-          padding: "22px 26px",
-          fontSize: 27,
+          padding: "26px 30px",
+          fontSize: 34,
           lineHeight: 1.35,
           color: "rgba(255,255,255,0.92)",
           fontWeight: 800,
