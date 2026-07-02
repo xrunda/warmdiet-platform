@@ -12,6 +12,10 @@
   />
 </div>
 
+## 🎬 项目演示
+
+https://github.com/user-attachments/assets/fd77a845-d376-4286-abd9-9a3bea5c7ca3
+
 ## 🌐 在线体验
 
 平台已部署在 Cloudflare，可直接访问在线 Demo（内置测试数据，**任意密码即可登录**）：
