@@ -48,3 +48,5 @@ jobs:
           npm run retro:build
           find "content/publish-packages/$(date +%F)" -type f
           head -12 "content/reviews/$(date +%F).md"
+      - name: status（状态总览应显示全链路完成）
+        run: npm run status
