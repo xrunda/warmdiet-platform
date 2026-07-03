@@ -8,6 +8,7 @@ import { runDraftsGenerate } from "./commands/drafts-generate.ts";
 import { runReviewBuild } from "./commands/review-build.ts";
 import { runPublishPackage } from "./commands/publish-package.ts";
 import { runPublishRecord, runRetroBuild } from "./commands/publish-record.ts";
+import { runStatus } from "./commands/status.ts";
 
 const USAGE = `growth-bot - 三餐管家推广运营中台 CLI
 
@@ -24,6 +25,7 @@ const USAGE = `growth-bot - 三餐管家推广运营中台 CLI
   publish:package  导出 Approve 条目的发布包到 content/publish-packages/yyyy-mm-dd/
   publish:record   生成发布记录骨架，写入 content/published/yyyy-mm-dd.json
   retro:build      渲染每日复盘模板，写入 content/reviews/yyyy-mm-dd.md
+  status           汇总当日流水线状态，给出下一步建议（--json 机器可读）
 
 选项:
   --dry-run     只打印结果，不写入任何文件
@@ -43,6 +45,7 @@ export async function main(argv: string[]): Promise<number> {
         "dry-run": { type: "boolean", default: false },
         date: { type: "string" },
         force: { type: "boolean", default: false },
+        json: { type: "boolean", default: false },
         help: { type: "boolean", short: "h", default: false },
       },
     }));
@@ -106,6 +109,11 @@ export async function main(argv: string[]): Promise<number> {
         dryRun: values["dry-run"],
         date: values.date,
         force: values.force,
+      });
+    case "status":
+      return runStatus({
+        date: values.date,
+        json: values.json,
       });
     default:
       process.stderr.write(`未知命令: ${command}\n\n${USAGE}`);

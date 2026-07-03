@@ -18,7 +18,8 @@
     "review:build": "node src/cli.ts review:build",
     "publish:package": "node src/cli.ts publish:package",
     "publish:record": "node src/cli.ts publish:record",
-    "retro:build": "node src/cli.ts retro:build"
+    "retro:build": "node src/cli.ts retro:build",
+    "status": "node src/cli.ts status"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
