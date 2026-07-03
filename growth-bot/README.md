@@ -29,6 +29,7 @@ npm install
 
 npm run typecheck              # 类型检查
 npm run test                   # 运行单元测试（Node 原生 test runner）
+npm run dashboard              # 启动本地 Web 工作台：http://127.0.0.1:4700
 npm run daily:plan -- --dry-run  # 输出每日内容计划（当前为占位结果）
 ```
 
@@ -53,6 +54,7 @@ npm run publish:record  # 生成发布记录骨架 → content/published/yyyy-mm
 npm run retro:build     # 渲染每日复盘模板 → content/reviews/yyyy-mm-dd.md
 npm run status          # 查看当日流水线状态与下一步建议（--json 机器可读）
 npm run daily:run       # 一键串联当日流水线（推荐的日常入口）
+npm run dashboard       # 打开本地可视化工作台
 ```
 
 `project:state` 从主仓库 README（`paths.readmePath`，默认 `../README.md`）提取项目简介、Demo 地址和测试账号，与配置中的仓库地址、视频素材路径合并输出；支持 `--dry-run` 和 `--date yyyy-mm-dd`。
@@ -70,6 +72,14 @@ npm run daily:run       # 一键串联当日流水线（推荐的日常入口）
 **推荐的每日用法**：早上写好热点源文件后跑 `npm run daily:run`——它自动完成生成阶段（项目状态 → 热点 → 日历 → 草稿 → 审核汇总），然后停在人工审核门口；你勾完 Approve 再跑一次 `npm run daily:run`，它跳过已完成步骤、继续导出发布包并生成记录与复盘模板。`--dry-run` 预览将执行的步骤；`--force` 只作用于日历与草稿的重建，永不覆盖审核勾选、发布指标、复盘结论。
 
 不确定流程走到哪一步时，随时运行 `npm run status`：它汇总当日八个环节的状态（✅ 完成 / ❌ 缺失 / ⏳ 需人工处理 / ⚠️ 可选缺失），并给出下一步该执行的命令或人工动作；`--date yyyy-mm-dd` 查看指定日期，`--json` 输出机器可读结构（供后续工作台复用）。
+
+## 本地工作台
+
+运行 `npm run dashboard` 后，浏览器访问 `http://127.0.0.1:4700`。工作台是只绑定本机的轻量 Web UI，不需要额外前端构建步骤；如端口被占用，可用 `npm run dashboard -- --port 5173` 指定端口。
+
+工作台读取现有 `data/` 与 `content/` 产物，展示当天流水线状态、内容日历、平台草稿、审核状态、发布包和复盘入口。缺失数据时页面会给出下一步命令；点击「生成今日流程」等价于执行 `daily:run`，会自动推进可自动完成的步骤，并停在需要人工审核或录入指标的位置。
+
+审核页支持把 Approve / Edit / Reject 写回 `content/review/yyyy-mm-dd.md`。发布包页支持复制平台可粘贴文案；系统不会自动登录或发布到外部平台。
 
 本机私有路径（如私有资料目录）写入 `config/paths.local.json`，它会覆盖 `paths.json` 中的同名字段，且已被 `.gitignore` 忽略。
 
@@ -89,4 +99,3 @@ growth-bot/
 
 - [协作与交付规范](./docs/COLLABORATION_SPEC.md)
 - [PRD v0.1](./docs/PRD.md)
-

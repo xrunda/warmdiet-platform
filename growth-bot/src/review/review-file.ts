@@ -98,3 +98,37 @@ export function parseReviewStatuses(markdown: string): ReviewEntryStatus[] {
   }
   return statuses;
 }
+
+const DECISION_BOXES: Record<ReviewDecision, string> = {
+  approve: "状态: [x] Approve　[ ] Edit　[ ] Reject",
+  edit: "状态: [ ] Approve　[x] Edit　[ ] Reject",
+  reject: "状态: [ ] Approve　[ ] Edit　[x] Reject",
+  pending: "状态: [ ] Approve　[ ] Edit　[ ] Reject",
+};
+
+/**
+ * 在审核 Markdown 中设置指定条目的决策（工作台回写用）。
+ * 只改写目标条目的状态行，其余内容原样保留；条目不存在时抛错。
+ */
+export function setReviewDecision(
+  markdown: string,
+  itemId: string,
+  decision: ReviewDecision,
+): string {
+  const sections = markdown.split(/\n(?=## )/);
+  let found = false;
+  const updated = sections.map((section) => {
+    if (!section.startsWith(`## ${itemId} ｜`)) {
+      return section;
+    }
+    found = true;
+    return section.replace(
+      /状态: \[.\] Approve　\[.\] Edit　\[.\] Reject/,
+      DECISION_BOXES[decision],
+    );
+  });
+  if (!found) {
+    throw new Error(`审核文件中不存在条目: ${itemId}`);
+  }
+  return updated.join("\n");
+}
