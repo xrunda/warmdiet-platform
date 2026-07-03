@@ -105,16 +105,16 @@ export function buildRetroMarkdown(record: PublishedFile): string {
     "",
     "## 发布数据",
     "",
-    "| 条目 | 平台 | 已发布 | 曝光 | 点赞 | 评论 | 收藏 |",
-    "|------|------|--------|------|------|------|------|",
+    "| 条目 | 平台 | 已发布 | 链接 | 曝光 | 点赞 | 评论 | 收藏 |",
+    "|------|------|--------|------|------|------|------|------|",
   ];
   for (const entry of record.entries) {
     lines.push(
-      `| ${entry.itemId} | ${entry.platform} | ${entry.published ? "✅" : "—"} | ${metricCell(
-        entry.metrics.impressions,
-      )} | ${metricCell(entry.metrics.likes)} | ${metricCell(entry.metrics.comments)} | ${metricCell(
-        entry.metrics.favorites,
-      )} |`,
+      `| ${entry.itemId} | ${entry.platform} | ${entry.published ? "✅" : "—"} | ${
+        entry.postUrl === null ? "—" : `[链接](${entry.postUrl})`
+      } | ${metricCell(entry.metrics.impressions)} | ${metricCell(entry.metrics.likes)} | ${metricCell(
+        entry.metrics.comments,
+      )} | ${metricCell(entry.metrics.favorites)} |`,
     );
   }
   lines.push(

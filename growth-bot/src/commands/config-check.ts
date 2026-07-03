@@ -1,14 +1,13 @@
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { ConfigError, loadConfig } from "../config/load.ts";
+import { defaultRootDir } from "./paths.ts";
 
 /**
  * config:check 命令：加载并校验 config/ 下的配置，输出摘要。
  * 校验失败时打印清晰错误并返回非零退出码。
  */
 export function runConfigCheck(configDir?: string): number {
-  const resolvedDir =
-    configDir ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..", "config");
+  const resolvedDir = configDir ?? join(defaultRootDir(), "config");
   try {
     const config = loadConfig(resolvedDir);
     const summary = {

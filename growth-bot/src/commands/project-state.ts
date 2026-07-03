@@ -1,6 +1,6 @@
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { ConfigError, loadConfig } from "../config/load.ts";
+import { defaultRootDir } from "./paths.ts";
 import { resolvePlanDate } from "./daily-plan.ts";
 import { buildProjectState, writeProjectState } from "../sources/project-state.ts";
 
@@ -15,8 +15,7 @@ export interface ProjectStateCommandOptions {
  * --dry-run 只打印结果不写文件。
  */
 export function runProjectState(options: ProjectStateCommandOptions): number {
-  const rootDir =
-    options.rootDir ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const rootDir = options.rootDir ?? defaultRootDir();
   try {
     const config = loadConfig(join(rootDir, "config"));
     const date = resolvePlanDate(options.date);

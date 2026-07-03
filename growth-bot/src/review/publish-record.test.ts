@@ -88,8 +88,8 @@ describe("buildPublishRecord / buildRetroMarkdown", () => {
   it("复盘模板包含数据表、star 增量与人工填写区（验收标准）", () => {
     const md = buildRetroMarkdown(record);
     assert.ok(md.includes("# 每日复盘 2026-07-03"));
-    assert.ok(md.includes("| cal-2026-07-03-01 | x | ✅ | 1200 | 45 | 6 | 12 |"));
-    assert.ok(md.includes("| cal-2026-07-03-02 | xiaohongshu | — | 待录入 | 待录入 | 待录入 | 待录入 |"));
+    assert.ok(md.includes("| cal-2026-07-03-01 | x | ✅ | [链接](https://x.com/example/status/1) | 1200 | 45 | 6 | 12 |"));
+    assert.ok(md.includes("| cal-2026-07-03-02 | xiaohongshu | — | — | 待录入 | 待录入 | 待录入 | 待录入 |"));
     assert.ok(md.includes("GitHub star 增量: 待录入"));
     assert.ok(md.includes("## 复盘结论（人工填写）"));
     assert.ok(md.includes("## 明日建议（人工填写"));

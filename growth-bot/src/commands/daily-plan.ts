@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { ConfigError, loadConfig } from "../config/load.ts";
+import { defaultRootDir, resolveContentRoot, resolveDataRoot } from "./paths.ts";
 import { generateCalendar, type CalendarFile } from "../pipeline/daily-calendar.ts";
 import type { ProjectState } from "../sources/project-state.ts";
 import type { NormalizedTrendsFile } from "../sources/trends.ts";
@@ -74,17 +74,12 @@ export function readJsonIfExists<T>(filePath: string): T | null {
 }
 
 export function runDailyPlan(options: DailyPlanOptions): number {
-  const rootDir =
-    options.rootDir ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const rootDir = options.rootDir ?? defaultRootDir();
   try {
     const config = loadConfig(join(rootDir, "config"));
     const date = resolvePlanDate(options.date);
-    const dataRoot = isAbsolute(config.paths.dataDir)
-      ? config.paths.dataDir
-      : join(rootDir, config.paths.dataDir);
-    const contentRoot = isAbsolute(config.paths.contentDir)
-      ? config.paths.contentDir
-      : join(rootDir, config.paths.contentDir);
+    const dataRoot = resolveDataRoot(config, rootDir);
+    const contentRoot = resolveContentRoot(config, rootDir);
 
     const statePath = join(dataRoot, "project-state", `${date}.json`);
     const projectState = readJsonIfExists<ProjectState>(statePath);
