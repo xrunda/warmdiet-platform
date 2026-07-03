@@ -26,7 +26,8 @@ export class ConfigError extends Error {
 
 function readJsonFile(filePath: string, hint: string): unknown {
   if (!existsSync(filePath)) {
-    throw new ConfigError(`缺少配置文件: ${filePath}\n请先执行: ${hint}`);
+    const hintLine = hint === "" ? "" : `\n请先执行: ${hint}`;
+    throw new ConfigError(`缺少配置文件: ${filePath}${hintLine}`);
   }
   const raw = readFileSync(filePath, "utf8");
   try {
