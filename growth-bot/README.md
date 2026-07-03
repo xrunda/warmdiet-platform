@@ -52,6 +52,7 @@ npm run publish:package # 导出 Approve 条目发布包 → content/publish-pac
 npm run publish:record  # 生成发布记录骨架 → content/published/yyyy-mm-dd.json
 npm run retro:build     # 渲染每日复盘模板 → content/reviews/yyyy-mm-dd.md
 npm run status          # 查看当日流水线状态与下一步建议（--json 机器可读）
+npm run daily:run       # 一键串联当日流水线（推荐的日常入口）
 ```
 
 `project:state` 从主仓库 README（`paths.readmePath`，默认 `../README.md`）提取项目简介、Demo 地址和测试账号，与配置中的仓库地址、视频素材路径合并输出；支持 `--dry-run` 和 `--date yyyy-mm-dd`。
@@ -65,6 +66,8 @@ npm run status          # 查看当日流水线状态与下一步建议（--json
 `review:build` 把当天 10 条内容压缩成一屏审核 Markdown，每条含角度、平台、风险、合规状态、草稿链接和 Approve / Edit / Reject 状态位；人工勾选后执行 `publish:package`，Approve 条目的草稿按平台分目录导出为发布包（含 manifest.json），发布动作由人工在各平台完成。审核文件默认不覆盖（其中有人工勾选结果）。
 
 `publish:record` 从发布包 manifest 生成发布记录骨架，人工在 JSON 中录入每条的发布状态、链接与曝光/点赞/评论/收藏指标及当日 star 增量（结构稳定，可被后续脚本读取）；`retro:build` 把记录渲染为复盘模板（数据表 + 复盘结论 + 明日建议的人工填写区）。指标更新后可用 `--force` 刷新数据表。两个文件默认都不覆盖。
+
+**推荐的每日用法**：早上写好热点源文件后跑 `npm run daily:run`——它自动完成生成阶段（项目状态 → 热点 → 日历 → 草稿 → 审核汇总），然后停在人工审核门口；你勾完 Approve 再跑一次 `npm run daily:run`，它跳过已完成步骤、继续导出发布包并生成记录与复盘模板。`--dry-run` 预览将执行的步骤；`--force` 只作用于日历与草稿的重建，永不覆盖审核勾选、发布指标、复盘结论。
 
 不确定流程走到哪一步时，随时运行 `npm run status`：它汇总当日八个环节的状态（✅ 完成 / ❌ 缺失 / ⏳ 需人工处理 / ⚠️ 可选缺失），并给出下一步该执行的命令或人工动作；`--date yyyy-mm-dd` 查看指定日期，`--json` 输出机器可读结构（供后续工作台复用）。
 
