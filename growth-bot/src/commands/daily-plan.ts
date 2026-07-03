@@ -1,29 +1,25 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { ConfigError, loadConfig } from "../config/load.ts";
+import { generateCalendar, type CalendarFile } from "../pipeline/daily-calendar.ts";
+import type { ProjectState } from "../sources/project-state.ts";
+import type { NormalizedTrendsFile } from "../sources/trends.ts";
+
 /**
- * 每日内容计划命令。
+ * 每日内容计划命令（GB-005）。
  *
- * GB-001 阶段只输出占位结果，用于验证 CLI 链路和目录约定。
- * 真实的选题生成依赖 GB-003（项目状态）、GB-004（热点导入）、GB-005（内容日历）。
+ * 输入 data/project-state/yyyy-mm-dd.json 与 data/trends/yyyy-mm-dd.json，
+ * 按 PRD 配比生成 10 条计划写入 content/calendar/yyyy-mm-dd.json。
+ * 已存在的日历文件默认不覆盖（保护人工编辑），--force 可重建。
  */
 
 export interface DailyPlanOptions {
   dryRun: boolean;
   date?: string | undefined;
+  force?: boolean | undefined;
+  rootDir?: string | undefined;
 }
-
-export interface DailyPlanResult {
-  command: "daily:plan";
-  status: "placeholder";
-  date: string;
-  dryRun: boolean;
-  planned: {
-    totalItems: number;
-    platforms: string[];
-    outputFile: string;
-  };
-  notes: string[];
-}
-
-const PLATFORMS = ["x", "xiaohongshu", "douyin", "wechat-video", "kuaishou"];
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -49,21 +45,90 @@ export function resolvePlanDate(input: string | undefined, now: Date = new Date(
   return `${year}-${month}-${day}`;
 }
 
-export function runDailyPlan(options: DailyPlanOptions): DailyPlanResult {
-  const date = resolvePlanDate(options.date);
-  return {
-    command: "daily:plan",
-    status: "placeholder",
-    date,
-    dryRun: options.dryRun,
-    planned: {
-      totalItems: 10,
-      platforms: PLATFORMS,
-      outputFile: `content/calendar/${date}.json`,
-    },
-    notes: [
-      "GB-001 骨架阶段：本命令仅输出占位结果，不生成真实内容。",
-      "选题生成将在 GB-005 实现，输入依赖 GB-003 项目状态与 GB-004 热点数据。",
-    ],
-  };
+export function previousDate(date: string): string {
+  const [year, month, day] = date.split("-").map(Number) as [number, number, number];
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  parsed.setUTCDate(parsed.getUTCDate() - 1);
+  return parsed.toISOString().slice(0, 10);
+}
+
+function readJsonIfExists<T>(filePath: string): T | null {
+  if (!existsSync(filePath)) {
+    return null;
+  }
+  return JSON.parse(readFileSync(filePath, "utf8")) as T;
+}
+
+export function runDailyPlan(options: DailyPlanOptions): number {
+  const rootDir =
+    options.rootDir ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  try {
+    const config = loadConfig(join(rootDir, "config"));
+    const date = resolvePlanDate(options.date);
+    const dataRoot = isAbsolute(config.paths.dataDir)
+      ? config.paths.dataDir
+      : join(rootDir, config.paths.dataDir);
+    const contentRoot = isAbsolute(config.paths.contentDir)
+      ? config.paths.contentDir
+      : join(rootDir, config.paths.contentDir);
+
+    const statePath = join(dataRoot, "project-state", `${date}.json`);
+    const projectState = readJsonIfExists<ProjectState>(statePath);
+    if (projectState === null) {
+      process.stderr.write(
+        `缺少项目状态文件: ${statePath}\n请先执行: npm run project:state -- --date ${date}\n`,
+      );
+      return 1;
+    }
+
+    const trendsPath = join(dataRoot, "trends", `${date}.json`);
+    const trendsFile = readJsonIfExists<NormalizedTrendsFile>(trendsPath);
+    if (trendsFile === null) {
+      process.stderr.write(
+        `提示: 未找到当日热点 ${trendsPath}，热点条目将使用兜底角度（可先执行 npm run trends:import）\n`,
+      );
+    }
+
+    const yesterday = readJsonIfExists<CalendarFile>(
+      join(contentRoot, "calendar", `${previousDate(date)}.json`),
+    );
+
+    const calendar = generateCalendar({
+      date,
+      projectState,
+      trends: trendsFile?.items ?? [],
+      yesterdayAngleKeys: yesterday?.items.map((item) => item.angleKey) ?? [],
+      yesterdayTrendRefs:
+        yesterday?.items.flatMap((item) => (item.trendRef === null ? [] : [item.trendRef])) ?? [],
+    });
+
+    for (const warning of calendar.warnings) {
+      process.stderr.write(`提示: ${warning}\n`);
+    }
+
+    if (options.dryRun) {
+      process.stdout.write(`${JSON.stringify(calendar, null, 2)}\n`);
+      return 0;
+    }
+
+    const outPath = join(contentRoot, "calendar", `${date}.json`);
+    if (existsSync(outPath) && options.force !== true) {
+      process.stderr.write(
+        `日历已存在: ${outPath}\n为保护人工编辑内容默认不覆盖；确认重建请加 --force\n`,
+      );
+      return 1;
+    }
+    mkdirSync(dirname(outPath), { recursive: true });
+    writeFileSync(outPath, `${JSON.stringify(calendar, null, 2)}\n`);
+    process.stdout.write(
+      `${JSON.stringify({ status: "written", outPath, date, count: calendar.count }, null, 2)}\n`,
+    );
+    return 0;
+  } catch (error) {
+    if (error instanceof ConfigError) {
+      process.stderr.write(`${error.message}\n`);
+      return 1;
+    }
+    throw error;
+  }
 }

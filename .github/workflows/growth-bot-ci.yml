@@ -23,7 +23,6 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run test
-      - run: npm run daily:plan -- --dry-run
       - name: config:check（用示例配置验证加载链路）
         run: |
           cp config/project.example.json config/project.json
@@ -36,3 +35,8 @@ jobs:
         run: |
           cp data/trends/source/example.json "data/trends/source/$(date +%F).json"
           npm run trends:import -- --dry-run
+      - name: daily:plan（完整流水线组装当日 10 条计划）
+        run: |
+          npm run project:state
+          npm run trends:import
+          npm run daily:plan -- --dry-run

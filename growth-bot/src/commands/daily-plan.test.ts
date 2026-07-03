@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { resolvePlanDate, runDailyPlan } from "./daily-plan.ts";
+import { previousDate, resolvePlanDate } from "./daily-plan.ts";
 
 describe("resolvePlanDate", () => {
   it("透传合法的 yyyy-mm-dd 日期", () => {
@@ -24,24 +24,14 @@ describe("resolvePlanDate", () => {
   });
 });
 
-describe("runDailyPlan", () => {
-  it("dry-run 输出占位计划结构", () => {
-    const result = runDailyPlan({ dryRun: true, date: "2026-07-03" });
-    assert.equal(result.command, "daily:plan");
-    assert.equal(result.status, "placeholder");
-    assert.equal(result.dryRun, true);
-    assert.equal(result.planned.totalItems, 10);
-    assert.equal(result.planned.outputFile, "content/calendar/2026-07-03.json");
+describe("previousDate", () => {
+  it("常规日期减一天", () => {
+    assert.equal(previousDate("2026-07-03"), "2026-07-02");
   });
 
-  it("覆盖 PRD 要求的五个平台", () => {
-    const result = runDailyPlan({ dryRun: true, date: "2026-07-03" });
-    assert.deepEqual(result.planned.platforms, [
-      "x",
-      "xiaohongshu",
-      "douyin",
-      "wechat-video",
-      "kuaishou",
-    ]);
+  it("跨月与跨年", () => {
+    assert.equal(previousDate("2026-07-01"), "2026-06-30");
+    assert.equal(previousDate("2026-01-01"), "2025-12-31");
+    assert.equal(previousDate("2026-03-01"), "2026-02-28");
   });
 });
