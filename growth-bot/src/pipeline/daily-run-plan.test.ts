@@ -75,6 +75,16 @@ describe("planDailyRun", () => {
     assert.ok(plan.blockReason!.includes("无发布内容"));
   });
 
+  it("--force 且已有审核文件：发布阶段阻塞，要求重新审核（Codex P1）", () => {
+    const plan = planDailyRun(
+      snapshot({ hasReview: true, review: { total: 10, approved: 10, pending: 0 } }),
+      true,
+    );
+    assert.equal(plan.publishBlocked, true);
+    assert.ok(plan.blockReason!.includes("失效"));
+    assert.equal(actionOf(plan, "packages").action, "blocked");
+  });
+
   it("审核完成且有 Approve：发布阶段放行", () => {
     const plan = planDailyRun(
       snapshot({ hasReview: true, review: { total: 10, approved: 3, pending: 0 } }),
@@ -86,7 +96,7 @@ describe("planDailyRun", () => {
     assert.equal(actionOf(plan, "retro").action, "run");
   });
 
-  it("发布记录与复盘已存在时跳过，--force 也不覆盖", () => {
+  it("发布记录与复盘已存在时跳过（人工数据永不覆盖）", () => {
     const plan = planDailyRun(
       snapshot({
         hasReview: true,
@@ -95,7 +105,7 @@ describe("planDailyRun", () => {
         hasRecord: true,
         hasRetro: true,
       }),
-      true,
+      false,
     );
     assert.equal(actionOf(plan, "record").action, "skip");
     assert.equal(actionOf(plan, "retro").action, "skip");

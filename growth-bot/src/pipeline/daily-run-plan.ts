@@ -8,6 +8,10 @@
 
 export type StepAction = "run" | "skip" | "manual" | "blocked";
 
+/** 生成阶段与发布阶段的步骤 key，执行器与计划函数共用，避免字符串漂移 */
+export const GENERATION_KEYS = ["project-state", "trends", "calendar", "drafts", "review"] as const;
+export const PUBLISH_KEYS = ["packages", "record", "retro"] as const;
+
 export interface PlannedStep {
   key: string;
   label: string;
@@ -91,7 +95,14 @@ export function planDailyRun(snapshot: DailyRunSnapshot, force: boolean): DailyR
   let blockReason: string | null = null;
 
   const review = snapshot.review;
-  if (review === null || !snapshot.hasReview) {
+  if (force && snapshot.hasReview) {
+    // P1 防线：--force 重建了日历/草稿，但审核文件保留的是对旧内容的勾选；
+    // 条目 id 是位置化的，旧 Approve 会错误地放行未审核的新内容
+    publishBlocked = true;
+    blockReason =
+      "内容已用 --force 重建，现有审核勾选针对旧内容已失效；" +
+      "请删除审核文件后重新运行 daily:run 生成新审核汇总并重新勾选";
+  } else if (review === null || !snapshot.hasReview) {
     publishBlocked = true;
     blockReason = "审核文件刚生成或尚未勾选，等待人工审核";
   } else if (review.pending > 0) {

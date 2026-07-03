@@ -11,7 +11,7 @@ import { runReviewBuild } from "./review-build.ts";
 import { runPublishPackage } from "./publish-package.ts";
 import { runPublishRecord, runRetroBuild } from "./publish-record.ts";
 import { parseReviewStatuses } from "../review/review-file.ts";
-import { planDailyRun, type DailyRunSnapshot, type PlannedStep } from "../pipeline/daily-run-plan.ts";
+import { planDailyRun, GENERATION_KEYS, PUBLISH_KEYS, type DailyRunSnapshot, type PlannedStep } from "../pipeline/daily-run-plan.ts";
 import { gatherDailyStatus, renderDailyStatus } from "../pipeline/daily-status.ts";
 
 export interface DailyRunOptions {
@@ -95,7 +95,7 @@ export function runDailyRun(options: DailyRunOptions): number {
 
     // 第一阶段：生成（project-state ~ review）
     const generationSteps = plan.steps.filter((s) =>
-      ["project-state", "trends", "calendar", "drafts", "review"].includes(s.key),
+      (GENERATION_KEYS as readonly string[]).includes(s.key),
     );
     for (const step of generationSteps) {
       process.stdout.write(`\n${ACTION_ICONS[step.action]} ${step.label}: ${step.reason}\n`);
@@ -119,7 +119,7 @@ export function runDailyRun(options: DailyRunOptions): number {
       );
     } else {
       for (const step of freshPlan.steps.filter((s) =>
-        ["packages", "record", "retro"].includes(s.key),
+        (PUBLISH_KEYS as readonly string[]).includes(s.key),
       )) {
         process.stdout.write(`\n${ACTION_ICONS[step.action]} ${step.label}: ${step.reason}\n`);
         if (step.action !== "run") {
