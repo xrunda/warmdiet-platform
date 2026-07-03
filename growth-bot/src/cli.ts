@@ -7,6 +7,7 @@ import { runTrendsImport } from "./commands/trends-import.ts";
 import { runDraftsGenerate } from "./commands/drafts-generate.ts";
 import { runReviewBuild } from "./commands/review-build.ts";
 import { runPublishPackage } from "./commands/publish-package.ts";
+import { runPublishRecord, runRetroBuild } from "./commands/publish-record.ts";
 
 const USAGE = `growth-bot - 三餐管家推广运营中台 CLI
 
@@ -21,6 +22,8 @@ const USAGE = `growth-bot - 三餐管家推广运营中台 CLI
   drafts:generate  从内容日历生成多平台草稿，写入 content/drafts/yyyy-mm-dd/
   review:build     生成一屏审核汇总，写入 content/review/yyyy-mm-dd.md
   publish:package  导出 Approve 条目的发布包到 content/publish-packages/yyyy-mm-dd/
+  publish:record   生成发布记录骨架，写入 content/published/yyyy-mm-dd.json
+  retro:build      渲染每日复盘模板，写入 content/reviews/yyyy-mm-dd.md
 
 选项:
   --dry-run     只打印结果，不写入任何文件
@@ -91,6 +94,18 @@ export async function main(argv: string[]): Promise<number> {
       return runPublishPackage({
         dryRun: values["dry-run"],
         date: values.date,
+      });
+    case "publish:record":
+      return runPublishRecord({
+        dryRun: values["dry-run"],
+        date: values.date,
+        force: values.force,
+      });
+    case "retro:build":
+      return runRetroBuild({
+        dryRun: values["dry-run"],
+        date: values.date,
+        force: values.force,
       });
     default:
       process.stderr.write(`未知命令: ${command}\n\n${USAGE}`);

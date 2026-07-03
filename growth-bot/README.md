@@ -49,6 +49,8 @@ npm run daily:plan     # 生成每日 10 条内容计划 → content/calendar/yy
 npm run drafts:generate # 生成多平台草稿 → content/drafts/yyyy-mm-dd/*.md
 npm run review:build    # 生成一屏审核汇总 → content/review/yyyy-mm-dd.md
 npm run publish:package # 导出 Approve 条目发布包 → content/publish-packages/yyyy-mm-dd/
+npm run publish:record  # 生成发布记录骨架 → content/published/yyyy-mm-dd.json
+npm run retro:build     # 渲染每日复盘模板 → content/reviews/yyyy-mm-dd.md
 ```
 
 `project:state` 从主仓库 README（`paths.readmePath`，默认 `../README.md`）提取项目简介、Demo 地址和测试账号，与配置中的仓库地址、视频素材路径合并输出；支持 `--dry-run` 和 `--date yyyy-mm-dd`。
@@ -60,6 +62,8 @@ npm run publish:package # 导出 Approve 条目发布包 → content/publish-pac
 `drafts:generate` 把日历条目按 platformTargets 展开为平台草稿 Markdown（X、小红书、抖音、视频号、快手模板），每份含标题、正文、话题、素材建议、合规自检（含医疗禁用词自动扫描）。草稿带 frontmatter 供审核流机读，可直接人工编辑；已存在的草稿默认跳过，重建需 `--force`。
 
 `review:build` 把当天 10 条内容压缩成一屏审核 Markdown，每条含角度、平台、风险、合规状态、草稿链接和 Approve / Edit / Reject 状态位；人工勾选后执行 `publish:package`，Approve 条目的草稿按平台分目录导出为发布包（含 manifest.json），发布动作由人工在各平台完成。审核文件默认不覆盖（其中有人工勾选结果）。
+
+`publish:record` 从发布包 manifest 生成发布记录骨架，人工在 JSON 中录入每条的发布状态、链接与曝光/点赞/评论/收藏指标及当日 star 增量（结构稳定，可被后续脚本读取）；`retro:build` 把记录渲染为复盘模板（数据表 + 复盘结论 + 明日建议的人工填写区）。指标更新后可用 `--force` 刷新数据表。两个文件默认都不覆盖。
 
 本机私有路径（如私有资料目录）写入 `config/paths.local.json`，它会覆盖 `paths.json` 中的同名字段，且已被 `.gitignore` 忽略。
 

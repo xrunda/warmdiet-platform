@@ -26,6 +26,9 @@ function statusLine(): string {
 }
 
 function complianceBadge(drafts: DraftMeta[]): string {
+  if (drafts.length === 0) {
+    return "⚠️ 无草稿可扫描，不可直接 Approve";
+  }
   const failed = drafts.filter((draft) => !draft.compliancePass);
   return failed.length === 0
     ? "✅ 自动合规通过"

@@ -29,6 +29,8 @@ content/calendar/*.json
 content/drafts/
 content/review/*.md
 content/publish-packages/
+content/published/*.json
+content/reviews/*.md
 
 # 系统文件
 .DS_Store

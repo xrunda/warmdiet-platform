@@ -27,6 +27,9 @@ export function runProjectState(options: ProjectStateCommandOptions): number {
         `警告: 未找到 README（${state.source.readmePath}），Demo 地址与简介回退到 config 值\n`,
       );
     }
+    for (const warning of state.source.warnings) {
+      process.stderr.write(`警告: ${warning}\n`);
+    }
 
     if (options.dryRun) {
       process.stdout.write(`${JSON.stringify(state, null, 2)}\n`);

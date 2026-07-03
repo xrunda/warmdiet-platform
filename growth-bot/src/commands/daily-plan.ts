@@ -121,8 +121,8 @@ export function runDailyPlan(options: DailyPlanOptions): number {
       projectState,
       trends: trendsFile?.items ?? [],
       yesterdayAngleKeys: yesterday?.items.map((item) => item.angleKey) ?? [],
-      yesterdayTrendRefs:
-        yesterday?.items.flatMap((item) => (item.trendRef === null ? [] : [item.trendRef])) ?? [],
+      yesterdayTrendUrls:
+        yesterday?.items.flatMap((item) => (item.trendUrl == null ? [] : [item.trendUrl])) ?? [],
     });
 
     for (const warning of calendar.warnings) {

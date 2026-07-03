@@ -19,6 +19,7 @@ function calendarItem(id: string, overrides: Partial<CalendarItem> = {}): Calend
     riskLevel: "low",
     linkPolicy: "none",
     trendRef: null,
+    trendUrl: null,
     assetHint: null,
     ...overrides,
   };
@@ -56,6 +57,12 @@ describe("buildReviewMarkdown", () => {
     assert.ok(md.includes("⚠️ risk: medium"));
     assert.ok(md.includes("⚠️ 1 份草稿未过合规扫描"));
     assert.ok(md.includes("✅ 自动合规通过"));
+  });
+
+  it("无草稿的条目不显示合规通过，提示不可直接 Approve", () => {
+    const noDrafts = buildReviewMarkdown(CALENDAR, new Map());
+    assert.ok(noDrafts.includes("⚠️ 无草稿可扫描，不可直接 Approve"));
+    assert.ok(!noDrafts.includes("✅ 自动合规通过"));
   });
 
   it("草稿链接指向 drafts 目录", () => {

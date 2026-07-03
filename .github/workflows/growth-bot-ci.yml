@@ -3,9 +3,9 @@ name: growth-bot CI
 on:
   push:
     branches: [main]
-    paths: ["growth-bot/**", ".github/workflows/growth-bot-ci.yml"]
+    paths: ["growth-bot/**", ".github/workflows/growth-bot-ci.yml", "README.md"]
   pull_request:
-    paths: ["growth-bot/**", ".github/workflows/growth-bot-ci.yml"]
+    paths: ["growth-bot/**", ".github/workflows/growth-bot-ci.yml", "README.md"]
 
 jobs:
   test:
@@ -44,4 +44,7 @@ jobs:
           npm run review:build
           sed -i '0,/\[ \] Approve/s//[x] Approve/' "content/review/$(date +%F).md"
           npm run publish:package
+          npm run publish:record
+          npm run retro:build
           find "content/publish-packages/$(date +%F)" -type f
+          head -12 "content/reviews/$(date +%F).md"
