@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Growth Bot 工作台</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --line:#e2e5ea; --ink:#1c2330; --dim:#6b7686;
+          --ok:#1a7f4b; --warn:#b45309; --bad:#b91c1c; --act:#1d4ed8; }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--bg); color:var(--ink); font:14px/1.6 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
+  header { display:flex; align-items:center; gap:12px; padding:10px 20px; background:var(--card);
+           border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5; flex-wrap:wrap; }
+  header h1 { font-size:16px; margin-right:8px; }
+  header .date { color:var(--dim); }
+  input[type=date] { padding:4px 8px; border:1px solid var(--line); border-radius:6px; font:inherit; }
+  button { padding:5px 12px; border:1px solid var(--line); border-radius:6px; background:var(--card);
+           font:inherit; cursor:pointer; }
+  button:hover { border-color:var(--act); color:var(--act); }
+  button.primary { background:var(--act); border-color:var(--act); color:#fff; }
+  button.primary:hover { opacity:.9; color:#fff; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  nav { display:flex; gap:2px; padding:0 20px; background:var(--card); border-bottom:1px solid var(--line); }
+  nav button { border:none; border-bottom:2px solid transparent; border-radius:0; padding:9px 14px; }
+  nav button.on { border-bottom-color:var(--act); color:var(--act); font-weight:600; }
+  main { padding:16px 20px 60px; max-width:1180px; margin:0 auto; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:14px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:10px; }
+  .step { display:flex; gap:8px; align-items:baseline; padding:8px 10px; border:1px solid var(--line); border-radius:8px; }
+  .step b { white-space:nowrap; }
+  .step small { color:var(--dim); }
+  .s-done { border-left:3px solid var(--ok); }
+  .s-missing { border-left:3px solid var(--line); color:var(--dim); }
+  .s-action-required { border-left:3px solid var(--warn); background:#fffaf0; }
+  .s-warn { border-left:3px solid var(--warn); }
+  .next { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  code, .cmd { background:#eef1f5; border-radius:6px; padding:2px 8px; font-family:ui-monospace,Menlo,monospace; font-size:13px; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:7px 9px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--dim); font-weight:500; white-space:nowrap; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:99px; background:#eef1f5; font-size:12px; margin:1px 2px 1px 0; white-space:nowrap; }
+  .tag.risk-medium { background:#fef3c7; color:var(--warn); }
+  .tag.risk-high { background:#fee2e2; color:var(--bad); }
+  .tag.ok { background:#dcfce7; color:var(--ok); }
+  .tag.bad { background:#fee2e2; color:var(--bad); }
+  .empty { color:var(--dim); padding:26px; text-align:center; }
+  .empty .cmd { margin-top:6px; display:inline-block; }
+  .md { background:#fafbfc; border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
+  .md h4 { margin:10px 0 4px; font-size:13px; color:var(--dim); }
+  .md p { margin:4px 0; white-space:pre-wrap; }
+  .filters { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+  select, input[type=text] { padding:4px 8px; border:1px solid var(--line); border-radius:6px; font:inherit; }
+  .row-btns button { padding:3px 10px; font-size:13px; }
+  .row-btns button.sel-approve { background:var(--ok); border-color:var(--ok); color:#fff; }
+  .row-btns button.sel-edit { background:var(--warn); border-color:var(--warn); color:#fff; }
+  .row-btns button.sel-reject { background:var(--bad); border-color:var(--bad); color:#fff; }
+  .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--ink);
+           color:#fff; padding:8px 18px; border-radius:8px; opacity:0; transition:opacity .25s; pointer-events:none; }
+  .toast.show { opacity:.92; }
+  .subtabs { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+  .subtabs button.on { background:var(--act); border-color:var(--act); color:#fff; }
+  h3 { font-size:14px; margin-bottom:10px; }
+  .hint { color:var(--dim); font-size:13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Growth Bot 工作台</h1>
+  <input type="date" id="datePick">
+  <button id="btnRefresh">刷新</button>
+  <button id="btnRun" class="primary">生成今日流程</button>
+  <span class="hint" id="runHint"></span>
+</header>
+<nav id="tabs"></nav>
+<main id="main"><div class="empty">加载中…</div></main>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $ = (sel) => document.querySelector(sel);
+const TABS = [
+  ["status","状态总览"],["calendar","内容日历"],["drafts","草稿预览"],
+  ["review","审核"],["packages","发布包"],["retro","复盘"],
+];
+function todayLocal(){
+  const d = new Date();
+  const m = String(d.getMonth()+1).padStart(2,"0");
+  const day = String(d.getDate()).padStart(2,"0");
+  return d.getFullYear()+"-"+m+"-"+day;
+}
+
+let state = { tab:"status", data:null, date:todayLocal(),
+              draftItem:null, draftPlatform:null, busy:false,
+              fPlatform:"", fRisk:"", fAudience:"" };
+
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
+
+async function api(path, opts){
+  const sep = path.includes("?") ? "&" : "?";
+  const res = await fetch(path + sep + "date=" + state.date, opts);
+  const body = await res.json();
+  if(!res.ok) throw new Error(body.error || ("HTTP "+res.status));
+  return body;
+}
+
+async function refresh(){
+  try { state.data = await api("/api/overview"); render(); }
+  catch(e){ $("#main").innerHTML = '<div class="card empty">加载失败：'+esc(e.message)+'</div>'; }
+}
+
+async function runDaily(){
+  if(state.busy) return;
+  state.busy = true; $("#btnRun").disabled = true; $("#runHint").textContent = "正在执行 daily:run…";
+  try {
+    const r = await api("/api/daily-run", {method:"POST"});
+    state.data = r.overview; render();
+    toast(r.exitCode === 0 ? "daily:run 执行完成" : "daily:run 有步骤失败，见状态总览");
+  } catch(e){ toast("执行失败："+e.message); }
+  state.busy = false; $("#btnRun").disabled = false; $("#runHint").textContent = "";
+}
+
+async function setDecision(itemId, decision){
+  try {
+    const r = await api("/api/review-decision", {method:"POST", headers:{"content-type":"application/json"},
+      body: JSON.stringify({itemId, decision})});
+    state.data = r.overview; render();
+  } catch(e){ toast("回写失败："+e.message); }
+}
+
+async function exportPackages(){
+  try {
+    const r = await api("/api/publish-package", {method:"POST"});
+    state.data = r.overview; render();
+    toast(r.exitCode === 0 ? "发布包已导出" : "导出未完成，查看审核状态");
+    if(r.exitCode === 0) switchTab("packages");
+  } catch(e){ toast("导出失败："+e.message); }
+}
+
+function copyText(text, label){
+  navigator.clipboard.writeText(text).then(()=>toast((label||"内容")+"已复制")).catch(()=>toast("复制失败"));
+}
+
+/* 提取草稿中给平台粘贴用的部分：标题 + 正文 + 话题 */
+function pasteBody(md){
+  const grab = (name) => { const m = md.match(new RegExp("## "+name+"\\n\\n([\\s\\S]*?)(?=\\n## |$)")); return m ? m[1].trim() : ""; };
+  const title = (md.match(/# 标题\n\n(.*)/) || [,""])[1];
+  return [title, "", grab("正文"), "", grab("话题")].join("\n").trim();
+}
+
+function mdToHtml(md){
+  const body = md.replace(/^---[\s\S]*?---\n/, "");
+  return body.split("\n").map(line=>{
+    if(line.startsWith("# ")) return "<h4>"+esc(line.slice(2))+"</h4>";
+    if(line.startsWith("## ")) return "<h4>"+esc(line.slice(3))+"</h4>";
+    if(line.trim()==="") return "";
+    return "<p>"+esc(line)+"</p>";
+  }).join("");
+}
+
+function decisionOf(itemId){
+  const s = (state.data.review.statuses||[]).find(x=>x.itemId===itemId);
+  return s ? s.decision : null;
+}
+const DECISION_LABEL = {approve:"✅ Approve", edit:"✏️ Edit", reject:"🚫 Reject", pending:"⬜ 待勾选"};
+
+/* ---------- 渲染 ---------- */
+function render(){
+  $("#tabs").innerHTML = TABS.map(([k,label])=>{
+    let badge = "";
+    if(k==="review" && state.data){
+      const p = (state.data.review.statuses||[]).filter(s=>s.decision==="pending").length;
+      if(p>0) badge = " ("+p+")";
+    }
+    return '<button data-tab="'+k+'" class="'+(state.tab===k?"on":"")+'">'+label+badge+'</button>';
+  }).join("");
+  document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+  const d = state.data;
+  if(!d){ return; }
+  const views = {status:vStatus, calendar:vCalendar, drafts:vDrafts, review:vReview, packages:vPackages, retro:vRetro};
+  $("#main").innerHTML = views[state.tab](d);
+  bindView();
+}
+function switchTab(t){ state.tab = t; render(); }
+
+function emptyBox(text, cmd){
+  return '<div class="card empty">'+esc(text)+(cmd?'<br><span class="cmd">'+esc(cmd)+'</span>':"")+'</div>';
+}
+
+function vStatus(d){
+  const icons = {done:"✅", missing:"❌", "action-required":"⏳", warn:"⚠️"};
+  const steps = d.status.steps.map(s=>
+    '<div class="step s-'+s.state+'"><span>'+icons[s.state]+'</span><b>'+esc(s.label)+'</b><small>'+esc(s.detail)+'</small></div>'
+  ).join("");
+  const n = d.status.next;
+  return '<div class="card"><h3>流水线 · '+esc(d.date)+'</h3><div class="grid">'+steps+'</div></div>'
+    + '<div class="card next"><b>下一步</b><span>'+esc(n.hint)+'</span>'
+    + (n.command ? '<span class="cmd">'+esc(n.command)+'</span><button data-copy-cmd>复制命令</button>' : "")
+    + '</div>'
+    + '<div class="card hint">「生成今日流程」按钮等价于命令行 npm run daily:run：自动完成可自动的步骤，'
+    + '停在需要你的地方（审核勾选在「审核」页完成，发布数据在 content/published/ 填写）。</div>';
+}
+
+function vCalendar(d){
+  if(!d.calendar) return emptyBox("今日内容日历还没生成。点击上方「生成今日流程」，或运行：","npm run daily:plan");
+  const items = d.calendar.items.filter(it=>
+    (!state.fPlatform || it.platformTargets.includes(state.fPlatform)) &&
+    (!state.fRisk || it.riskLevel===state.fRisk) &&
+    (!state.fAudience || it.audience.includes(state.fAudience)));
+  const platforms = [...new Set(d.calendar.items.flatMap(i=>i.platformTargets))];
+  const rows = items.map(it=>'<tr><td><span class="hint">'+esc(it.id.slice(-2))+'</span></td>'
+    +'<td>'+esc(it.angle)+'<br><span class="hint">'+esc(it.category)+'</span></td>'
+    +'<td>'+it.platformTargets.map(p=>'<span class="tag">'+esc(p)+'</span>').join("")+'</td>'
+    +'<td>'+esc(it.audience)+'</td><td>'+esc(it.assetType)+'</td>'
+    +'<td><span class="tag risk-'+it.riskLevel+'">'+esc(it.riskLevel)+'</span></td>'
+    +'<td>'+esc(it.linkPolicy)+'</td>'
+    +'<td>'+esc(DECISION_LABEL[decisionOf(it.id)] || "—")+'</td></tr>').join("");
+  return '<div class="card"><h3>内容日历（'+items.length+'/'+d.calendar.items.length+' 条）</h3>'
+    +'<div class="filters"><select id="fPlatform"><option value="">全部平台</option>'
+    +platforms.map(p=>'<option '+(state.fPlatform===p?"selected":"")+'>'+esc(p)+'</option>').join("")+'</select>'
+    +'<select id="fRisk"><option value="">全部风险</option>'
+    +["low","medium","high"].map(r=>'<option '+(state.fRisk===r?"selected":"")+'>'+r+'</option>').join("")+'</select>'
+    +'<input type="text" id="fAudience" placeholder="按受众筛选" value="'+esc(state.fAudience)+'"></div>'
+    +'<table><tr><th>#</th><th>选题角度</th><th>平台</th><th>受众</th><th>素材</th><th>风险</th><th>链接</th><th>审核</th></tr>'
+    +rows+'</table></div>';
+}
+
+function vDrafts(d){
+  if(d.drafts.length===0) return emptyBox("还没有草稿。点击「生成今日流程」，或运行：","npm run drafts:generate");
+  const itemIds = [...new Set(d.drafts.map(x=>x.itemId))];
+  if(!state.draftItem || !itemIds.includes(state.draftItem)) state.draftItem = itemIds[0];
+  const mine = d.drafts.filter(x=>x.itemId===state.draftItem);
+  if(!state.draftPlatform || !mine.some(x=>x.platform===state.draftPlatform)) state.draftPlatform = mine[0].platform;
+  const cur = mine.find(x=>x.platform===state.draftPlatform);
+  const angle = d.calendar ? (d.calendar.items.find(i=>i.id===state.draftItem)||{}).angle : "";
+  return '<div class="card"><h3>草稿预览</h3>'
+    +'<div class="subtabs">'+itemIds.map(id=>'<button data-item="'+esc(id)+'" class="'+(id===state.draftItem?"on":"")+'">'+esc(id.slice(-2))+'</button>').join("")+'</div>'
+    +(angle?'<p class="hint">'+esc(angle)+'</p>':"")
+    +'<div class="subtabs">'+mine.map(x=>'<button data-platform="'+esc(x.platform)+'" class="'+(x.platform===state.draftPlatform?"on":"")+'">'
+      +esc(x.platform)+(x.compliancePass?"":" ⚠️")+'</button>').join("")+'</div>'
+    +(cur.compliancePass?"":'<p><span class="tag bad">未通过合规扫描，需改写后再审核</span></p>')
+    +'<p style="margin:8px 0"><button data-copy-paste>复制可粘贴文案</button> '
+    +'<span class="hint">文件: content/drafts/'+esc(d.date)+'/'+esc(cur.fileName)+'（可直接用编辑器修改）</span></p>'
+    +'<div class="md">'+mdToHtml(cur.markdown)+'</div></div>';
+}
+
+function vReview(d){
+  if(!d.review.exists) return emptyBox("审核文件还没生成。点击「生成今日流程」，或运行：","npm run review:build");
+  if(!d.calendar) return emptyBox("缺少内容日历，无法展示审核详情。","npm run daily:plan");
+  const pending = d.review.statuses.filter(s=>s.decision==="pending").length;
+  const approved = d.review.statuses.filter(s=>s.decision==="approve").length;
+  const rows = d.calendar.items.map(it=>{
+    const dec = decisionOf(it.id) || "pending";
+    const drafts = d.drafts.filter(x=>x.itemId===it.id);
+    const compliance = drafts.length===0 ? '<span class="tag bad">无草稿</span>'
+      : drafts.every(x=>x.compliancePass) ? '<span class="tag ok">合规通过</span>'
+      : '<span class="tag bad">'+drafts.filter(x=>!x.compliancePass).length+' 份未过扫描</span>';
+    const btn = (kind,label)=>'<button data-decide="'+kind+'" data-item="'+esc(it.id)+'" class="'+(dec===kind?"sel-"+kind:"")+'">'+label+'</button>';
+    return '<tr><td>'+esc(it.id.slice(-2))+'</td><td>'+esc(it.angle)
+      +'<br><span class="hint">'+it.platformTargets.map(p=>'<span class="tag">'+esc(p)+'</span>').join("")
+      +' <span class="tag risk-'+it.riskLevel+'">'+esc(it.riskLevel)+'</span> '+compliance+'</span></td>'
+      +'<td class="row-btns">'+btn("approve","Approve")+" "+btn("edit","Edit")+" "+btn("reject","Reject")+'</td></tr>';
+  }).join("");
+  const canExport = pending===0 && approved>0;
+  return '<div class="card"><h3>人工审核（Approve '+approved+' / 待勾选 '+pending+'）</h3>'
+    +'<p class="hint" style="margin-bottom:8px">点按钮即写回 content/review/'+esc(d.date)+'.md；Edit 表示"改完草稿后再改成 Approve"。</p>'
+    +'<table><tr><th>#</th><th>内容</th><th>决策</th></tr>'+rows+'</table>'
+    +'<p style="margin-top:12px"><button id="btnExport" class="primary" '+(canExport?"":"disabled")+'>导出发布包（'+approved+' 条 Approve）</button> '
+    +(canExport?'':'<span class="hint">'+(pending>0?"全部勾选后可导出":"没有 Approve 条目")+'</span>')+'</p></div>';
+}
+
+function vPackages(d){
+  const platforms = Object.keys(d.packages.platforms);
+  if(!d.packages.exists || platforms.length===0)
+    return emptyBox("还没有发布包。在「审核」页完成勾选后点「导出发布包」。","npm run publish:package");
+  const blocks = platforms.map(p=>{
+    const files = d.packages.platforms[p].map((f,i)=>
+      '<tr><td>'+esc(f.fileName)+'</td><td class="row-btns">'
+      +'<button data-copy-pkg="'+esc(p)+'|'+i+'">复制可粘贴文案</button> '
+      +'<button data-copy-pkg-full="'+esc(p)+'|'+i+'">复制完整 Markdown</button></td></tr>').join("");
+    return '<div class="card"><h3>'+esc(p)+'（'+d.packages.platforms[p].length+' 份）</h3><table>'+files+'</table></div>';
+  }).join("");
+  return '<div class="card hint">复制文案后到对应平台后台粘贴、配素材、人工点发布——系统不自动发布。'
+    +'发布完成后在「复盘」页查看数据录入入口。</div>'+blocks;
+}
+
+function vRetro(d){
+  let publishedBlock;
+  if(!d.published){
+    publishedBlock = emptyBox("发布记录还没生成。导出发布包后运行：","npm run publish:record");
+  } else {
+    const rows = d.published.entries.map(e=>{
+      const m = e.metrics;
+      const cell = v => v==null ? '<span class="hint">待录入</span>' : v;
+      return '<tr><td>'+esc(e.itemId)+'</td><td>'+esc(e.platform)+'</td><td>'+(e.published?"✅":"—")+'</td>'
+        +'<td>'+cell(m.impressions)+'</td><td>'+cell(m.likes)+'</td><td>'+cell(m.comments)+'</td><td>'+cell(m.favorites)+'</td></tr>';
+    }).join("");
+    publishedBlock = '<div class="card"><h3>发布记录（star 增量: '+(d.published.starDelta==null?"待录入":esc(d.published.starDelta))+'）</h3>'
+      +'<p class="hint" style="margin-bottom:8px">指标在 content/published/'+esc(d.date)+'.json 中填写，保存后刷新本页。</p>'
+      +'<table><tr><th>条目</th><th>平台</th><th>已发布</th><th>曝光</th><th>点赞</th><th>评论</th><th>收藏</th></tr>'+rows+'</table></div>';
+  }
+  const retroBlock = d.retro
+    ? '<div class="card"><h3>复盘模板</h3><p class="hint" style="margin-bottom:8px">结论与明日建议在 content/reviews/'+esc(d.date)+'.md 中撰写。</p><div class="md">'+mdToHtml(d.retro)+'</div></div>'
+    : emptyBox("复盘模板还没生成。有发布记录后运行：","npm run retro:build");
+  return publishedBlock + retroBlock;
+}
+
+/* ---------- 事件绑定 ---------- */
+function bindView(){
+  const d = state.data;
+  const q = sel => document.querySelectorAll(sel);
+  q("[data-item]").forEach(b=>{ if(b.dataset.decide===undefined) b.onclick=()=>{ state.draftItem=b.dataset.item; state.draftPlatform=null; render(); }; });
+  q("[data-platform]").forEach(b=>b.onclick=()=>{ state.draftPlatform=b.dataset.platform; render(); });
+  q("[data-decide]").forEach(b=>b.onclick=()=>setDecision(b.dataset.item, b.dataset.decide));
+  q("[data-copy-cmd]").forEach(b=>b.onclick=()=>copyText(d.status.next.command,"命令"));
+  q("[data-copy-paste]").forEach(b=>b.onclick=()=>{
+    const cur = d.drafts.find(x=>x.itemId===state.draftItem && x.platform===state.draftPlatform);
+    copyText(pasteBody(cur.markdown),"可粘贴文案");
+  });
+  q("[data-copy-pkg]").forEach(b=>b.onclick=()=>{
+    const [p,i] = b.dataset.copyPkg.split("|");
+    copyText(pasteBody(d.packages.platforms[p][Number(i)].markdown),"可粘贴文案");
+  });
+  q("[data-copy-pkg-full]").forEach(b=>b.onclick=()=>{
+    const [p,i] = b.dataset.copyPkgFull.split("|");
+    copyText(d.packages.platforms[p][Number(i)].markdown,"完整 Markdown");
+  });
+  const fp=$("#fPlatform"), fr=$("#fRisk"), fa=$("#fAudience"), ex=$("#btnExport");
+  if(fp) fp.onchange=()=>{ state.fPlatform=fp.value; render(); };
+  if(fr) fr.onchange=()=>{ state.fRisk=fr.value; render(); };
+  if(fa) fa.onchange=()=>{ state.fAudience=fa.value; render(); };
+  if(ex) ex.onclick=exportPackages;
+}
+
+$("#datePick").value = state.date;
+$("#datePick").onchange = e => { state.date = e.target.value; refresh(); };
+$("#btnRefresh").onclick = refresh;
+$("#btnRun").onclick = runDaily;
+refresh();
+</script>
+</body>
+</html>

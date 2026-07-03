@@ -20,7 +20,8 @@
     "publish:record": "node src/cli.ts publish:record",
     "retro:build": "node src/cli.ts retro:build",
     "status": "node src/cli.ts status",
-    "daily:run": "node src/cli.ts daily:run"
+    "daily:run": "node src/cli.ts daily:run",
+    "dashboard": "node src/cli.ts dashboard"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

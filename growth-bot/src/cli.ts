@@ -10,6 +10,7 @@ import { runPublishPackage } from "./commands/publish-package.ts";
 import { runPublishRecord, runRetroBuild } from "./commands/publish-record.ts";
 import { runStatus } from "./commands/status.ts";
 import { runDailyRun } from "./commands/daily-run.ts";
+import { runDashboard } from "./commands/dashboard.ts";
 
 const USAGE = `growth-bot - 三餐管家推广运营中台 CLI
 
@@ -28,6 +29,7 @@ const USAGE = `growth-bot - 三餐管家推广运营中台 CLI
   retro:build      渲染每日复盘模板，写入 content/reviews/yyyy-mm-dd.md
   status           汇总当日流水线状态，给出下一步建议（--json 机器可读）
   daily:run        一键串联当日流水线（发布阶段由人工审核门控）
+  dashboard        启动本地工作台页面（默认 http://127.0.0.1:4700）
 
 选项:
   --dry-run     只打印结果，不写入任何文件
@@ -48,6 +50,7 @@ export async function main(argv: string[]): Promise<number> {
         date: { type: "string" },
         force: { type: "boolean", default: false },
         json: { type: "boolean", default: false },
+        port: { type: "string" },
         help: { type: "boolean", short: "h", default: false },
       },
     }));
@@ -123,6 +126,8 @@ export async function main(argv: string[]): Promise<number> {
         date: values.date,
         force: values.force,
       });
+    case "dashboard":
+      return runDashboard({ port: values.port });
     default:
       process.stderr.write(`未知命令: ${command}\n\n${USAGE}`);
       return 1;
