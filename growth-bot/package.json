@@ -10,7 +10,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node --test \"src/**/*.test.ts\"",
-    "daily:plan": "node src/cli.ts daily:plan"
+    "daily:plan": "node src/cli.ts daily:plan",
+    "config:check": "node src/cli.ts config:check"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

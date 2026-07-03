@@ -1,0 +1,18 @@
+{
+  "name": "三餐管家 WarmDiet",
+  "repo": {
+    "owner": "xrunda",
+    "name": "warmdiet-platform",
+    "url": "https://github.com/xrunda/warmdiet-platform"
+  },
+  "demo": {
+    "hospitalUrl": "https://example.com/hospital-demo",
+    "familyUrl": "https://example.com/family-demo"
+  },
+  "positioning": "开源的三餐随诊与家属照护平台，open-core 模式，基础产品开源",
+  "language": "zh",
+  "video": {
+    "promoPath": "assets/source/promo-90s.mp4",
+    "durationSeconds": 90
+  }
+}

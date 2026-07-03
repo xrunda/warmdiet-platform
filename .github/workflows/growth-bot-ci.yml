@@ -1,0 +1,32 @@
+name: growth-bot CI
+
+on:
+  push:
+    branches: [main]
+    paths: ["growth-bot/**", ".github/workflows/growth-bot-ci.yml"]
+  pull_request:
+    paths: ["growth-bot/**", ".github/workflows/growth-bot-ci.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: growth-bot
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: growth-bot/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run daily:plan -- --dry-run
+      - name: config:check（用示例配置验证加载链路）
+        run: |
+          cp config/project.example.json config/project.json
+          cp config/platforms.example.json config/platforms.json
+          cp config/paths.example.json config/paths.json
+          npm run config:check

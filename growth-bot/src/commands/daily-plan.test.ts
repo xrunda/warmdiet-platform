@@ -12,6 +12,12 @@ describe("resolvePlanDate", () => {
     assert.throws(() => resolvePlanDate("today"), /无效日期/);
   });
 
+  it("拒绝格式正确但不存在的日历日期", () => {
+    assert.throws(() => resolvePlanDate("2026-99-99"), /不是真实存在的日历日期/);
+    assert.throws(() => resolvePlanDate("2026-02-30"), /不是真实存在的日历日期/);
+    assert.throws(() => resolvePlanDate("2026-00-01"), /不是真实存在的日历日期/);
+  });
+
   it("缺省时返回当天日期", () => {
     const fixed = new Date(2026, 6, 3);
     assert.equal(resolvePlanDate(undefined, fixed), "2026-07-03");
