@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test \"src/**/*.test.ts\"",
     "daily:plan": "node src/cli.ts daily:plan",
-    "config:check": "node src/cli.ts config:check"
+    "config:check": "node src/cli.ts config:check",
+    "project:state": "node src/cli.ts project:state"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

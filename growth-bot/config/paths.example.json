@@ -2,5 +2,6 @@
   "dataDir": "data",
   "contentDir": "content",
   "assetsDir": "assets",
-  "privateMaterialsDir": null
+  "privateMaterialsDir": null,
+  "readmePath": "../README.md"
 }

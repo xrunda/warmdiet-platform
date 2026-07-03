@@ -2,6 +2,7 @@ import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
 import { runDailyPlan } from "./commands/daily-plan.ts";
 import { runConfigCheck } from "./commands/config-check.ts";
+import { runProjectState } from "./commands/project-state.ts";
 
 const USAGE = `growth-bot - 三餐管家推广运营中台 CLI
 
@@ -9,8 +10,9 @@ const USAGE = `growth-bot - 三餐管家推广运营中台 CLI
   node src/cli.ts <command> [options]
 
 命令:
-  daily:plan    生成每日内容计划（GB-001 阶段为占位输出）
-  config:check  加载并校验 config/ 下的配置文件
+  daily:plan     生成每日内容计划（GB-001 阶段为占位输出）
+  config:check   加载并校验 config/ 下的配置文件
+  project:state  采集项目状态，写入 data/project-state/yyyy-mm-dd.json
 
 选项:
   --dry-run     只打印结果，不写入任何文件
@@ -55,6 +57,11 @@ export async function main(argv: string[]): Promise<number> {
     }
     case "config:check":
       return runConfigCheck();
+    case "project:state":
+      return runProjectState({
+        dryRun: values["dry-run"],
+        date: values.date,
+      });
     default:
       process.stderr.write(`未知命令: ${command}\n\n${USAGE}`);
       return 1;

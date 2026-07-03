@@ -45,6 +45,8 @@ export interface PathsConfig {
   assetsDir: string;
   /** 私有资料目录（如 公司资料/2026/三餐管家），仅本机使用，null 表示未配置 */
   privateMaterialsDir: string | null;
+  /** 主仓库 README 路径，相对 growth-bot 根目录解析，缺省为 ../README.md */
+  readmePath?: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -137,6 +139,9 @@ export function validatePathsConfig(value: unknown): string[] {
   requireString(value, "assetsDir", "paths", errors);
   if (value.privateMaterialsDir !== null && typeof value.privateMaterialsDir !== "string") {
     errors.push("paths.privateMaterialsDir 必须是字符串或 null");
+  }
+  if (value.readmePath !== undefined && (typeof value.readmePath !== "string" || value.readmePath === "")) {
+    errors.push("paths.readmePath 若存在必须是非空字符串");
   }
   return errors;
 }
