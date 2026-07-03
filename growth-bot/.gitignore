@@ -25,6 +25,7 @@ data/trends/*.json
 # 每日热点源文件为本地运营数据，仅提交 example 模板
 data/trends/source/*.json
 !data/trends/source/example.json
+content/calendar/*.json
 
 # 系统文件
 .DS_Store

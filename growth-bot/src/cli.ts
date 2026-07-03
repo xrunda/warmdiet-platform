@@ -11,7 +11,7 @@ const USAGE = `growth-bot - 三餐管家推广运营中台 CLI
   node src/cli.ts <command> [options]
 
 命令:
-  daily:plan     生成每日内容计划（GB-001 阶段为占位输出）
+  daily:plan     生成每日 10 条内容计划，写入 content/calendar/yyyy-mm-dd.json
   config:check   加载并校验 config/ 下的配置文件
   project:state  采集项目状态，写入 data/project-state/yyyy-mm-dd.json
   trends:import  校验并标准化热点源文件，写入 data/trends/yyyy-mm-dd.json
@@ -19,6 +19,7 @@ const USAGE = `growth-bot - 三餐管家推广运营中台 CLI
 选项:
   --dry-run     只打印结果，不写入任何文件
   --date <yyyy-mm-dd>  指定计划日期，默认今天
+  --force       允许覆盖已存在的日历文件（默认保护人工编辑）
   -h, --help    显示帮助
 `;
 
@@ -32,6 +33,7 @@ export async function main(argv: string[]): Promise<number> {
       options: {
         "dry-run": { type: "boolean", default: false },
         date: { type: "string" },
+        force: { type: "boolean", default: false },
         help: { type: "boolean", short: "h", default: false },
       },
     }));
@@ -49,14 +51,12 @@ export async function main(argv: string[]): Promise<number> {
   }
 
   switch (command) {
-    case "daily:plan": {
-      const plan = runDailyPlan({
+    case "daily:plan":
+      return runDailyPlan({
         dryRun: values["dry-run"],
         date: values.date,
+        force: values.force,
       });
-      process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
-      return 0;
-    }
     case "config:check":
       return runConfigCheck();
     case "project:state":
