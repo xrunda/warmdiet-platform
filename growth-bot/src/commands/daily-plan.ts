@@ -53,8 +53,11 @@ export function previousDate(date: string): string {
 }
 
 export class DataFileError extends Error {
-  constructor(filePath: string, cause: string) {
-    super(`数据文件不是合法 JSON: ${filePath}\n${cause}\n请修复该文件或删除后重新生成`);
+  constructor(filePath: string, cause: unknown) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    super(`数据文件不是合法 JSON: ${filePath}\n${detail}\n请修复该文件或删除后重新生成`, {
+      cause,
+    });
     this.name = "DataFileError";
   }
 }
@@ -66,7 +69,7 @@ export function readJsonIfExists<T>(filePath: string): T | null {
   try {
     return JSON.parse(readFileSync(filePath, "utf8")) as T;
   } catch (error) {
-    throw new DataFileError(filePath, error instanceof Error ? error.message : String(error));
+    throw new DataFileError(filePath, error);
   }
 }
 
