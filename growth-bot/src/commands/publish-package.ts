@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, isAbsolute, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { ConfigError, loadConfig } from "../config/load.ts";
+import { defaultRootDir, resolveContentRoot } from "./paths.ts";
 import { resolvePlanDate, DataFileError } from "./daily-plan.ts";
 import { parseReviewStatuses } from "../review/review-file.ts";
 import { exportPackages } from "../review/publish-package.ts";
@@ -17,14 +17,11 @@ export interface PublishPackageOptions {
  * 把 Approve 条目的草稿按平台导出到 content/publish-packages/yyyy-mm-dd/。
  */
 export function runPublishPackage(options: PublishPackageOptions): number {
-  const rootDir =
-    options.rootDir ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const rootDir = options.rootDir ?? defaultRootDir();
   try {
     const config = loadConfig(join(rootDir, "config"));
     const date = resolvePlanDate(options.date);
-    const contentRoot = isAbsolute(config.paths.contentDir)
-      ? config.paths.contentDir
-      : join(rootDir, config.paths.contentDir);
+    const contentRoot = resolveContentRoot(config, rootDir);
 
     const reviewPath = join(contentRoot, "review", `${date}.md`);
     if (!existsSync(reviewPath)) {
@@ -64,7 +61,7 @@ export function runPublishPackage(options: PublishPackageOptions): number {
 
     if (result.approvedCount === 0) {
       process.stderr.write(
-        `导出失败: ${approved.length} 条 Approve 条目均未找到草稿文件\n请先执行: npm run drafts:generate -- --date ${date}\n`,
+        `导出失败: Approve 条目共 ${approved.length} 条，实际导出 ${result.approvedCount} 条（草稿文件缺失）\n请先执行: npm run drafts:generate -- --date ${date}\n`,
       );
       return 1;
     }

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { ConfigError, loadConfig } from "../config/load.ts";
+import { defaultRootDir, resolveContentRoot, resolveDataRoot } from "./paths.ts";
 import { readJsonIfExists, resolvePlanDate, DataFileError } from "./daily-plan.ts";
 import {
   buildDraftsForCalendar,
@@ -22,17 +22,12 @@ export interface DraftsGenerateOptions {
  * 已存在的草稿文件默认跳过（保护人工编辑），--force 覆盖重建。
  */
 export function runDraftsGenerate(options: DraftsGenerateOptions): number {
-  const rootDir =
-    options.rootDir ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const rootDir = options.rootDir ?? defaultRootDir();
   try {
     const config = loadConfig(join(rootDir, "config"));
     const date = resolvePlanDate(options.date);
-    const dataRoot = isAbsolute(config.paths.dataDir)
-      ? config.paths.dataDir
-      : join(rootDir, config.paths.dataDir);
-    const contentRoot = isAbsolute(config.paths.contentDir)
-      ? config.paths.contentDir
-      : join(rootDir, config.paths.contentDir);
+    const dataRoot = resolveDataRoot(config, rootDir);
+    const contentRoot = resolveContentRoot(config, rootDir);
 
     const calendarPath = join(contentRoot, "calendar", `${date}.json`);
     const calendar = readJsonIfExists<CalendarFile>(calendarPath);

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { ConfigError, loadConfig } from "../config/load.ts";
+import { defaultRootDir, resolveContentRoot } from "./paths.ts";
 import { readJsonIfExists, resolvePlanDate, DataFileError } from "./daily-plan.ts";
 import { buildReviewMarkdown, type DraftMeta } from "../review/review-file.ts";
 import type { CalendarFile } from "../pipeline/daily-calendar.ts";
@@ -43,14 +43,11 @@ export function loadDraftMetas(draftsDir: string): Map<string, DraftMeta[]> {
  * 审核文件承载人工勾选结果，默认不覆盖，--force 重建。
  */
 export function runReviewBuild(options: ReviewBuildOptions): number {
-  const rootDir =
-    options.rootDir ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const rootDir = options.rootDir ?? defaultRootDir();
   try {
     const config = loadConfig(join(rootDir, "config"));
     const date = resolvePlanDate(options.date);
-    const contentRoot = isAbsolute(config.paths.contentDir)
-      ? config.paths.contentDir
-      : join(rootDir, config.paths.contentDir);
+    const contentRoot = resolveContentRoot(config, rootDir);
 
     const calendarPath = join(contentRoot, "calendar", `${date}.json`);
     const calendar = readJsonIfExists<CalendarFile>(calendarPath);

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { ConfigError, loadConfig } from "../config/load.ts";
+import { defaultRootDir, resolveContentRoot } from "./paths.ts";
 import { resolvePlanDate, DataFileError, readJsonIfExists } from "./daily-plan.ts";
 import {
   buildPublishRecord,
@@ -18,10 +18,7 @@ interface CommonOptions {
 }
 
 function contentRootOf(rootDir: string): string {
-  const config = loadConfig(join(rootDir, "config"));
-  return isAbsolute(config.paths.contentDir)
-    ? config.paths.contentDir
-    : join(rootDir, config.paths.contentDir);
+  return resolveContentRoot(loadConfig(join(rootDir, "config")), rootDir);
 }
 
 /**
@@ -29,8 +26,7 @@ function contentRootOf(rootDir: string): string {
  * content/published/yyyy-mm-dd.json。人工在其中录入指标，默认不覆盖。
  */
 export function runPublishRecord(options: CommonOptions): number {
-  const rootDir =
-    options.rootDir ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const rootDir = options.rootDir ?? defaultRootDir();
   try {
     const date = resolvePlanDate(options.date);
     const contentRoot = contentRootOf(rootDir);
@@ -78,8 +74,7 @@ export function runPublishRecord(options: CommonOptions): number {
  * content/reviews/yyyy-mm-dd.md。复盘结论为人工写作区，默认不覆盖。
  */
 export function runRetroBuild(options: CommonOptions): number {
-  const rootDir =
-    options.rootDir ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const rootDir = options.rootDir ?? defaultRootDir();
   try {
     const date = resolvePlanDate(options.date);
     const contentRoot = contentRootOf(rootDir);
