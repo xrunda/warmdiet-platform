@@ -145,6 +145,22 @@ describe("exportPackages", () => {
     assert.ok(packaged.includes("status: approved"));
   });
 
+  it("Approve 但草稿缺失的条目计入 skipped 而非静默丢失", () => {
+    const result = exportPackages({
+      date: "2026-07-03",
+      draftsDir: join(dir, "drafts"),
+      packagesRoot: join(dir, "packages"),
+      statuses: [
+        { itemId: "cal-2026-07-03-01", decision: "approve" },
+        { itemId: "cal-2026-07-03-99", decision: "approve" },
+      ],
+    });
+    assert.equal(result.approvedCount, 1);
+    assert.deepEqual(result.skipped, [
+      { itemId: "cal-2026-07-03-99", reason: "missing-drafts" },
+    ]);
+  });
+
   it("重复导出整体重建，反映最新审核结果", () => {
     const rerun = exportPackages({
       date: "2026-07-03",

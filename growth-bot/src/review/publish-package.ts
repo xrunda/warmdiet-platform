@@ -18,6 +18,7 @@ export interface PackageManifestEntry {
 export interface PackageResult {
   outDir: string;
   platforms: Record<string, PackageManifestEntry[]>;
+  /** 实际导出的 Approve 条目数（Approve 但缺草稿的计入 skipped） */
   approvedCount: number;
   skipped: { itemId: string; reason: string }[];
 }
@@ -33,7 +34,7 @@ export function exportPackages(options: {
   const approved = new Set(
     options.statuses.filter((s) => s.decision === "approve").map((s) => s.itemId),
   );
-  const skipped = options.statuses
+  const skipped: { itemId: string; reason: string }[] = options.statuses
     .filter((s) => s.decision !== "approve")
     .map((s) => ({ itemId: s.itemId, reason: s.decision }));
 
@@ -45,6 +46,7 @@ export function exportPackages(options: {
 
   const platforms: Record<string, PackageManifestEntry[]> = {};
   const draftFiles = existsSync(options.draftsDir) ? readdirSync(options.draftsDir) : [];
+  const exported = new Set<string>();
 
   for (const fileName of draftFiles) {
     const match = fileName.match(DRAFT_NAME_PATTERN);
@@ -60,9 +62,17 @@ export function exportPackages(options: {
     const content = readFileSync(join(options.draftsDir, fileName), "utf8");
     writeFileSync(
       join(platformDir, fileName),
-      content.replace("status: draft", "status: approved"),
+      content.replace(/^status: draft$/m, "status: approved"),
     );
     (platforms[platform] ??= []).push({ itemId, fileName });
+    exported.add(itemId);
+  }
+
+  // Approve 了但找不到草稿的条目显式计入 skipped，避免静默丢失
+  for (const itemId of approved) {
+    if (!exported.has(itemId)) {
+      skipped.push({ itemId, reason: "missing-drafts" });
+    }
   }
 
   for (const [platform, entries] of Object.entries(platforms)) {
@@ -72,5 +82,5 @@ export function exportPackages(options: {
     );
   }
 
-  return { outDir, platforms, approvedCount: approved.size, skipped };
+  return { outDir, platforms, approvedCount: exported.size, skipped };
 }
