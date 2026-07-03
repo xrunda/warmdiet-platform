@@ -47,6 +47,8 @@ npm run project:state  # 采集项目状态 → data/project-state/yyyy-mm-dd.js
 npm run trends:import  # 标准化热点源文件 → data/trends/yyyy-mm-dd.json
 npm run daily:plan     # 生成每日 10 条内容计划 → content/calendar/yyyy-mm-dd.json
 npm run drafts:generate # 生成多平台草稿 → content/drafts/yyyy-mm-dd/*.md
+npm run review:build    # 生成一屏审核汇总 → content/review/yyyy-mm-dd.md
+npm run publish:package # 导出 Approve 条目发布包 → content/publish-packages/yyyy-mm-dd/
 ```
 
 `project:state` 从主仓库 README（`paths.readmePath`，默认 `../README.md`）提取项目简介、Demo 地址和测试账号，与配置中的仓库地址、视频素材路径合并输出；支持 `--dry-run` 和 `--date yyyy-mm-dd`。
@@ -56,6 +58,8 @@ npm run drafts:generate # 生成多平台草稿 → content/drafts/yyyy-mm-dd/*.
 `daily:plan` 按 PRD 配比（产品功能 2 / 热点 2 / 技术开源 2 / 视频 1 / GitHub 动态 1 / 产品思考 1 / 互动 1）生成 10 条计划：以日期为种子轮换选题角度、避开昨日角度与热点、只选可借势热点（不足用兜底角度）、保证五平台覆盖、含链接条数 ≤3。已存在的日历默认不覆盖（保护人工编辑），重建需 `--force`。
 
 `drafts:generate` 把日历条目按 platformTargets 展开为平台草稿 Markdown（X、小红书、抖音、视频号、快手模板），每份含标题、正文、话题、素材建议、合规自检（含医疗禁用词自动扫描）。草稿带 frontmatter 供审核流机读，可直接人工编辑；已存在的草稿默认跳过，重建需 `--force`。
+
+`review:build` 把当天 10 条内容压缩成一屏审核 Markdown，每条含角度、平台、风险、合规状态、草稿链接和 Approve / Edit / Reject 状态位；人工勾选后执行 `publish:package`，Approve 条目的草稿按平台分目录导出为发布包（含 manifest.json），发布动作由人工在各平台完成。审核文件默认不覆盖（其中有人工勾选结果）。
 
 本机私有路径（如私有资料目录）写入 `config/paths.local.json`，它会覆盖 `paths.json` 中的同名字段，且已被 `.gitignore` 忽略。
 
