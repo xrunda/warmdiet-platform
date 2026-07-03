@@ -11,7 +11,7 @@ import { runReviewBuild } from "./review-build.ts";
 import { runPublishPackage } from "./publish-package.ts";
 import { runPublishRecord, runRetroBuild } from "./publish-record.ts";
 import { parseReviewStatuses } from "../review/review-file.ts";
-import { planDailyRun, type DailyRunSnapshot, type PlannedStep } from "../pipeline/daily-run-plan.ts";
+import { planDailyRun, GENERATION_KEYS, PUBLISH_KEYS, type DailyRunSnapshot, type PlannedStep } from "../pipeline/daily-run-plan.ts";
 import { gatherDailyStatus, renderDailyStatus } from "../pipeline/daily-status.ts";
 
 export interface DailyRunOptions {
@@ -70,7 +70,9 @@ export function runDailyRun(options: DailyRunOptions): number {
     const dataRoot = resolveDataRoot(config, rootDir);
     const contentRoot = resolveContentRoot(config, rootDir);
 
-    const plan = planDailyRun(takeSnapshot(dataRoot, contentRoot, date), force);
+    const initialSnapshot = takeSnapshot(dataRoot, contentRoot, date);
+    const planOptions = { force, reviewExistedAtStart: initialSnapshot.hasReview };
+    const plan = planDailyRun(initialSnapshot, planOptions);
 
     if (options.dryRun) {
       process.stdout.write(`daily:run 计划 · ${date}\n\n`);
@@ -95,7 +97,7 @@ export function runDailyRun(options: DailyRunOptions): number {
 
     // 第一阶段：生成（project-state ~ review）
     const generationSteps = plan.steps.filter((s) =>
-      ["project-state", "trends", "calendar", "drafts", "review"].includes(s.key),
+      (GENERATION_KEYS as readonly string[]).includes(s.key),
     );
     for (const step of generationSteps) {
       process.stdout.write(`\n${ACTION_ICONS[step.action]} ${step.label}: ${step.reason}\n`);
@@ -110,16 +112,19 @@ export function runDailyRun(options: DailyRunOptions): number {
     }
 
     // 第二阶段：发布，重新读取审核状态（审核文件可能刚生成或刚被人工勾选）
-    const freshPlan = planDailyRun(takeSnapshot(dataRoot, contentRoot, date), force);
+    const freshPlan = planDailyRun(takeSnapshot(dataRoot, contentRoot, date), planOptions);
     if (freshPlan.publishBlocked) {
-      process.stdout.write(
-        `\n⏸ 发布阶段暂停：${freshPlan.blockReason}\n` +
-          `   完成勾选后再次运行 npm run daily:run（已完成的步骤会自动跳过），\n` +
-          `   或直接执行 npm run publish:package -- --date ${date}\n`,
-      );
+      // 后续指引按阻塞种类分流：stale 场景绝不能建议 publish:package（会绕过防线）
+      const guidance =
+        freshPlan.blockKind === "stale-review"
+          ? `   请执行: rm content/review/${date}.md && npm run daily:run\n   然后在新审核文件中重新勾选\n`
+          : freshPlan.blockKind === "no-approvals"
+            ? "   如需调整决策，修改审核文件勾选后再次运行 npm run daily:run\n"
+            : `   完成勾选后再次运行 npm run daily:run（已完成的步骤会自动跳过），\n   或直接执行 npm run publish:package -- --date ${date}\n`;
+      process.stdout.write(`\n⏸ 发布阶段暂停：${freshPlan.blockReason}\n${guidance}`);
     } else {
       for (const step of freshPlan.steps.filter((s) =>
-        ["packages", "record", "retro"].includes(s.key),
+        (PUBLISH_KEYS as readonly string[]).includes(s.key),
       )) {
         process.stdout.write(`\n${ACTION_ICONS[step.action]} ${step.label}: ${step.reason}\n`);
         if (step.action !== "run") {

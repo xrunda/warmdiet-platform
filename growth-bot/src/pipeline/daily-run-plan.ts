@@ -8,6 +8,10 @@
 
 export type StepAction = "run" | "skip" | "manual" | "blocked";
 
+/** 生成阶段与发布阶段的步骤 key，执行器与计划函数共用，避免字符串漂移 */
+export const GENERATION_KEYS = ["project-state", "trends", "calendar", "drafts", "review"] as const;
+export const PUBLISH_KEYS = ["packages", "record", "retro"] as const;
+
 export interface PlannedStep {
   key: string;
   label: string;
@@ -29,14 +33,26 @@ export interface DailyRunSnapshot {
   hasRetro: boolean;
 }
 
+export type BlockKind = "stale-review" | "awaiting-review" | "no-approvals";
+
 export interface DailyRunPlan {
   steps: PlannedStep[];
   /** 发布阶段是否被人工审核阻塞 */
   publishBlocked: boolean;
   blockReason: string | null;
+  /** 阻塞种类：执行器据此给出不同的后续指引（stale 时绝不能建议 publish:package） */
+  blockKind: BlockKind | null;
 }
 
-export function planDailyRun(snapshot: DailyRunSnapshot, force: boolean): DailyRunPlan {
+export interface PlanOptions {
+  force: boolean;
+  /** 本次 daily:run 开始时审核文件是否已存在（stale 判定必须用开始时的快照，
+   * 否则本次刚生成的全新审核文件会被误判为失效） */
+  reviewExistedAtStart: boolean;
+}
+
+export function planDailyRun(snapshot: DailyRunSnapshot, options: PlanOptions): DailyRunPlan {
+  const { force, reviewExistedAtStart } = options;
   const steps: PlannedStep[] = [];
 
   steps.push({
@@ -89,16 +105,28 @@ export function planDailyRun(snapshot: DailyRunSnapshot, force: boolean): DailyR
   // 发布阶段：由审核状态门控
   let publishBlocked = false;
   let blockReason: string | null = null;
+  let blockKind: BlockKind | null = null;
 
   const review = snapshot.review;
-  if (review === null || !snapshot.hasReview) {
+  if (force && reviewExistedAtStart) {
+    // P1 防线：--force 重建了日历/草稿，但运行前已存在的审核文件保留的是
+    // 对旧内容的勾选；条目 id 是位置化的，旧 Approve 会错误放行未审核的新内容
     publishBlocked = true;
+    blockKind = "stale-review";
+    blockReason =
+      "内容已用 --force 重建，现有审核勾选针对旧内容已失效；" +
+      "请删除审核文件后重新运行 daily:run 生成新审核汇总并重新勾选";
+  } else if (review === null || !snapshot.hasReview) {
+    publishBlocked = true;
+    blockKind = "awaiting-review";
     blockReason = "审核文件刚生成或尚未勾选，等待人工审核";
   } else if (review.pending > 0) {
     publishBlocked = true;
+    blockKind = "awaiting-review";
     blockReason = `还有 ${review.pending} 条待勾选，等待人工审核`;
   } else if (review.approved === 0) {
     publishBlocked = true;
+    blockKind = "no-approvals";
     blockReason = "没有 Approve 条目（全部 Edit/Reject），今日无发布内容";
   }
 
@@ -110,7 +138,7 @@ export function planDailyRun(snapshot: DailyRunSnapshot, force: boolean): DailyR
     ] as const) {
       steps.push({ key, label, action: "blocked", reason: blockReason! });
     }
-    return { steps, publishBlocked, blockReason };
+    return { steps, publishBlocked, blockReason, blockKind };
   }
 
   steps.push(
@@ -129,5 +157,5 @@ export function planDailyRun(snapshot: DailyRunSnapshot, force: boolean): DailyR
       : { key: "retro", label: "每日复盘", action: "run", reason: "渲染复盘模板" },
   );
 
-  return { steps, publishBlocked: false, blockReason: null };
+  return { steps, publishBlocked: false, blockReason: null, blockKind: null };
 }

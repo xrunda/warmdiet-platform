@@ -61,6 +61,15 @@ describe("runDailyRun 集成（临时项目根目录）", () => {
     assert.ok(readFileSync(reviewPath, "utf8").includes("[x] Approve"));
   });
 
+  it("--force 重建后旧 Approve 不放行发布（Codex P1）", () => {
+    // 删除发布包，模拟 --force 重建内容后再跑：审核勾选仍是全 Approve，
+    // 但发布阶段必须阻塞，发布包不得基于旧勾选重新导出
+    rmSync(join(root, "content", "publish-packages", DATE), { recursive: true, force: true });
+    const code = runDailyRun({ dryRun: false, date: DATE, force: true, rootDir: root });
+    assert.equal(code, 0);
+    assert.ok(!existsSync(join(root, "content", "publish-packages", DATE)));
+  });
+
   it("dry-run 只列计划不写文件", () => {
     const marker = join(root, "content", "calendar", "2026-08-01.json");
     const code = runDailyRun({ dryRun: true, date: "2026-08-01", rootDir: root });
