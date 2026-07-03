@@ -44,9 +44,12 @@ cp config/paths.example.json config/paths.json
 
 npm run config:check   # 加载并校验配置
 npm run project:state  # 采集项目状态 → data/project-state/yyyy-mm-dd.json
+npm run trends:import  # 标准化热点源文件 → data/trends/yyyy-mm-dd.json
 ```
 
 `project:state` 从主仓库 README（`paths.readmePath`，默认 `../README.md`）提取项目简介、Demo 地址和测试账号，与配置中的仓库地址、视频素材路径合并输出；支持 `--dry-run` 和 `--date yyyy-mm-dd`。
+
+`trends:import` 读取人工或 Codex 写入的 `data/trends/source/yyyy-mm-dd.json`（模板见 [example.json](./data/trends/source/example.json)），校验 title/source/url/summary/tags/riskLevel 后输出标准化热点数据；高风险（`riskLevel: high`）或敏感（`sensitive: true`）热点会被标记为 `leverageable: false`，默认不借势。
 
 本机私有路径（如私有资料目录）写入 `config/paths.local.json`，它会覆盖 `paths.json` 中的同名字段，且已被 `.gitignore` 忽略。
 
