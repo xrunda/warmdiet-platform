@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it, beforeEach, afterEach } from "node:test";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { gatherDailyStatus, renderDailyStatus } from "./daily-status.ts";
 
 const DATE = "2026-07-03";
@@ -29,7 +29,7 @@ describe("gatherDailyStatus", () => {
 
   function writeJson(relPath: string, data: unknown): void {
     const filePath = join(root, relPath);
-    mkdirSync(join(filePath, ".."), { recursive: true });
+    mkdirSync(dirname(filePath), { recursive: true });
     writeFileSync(filePath, JSON.stringify(data));
   }
 
