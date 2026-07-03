@@ -4,6 +4,7 @@ import { runDailyPlan } from "./commands/daily-plan.ts";
 import { runConfigCheck } from "./commands/config-check.ts";
 import { runProjectState } from "./commands/project-state.ts";
 import { runTrendsImport } from "./commands/trends-import.ts";
+import { runDraftsGenerate } from "./commands/drafts-generate.ts";
 
 const USAGE = `growth-bot - 三餐管家推广运营中台 CLI
 
@@ -15,6 +16,7 @@ const USAGE = `growth-bot - 三餐管家推广运营中台 CLI
   config:check   加载并校验 config/ 下的配置文件
   project:state  采集项目状态，写入 data/project-state/yyyy-mm-dd.json
   trends:import  校验并标准化热点源文件，写入 data/trends/yyyy-mm-dd.json
+  drafts:generate  从内容日历生成多平台草稿，写入 content/drafts/yyyy-mm-dd/
 
 选项:
   --dry-run     只打印结果，不写入任何文件
@@ -68,6 +70,12 @@ export async function main(argv: string[]): Promise<number> {
       return runTrendsImport({
         dryRun: values["dry-run"],
         date: values.date,
+      });
+    case "drafts:generate":
+      return runDraftsGenerate({
+        dryRun: values["dry-run"],
+        date: values.date,
+        force: values.force,
       });
     default:
       process.stderr.write(`未知命令: ${command}\n\n${USAGE}`);

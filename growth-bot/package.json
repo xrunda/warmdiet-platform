@@ -13,7 +13,8 @@
     "daily:plan": "node src/cli.ts daily:plan",
     "config:check": "node src/cli.ts config:check",
     "project:state": "node src/cli.ts project:state",
-    "trends:import": "node src/cli.ts trends:import"
+    "trends:import": "node src/cli.ts trends:import",
+    "drafts:generate": "node src/cli.ts drafts:generate"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
