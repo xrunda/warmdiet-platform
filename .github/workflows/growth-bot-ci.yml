@@ -35,8 +35,10 @@ jobs:
         run: |
           cp data/trends/source/example.json "data/trends/source/$(date +%F).json"
           npm run trends:import -- --dry-run
-      - name: daily:plan（完整流水线组装当日 10 条计划）
+      - name: daily:plan + drafts:generate（完整流水线到平台草稿）
         run: |
           npm run project:state
           npm run trends:import
-          npm run daily:plan -- --dry-run
+          npm run daily:plan
+          npm run drafts:generate
+          ls "content/drafts/$(date +%F)/" | head -5
