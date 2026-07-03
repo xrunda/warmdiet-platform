@@ -14,7 +14,9 @@
     "config:check": "node src/cli.ts config:check",
     "project:state": "node src/cli.ts project:state",
     "trends:import": "node src/cli.ts trends:import",
-    "drafts:generate": "node src/cli.ts drafts:generate"
+    "drafts:generate": "node src/cli.ts drafts:generate",
+    "review:build": "node src/cli.ts review:build",
+    "publish:package": "node src/cli.ts publish:package"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

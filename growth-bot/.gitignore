@@ -27,6 +27,8 @@ data/trends/source/*.json
 !data/trends/source/example.json
 content/calendar/*.json
 content/drafts/
+content/review/*.md
+content/publish-packages/
 
 # 系统文件
 .DS_Store

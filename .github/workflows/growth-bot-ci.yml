@@ -35,10 +35,13 @@ jobs:
         run: |
           cp data/trends/source/example.json "data/trends/source/$(date +%F).json"
           npm run trends:import -- --dry-run
-      - name: daily:plan + drafts:generate（完整流水线到平台草稿）
+      - name: 完整流水线（项目状态 → 热点 → 日历 → 草稿 → 审核 → 发布包）
         run: |
           npm run project:state
           npm run trends:import
           npm run daily:plan
           npm run drafts:generate
-          ls "content/drafts/$(date +%F)/" | head -5
+          npm run review:build
+          sed -i '0,/\[ \] Approve/s//[x] Approve/' "content/review/$(date +%F).md"
+          npm run publish:package
+          find "content/publish-packages/$(date +%F)" -type f
