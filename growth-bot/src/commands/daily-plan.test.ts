@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { previousDate, resolvePlanDate } from "./daily-plan.ts";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DataFileError, previousDate, readJsonIfExists, resolvePlanDate } from "./daily-plan.ts";
 
 describe("resolvePlanDate", () => {
   it("透传合法的 yyyy-mm-dd 日期", () => {
@@ -21,6 +24,26 @@ describe("resolvePlanDate", () => {
   it("缺省时返回当天日期", () => {
     const fixed = new Date(2026, 6, 3);
     assert.equal(resolvePlanDate(undefined, fixed), "2026-07-03");
+  });
+});
+
+describe("readJsonIfExists", () => {
+  it("文件缺失返回 null，损坏 JSON 抛出带路径的清晰错误", () => {
+    const dir = mkdtempSync(join(tmpdir(), "growth-bot-json-"));
+    try {
+      assert.equal(readJsonIfExists(join(dir, "missing.json")), null);
+      const broken = join(dir, "broken.json");
+      writeFileSync(broken, "{oops");
+      assert.throws(
+        () => readJsonIfExists(broken),
+        (error: unknown) =>
+          error instanceof DataFileError &&
+          error.message.includes(broken) &&
+          error.message.includes("不是合法 JSON"),
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

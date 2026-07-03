@@ -52,11 +52,22 @@ export function previousDate(date: string): string {
   return parsed.toISOString().slice(0, 10);
 }
 
-function readJsonIfExists<T>(filePath: string): T | null {
+export class DataFileError extends Error {
+  constructor(filePath: string, cause: string) {
+    super(`数据文件不是合法 JSON: ${filePath}\n${cause}\n请修复该文件或删除后重新生成`);
+    this.name = "DataFileError";
+  }
+}
+
+export function readJsonIfExists<T>(filePath: string): T | null {
   if (!existsSync(filePath)) {
     return null;
   }
-  return JSON.parse(readFileSync(filePath, "utf8")) as T;
+  try {
+    return JSON.parse(readFileSync(filePath, "utf8")) as T;
+  } catch (error) {
+    throw new DataFileError(filePath, error instanceof Error ? error.message : String(error));
+  }
 }
 
 export function runDailyPlan(options: DailyPlanOptions): number {
@@ -89,9 +100,18 @@ export function runDailyPlan(options: DailyPlanOptions): number {
       );
     }
 
-    const yesterday = readJsonIfExists<CalendarFile>(
-      join(contentRoot, "calendar", `${previousDate(date)}.json`),
-    );
+    // 昨日日历只用于去重，损坏时降级为忽略而不是中断
+    let yesterday: CalendarFile | null = null;
+    try {
+      yesterday = readJsonIfExists<CalendarFile>(
+        join(contentRoot, "calendar", `${previousDate(date)}.json`),
+      );
+    } catch (error) {
+      if (!(error instanceof DataFileError)) {
+        throw error;
+      }
+      process.stderr.write(`提示: 昨日日历损坏，本次不做去重（${error.message.split("\n")[0]}）\n`);
+    }
 
     const calendar = generateCalendar({
       date,
@@ -125,7 +145,7 @@ export function runDailyPlan(options: DailyPlanOptions): number {
     );
     return 0;
   } catch (error) {
-    if (error instanceof ConfigError) {
+    if (error instanceof ConfigError || error instanceof DataFileError) {
       process.stderr.write(`${error.message}\n`);
       return 1;
     }
