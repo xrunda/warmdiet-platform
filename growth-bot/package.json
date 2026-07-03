@@ -16,7 +16,9 @@
     "trends:import": "node src/cli.ts trends:import",
     "drafts:generate": "node src/cli.ts drafts:generate",
     "review:build": "node src/cli.ts review:build",
-    "publish:package": "node src/cli.ts publish:package"
+    "publish:package": "node src/cli.ts publish:package",
+    "publish:record": "node src/cli.ts publish:record",
+    "retro:build": "node src/cli.ts retro:build"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

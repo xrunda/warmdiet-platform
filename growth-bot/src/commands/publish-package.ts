@@ -62,6 +62,13 @@ export function runPublishPackage(options: PublishPackageOptions): number {
       statuses,
     });
 
+    if (result.approvedCount === 0) {
+      process.stderr.write(
+        `导出失败: ${approved.length} 条 Approve 条目均未找到草稿文件\n请先执行: npm run drafts:generate -- --date ${date}\n`,
+      );
+      return 1;
+    }
+
     process.stdout.write(
       `${JSON.stringify(
         {

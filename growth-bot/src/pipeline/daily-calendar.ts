@@ -48,6 +48,8 @@ export interface CalendarItem {
   linkPolicy: LinkPolicy;
   /** 关联的热点 id（仅 trend 类），其余为 null */
   trendRef: string | null;
+  /** 热点 URL：跨天去重的稳定键（id 按日期生成，同一文章两天 id 不同） */
+  trendUrl: string | null;
   /** 素材提示（如视频路径），无则为 null */
   assetHint: string | null;
 }
@@ -276,9 +278,9 @@ export interface GenerateCalendarInput {
   projectState: ProjectState;
   /** 当日标准化热点，可为空数组（trends 文件缺失时） */
   trends: NormalizedTrendItem[];
-  /** 昨日日历中已使用的 angleKey 与 trendRef，用于避免重复 */
+  /** 昨日日历中已使用的 angleKey 与热点 URL，用于避免重复 */
   yesterdayAngleKeys?: string[];
-  yesterdayTrendRefs?: string[];
+  yesterdayTrendUrls?: string[];
   now?: Date;
 }
 
@@ -330,7 +332,7 @@ export function generateCalendar(input: GenerateCalendarInput): CalendarFile {
   const warnings: string[] = [];
   const seed = dateSeed(date);
   const avoidAngles = new Set(input.yesterdayAngleKeys ?? []);
-  const avoidTrends = new Set(input.yesterdayTrendRefs ?? []);
+  const avoidTrendUrls = new Set(input.yesterdayTrendUrls ?? []);
 
   const items: CalendarItem[] = [];
 
@@ -346,6 +348,7 @@ export function generateCalendar(input: GenerateCalendarInput): CalendarFile {
       riskLevel: "low",
       linkPolicy: template.linkPolicy,
       trendRef: null,
+      trendUrl: null,
       assetHint:
         template.assetType === "video" ? projectState.assets.promoVideo : null,
     });
@@ -354,7 +357,7 @@ export function generateCalendar(input: GenerateCalendarInput): CalendarFile {
   for (const { category, count } of CONTENT_MIX) {
     if (category === "trend") {
       const usable = input.trends
-        .filter((trend) => trend.leverageable && !avoidTrends.has(trend.id))
+        .filter((trend) => trend.leverageable && !avoidTrendUrls.has(trend.url))
         .sort((a, b) => {
           const rank = { high: 0, medium: 1, low: 2 } as const;
           return rank[a.credibility] - rank[b.credibility];
@@ -373,6 +376,7 @@ export function generateCalendar(input: GenerateCalendarInput): CalendarFile {
           riskLevel: trend.riskLevel,
           linkPolicy: "none",
           trendRef: trend.id,
+          trendUrl: trend.url,
           assetHint: null,
         });
       }

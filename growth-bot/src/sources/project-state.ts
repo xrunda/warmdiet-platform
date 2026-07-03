@@ -47,6 +47,8 @@ export interface ProjectState {
   source: {
     readmePath: string;
     readmeFound: boolean;
+    /** README 已找到但字段解析失败、回退 config 时的告警 */
+    warnings: string[];
   };
 }
 
@@ -164,6 +166,22 @@ export function buildProjectState(options: CollectOptions): ProjectState {
     ? parseReadme(readFileSync(readmePath, "utf8"))
     : { summary: null, demoUrls: {}, testAccounts: [] };
 
+  const warnings: string[] = [];
+  if (readmeFound) {
+    if (facts.demoUrls.hospital === undefined) {
+      warnings.push("README 未解析到医院端 Demo 地址，已回退 config 值");
+    }
+    if (facts.demoUrls.family === undefined) {
+      warnings.push("README 未解析到家属端 Demo 地址，已回退 config 值");
+    }
+    if (facts.summary === null) {
+      warnings.push("README 未解析到简介引言块");
+    }
+    if (facts.testAccounts.length === 0) {
+      warnings.push("README 未解析到测试账号表");
+    }
+  }
+
   return {
     date,
     generatedAt: (options.now ?? new Date()).toISOString(),
@@ -182,6 +200,7 @@ export function buildProjectState(options: CollectOptions): ProjectState {
     source: {
       readmePath,
       readmeFound,
+      warnings,
     },
   };
 }

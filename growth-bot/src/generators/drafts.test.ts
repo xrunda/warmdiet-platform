@@ -29,6 +29,7 @@ function calendarItem(overrides: Partial<CalendarItem> = {}): CalendarItem {
     riskLevel: "low",
     linkPolicy: "none",
     trendRef: null,
+    trendUrl: null,
     assetHint: null,
     ...overrides,
   };

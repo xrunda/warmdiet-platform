@@ -19,7 +19,7 @@ const PROJECT_STATE: ProjectState = {
   summary: "面向老年患者的医疗健康管理平台",
   testAccounts: [],
   assets: { promoVideo: "assets/source/promo-90s.mp4", assetsDir: "assets" },
-  source: { readmePath: "../README.md", readmeFound: true },
+  source: { readmePath: "../README.md", readmeFound: true, warnings: [] },
 };
 
 function trend(id: string, overrides: Partial<NormalizedTrendItem> = {}): NormalizedTrendItem {
@@ -27,7 +27,7 @@ function trend(id: string, overrides: Partial<NormalizedTrendItem> = {}): Normal
     id,
     title: `热点 ${id}`,
     source: "测试来源",
-    url: "https://example.com/news",
+    url: `https://example.com/news/${id}`,
     summary: "摘要",
     tags: ["养老"],
     riskLevel: "low",
@@ -124,7 +124,10 @@ describe("generateCalendar", () => {
     const second = generateCalendar(
       baseInput({
         yesterdayAngleKeys: first.items.map((item) => item.angleKey),
-        yesterdayTrendRefs: ["t-01", "t-02"],
+        yesterdayTrendUrls: [
+          "https://example.com/news/t-01",
+          "https://example.com/news/t-02",
+        ],
         trends: [trend("t-01"), trend("t-02"), trend("t-03")],
       }),
     );
