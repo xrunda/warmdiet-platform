@@ -1,0 +1,32 @@
+{
+  "items": [
+    {
+      "title": "国家卫健委发布老年人营养改善行动方案",
+      "source": "示例新闻源",
+      "url": "https://example.com/news/elderly-nutrition-plan",
+      "summary": "方案提出加强老年人群营养监测与膳食指导，鼓励医疗机构与社区协作开展随诊管理。",
+      "tags": ["养老", "营养", "政策"],
+      "riskLevel": "low",
+      "publishedAt": "2026-07-01",
+      "credibility": "high"
+    },
+    {
+      "title": "开源医疗软件在基层医院的应用讨论升温",
+      "source": "示例技术社区",
+      "url": "https://example.com/tech/open-source-healthcare",
+      "summary": "社区讨论开源模式如何降低基层医院信息化成本，open-core 商业模式受到关注。",
+      "tags": ["开源", "医疗信息化"],
+      "riskLevel": "medium",
+      "credibility": "medium"
+    },
+    {
+      "title": "某地医疗事故引发舆论关注（示例敏感事件）",
+      "source": "示例新闻源",
+      "url": "https://example.com/news/sensitive-incident",
+      "summary": "敏感医疗事件示例：此类热点默认不借势，仅记录供人工判断。",
+      "tags": ["医疗安全"],
+      "riskLevel": "high",
+      "sensitive": true
+    }
+  ]
+}

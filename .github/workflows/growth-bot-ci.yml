@@ -32,3 +32,7 @@ jobs:
           npm run config:check
       - name: project:state（对真实 README 做采集验证）
         run: npm run project:state -- --dry-run
+      - name: trends:import（用示例热点验证标准化链路）
+        run: |
+          cp data/trends/source/example.json "data/trends/source/$(date +%F).json"
+          npm run trends:import -- --dry-run
