@@ -32,6 +32,15 @@ export function resolvePlanDate(input: string | undefined, now: Date = new Date(
     if (!DATE_PATTERN.test(input)) {
       throw new Error(`无效日期: ${input}，期望格式 yyyy-mm-dd`);
     }
+    const [year, month, day] = input.split("-").map(Number) as [number, number, number];
+    const parsed = new Date(year, month - 1, day);
+    const roundTrips =
+      parsed.getFullYear() === year &&
+      parsed.getMonth() === month - 1 &&
+      parsed.getDate() === day;
+    if (!roundTrips) {
+      throw new Error(`无效日期: ${input}，不是真实存在的日历日期`);
+    }
     return input;
   }
   const year = now.getFullYear();

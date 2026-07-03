@@ -1,0 +1,39 @@
+{
+  "platforms": [
+    {
+      "id": "x",
+      "displayName": "X",
+      "tone": "技术、开源、产品思考，中英文短帖",
+      "automation": "api",
+      "autoPublish": false
+    },
+    {
+      "id": "xiaohongshu",
+      "displayName": "小红书",
+      "tone": "图文、照护故事、家属视角、截图卡片",
+      "automation": "package",
+      "autoPublish": false
+    },
+    {
+      "id": "douyin",
+      "displayName": "抖音",
+      "tone": "短视频、强钩子、快速解释",
+      "automation": "package",
+      "autoPublish": false
+    },
+    {
+      "id": "wechat-video",
+      "displayName": "视频号",
+      "tone": "行业可信、医疗管理、创业进展",
+      "automation": "package",
+      "autoPublish": false
+    },
+    {
+      "id": "kuaishou",
+      "displayName": "快手",
+      "tone": "生活化、直接、照护场景",
+      "automation": "package",
+      "autoPublish": false
+    }
+  ]
+}

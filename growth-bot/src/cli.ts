@@ -1,5 +1,7 @@
 import { parseArgs } from "node:util";
+import { fileURLToPath } from "node:url";
 import { runDailyPlan } from "./commands/daily-plan.ts";
+import { runConfigCheck } from "./commands/config-check.ts";
 
 const USAGE = `growth-bot - 三餐管家推广运营中台 CLI
 
@@ -8,6 +10,7 @@ const USAGE = `growth-bot - 三餐管家推广运营中台 CLI
 
 命令:
   daily:plan    生成每日内容计划（GB-001 阶段为占位输出）
+  config:check  加载并校验 config/ 下的配置文件
 
 选项:
   --dry-run     只打印结果，不写入任何文件
@@ -16,15 +19,23 @@ const USAGE = `growth-bot - 三餐管家推广运营中台 CLI
 `;
 
 export async function main(argv: string[]): Promise<number> {
-  const { values, positionals } = parseArgs({
-    args: argv,
-    allowPositionals: true,
-    options: {
-      "dry-run": { type: "boolean", default: false },
-      date: { type: "string" },
-      help: { type: "boolean", short: "h", default: false },
-    },
-  });
+  let values;
+  let positionals;
+  try {
+    ({ values, positionals } = parseArgs({
+      args: argv,
+      allowPositionals: true,
+      options: {
+        "dry-run": { type: "boolean", default: false },
+        date: { type: "string" },
+        help: { type: "boolean", short: "h", default: false },
+      },
+    }));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`参数错误: ${message}\n\n${USAGE}`);
+    return 1;
+  }
 
   const command = positionals[0];
 
@@ -42,6 +53,8 @@ export async function main(argv: string[]): Promise<number> {
       process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
       return 0;
     }
+    case "config:check":
+      return runConfigCheck();
     default:
       process.stderr.write(`未知命令: ${command}\n\n${USAGE}`);
       return 1;
@@ -50,7 +63,7 @@ export async function main(argv: string[]): Promise<number> {
 
 const isDirectRun =
   process.argv[1] !== undefined &&
-  import.meta.url === new URL(`file://${process.argv[1]}`).href;
+  fileURLToPath(import.meta.url) === process.argv[1];
 
 if (isDirectRun) {
   main(process.argv.slice(2))

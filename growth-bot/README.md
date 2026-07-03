@@ -32,6 +32,21 @@ npm run test                   # 运行单元测试（Node 原生 test runner）
 npm run daily:plan -- --dry-run  # 输出每日内容计划（当前为占位结果）
 ```
 
+## 配置
+
+配置文件在 `config/` 下，仓库只提交 `*.example.json`，真实配置不入库：
+
+```bash
+cd growth-bot
+cp config/project.example.json config/project.json
+cp config/platforms.example.json config/platforms.json
+cp config/paths.example.json config/paths.json
+
+npm run config:check   # 加载并校验配置
+```
+
+本机私有路径（如私有资料目录）写入 `config/paths.local.json`，它会覆盖 `paths.json` 中的同名字段，且已被 `.gitignore` 忽略。
+
 ## 目录结构
 
 ```text

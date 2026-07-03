@@ -2,7 +2,10 @@
 node_modules/
 dist/
 
-# 私有本机配置：只允许提交 *.example.json（GB-002 起生效）
+# 私有本机配置：只允许提交 *.example.json
+config/project.json
+config/platforms.json
+config/paths.json
 config/*.local.json
 paths.local.json
 *.local.json
