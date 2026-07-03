@@ -1,0 +1,19 @@
+{
+  "name": "@warmdiet/growth-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "三餐管家推广运营中台：热点 → 选题 → 多平台草稿 → 审核 → 发布包 → 复盘的本地内容流水线",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "daily:plan": "node src/cli.ts daily:plan"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.3"
+  }
+}

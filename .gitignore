@@ -29,6 +29,8 @@ dist-ssr
 
 # Database
 data/
+# growth-bot 的数据目录骨架需要入库（其私有内容由 growth-bot/.gitignore 单独管理）
+!growth-bot/data/
 *.db
 *.db-shm
 *.db-wal

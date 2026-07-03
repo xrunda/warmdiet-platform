@@ -19,6 +19,31 @@
 
 后续再逐步接入自动发布能力。
 
+## 快速开始
+
+要求 Node.js >= 22.18（本项目直接以 Node 原生 type stripping 运行 TypeScript，无需构建步骤）。
+
+```bash
+cd growth-bot
+npm install
+
+npm run typecheck              # 类型检查
+npm run test                   # 运行单元测试（Node 原生 test runner）
+npm run daily:plan -- --dry-run  # 输出每日内容计划（当前为占位结果）
+```
+
+## 目录结构
+
+```text
+growth-bot/
+├── assets/    # 素材：source / packaged / templates
+├── config/    # 配置示例与本机私有配置（*.local.json 不入库）
+├── content/   # 内容产出：calendar / drafts / published / review / reviews
+├── data/      # 数据：metrics / project-state / trends
+├── docs/      # PRD、协作规范、Issue backlog
+└── src/       # TypeScript 源码与测试
+```
+
 ## 核心文档
 
 - [协作与交付规范](./docs/COLLABORATION_SPEC.md)
