@@ -36,7 +36,7 @@ export interface NormalizedTrendsFile {
   generatedAt: string;
   sourceFile: string;
   count: number;
-  highRiskCount: number;
+  nonLeverageableCount: number;
   items: NormalizedTrendItem[];
 }
 
@@ -140,7 +140,7 @@ export function normalizeTrends(
     generatedAt: now.toISOString(),
     sourceFile,
     count: items.length,
-    highRiskCount: items.filter((item) => !item.leverageable).length,
+    nonLeverageableCount: items.filter((item) => !item.leverageable).length,
     items,
   };
 }

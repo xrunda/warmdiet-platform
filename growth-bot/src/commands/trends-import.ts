@@ -36,7 +36,7 @@ export function runTrendsImport(options: TrendsImportCommandOptions): number {
           outPath,
           date,
           count: result.normalized.count,
-          highRiskCount: result.normalized.highRiskCount,
+          nonLeverageableCount: result.normalized.nonLeverageableCount,
         },
         null,
         2,

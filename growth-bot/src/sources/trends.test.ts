@@ -86,7 +86,7 @@ describe("normalizeTrends", () => {
     assert.equal(file.items[0]!.leverageable, false);
     assert.equal(file.items[1]!.leverageable, false);
     assert.equal(file.items[2]!.leverageable, true);
-    assert.equal(file.highRiskCount, 2);
+    assert.equal(file.nonLeverageableCount, 2);
     assert.equal(file.count, 3);
   });
 
@@ -122,7 +122,7 @@ describe("importTrends 端到端", () => {
     assert.equal(outPath, join(dir, "data", "trends", "2026-07-03.json"));
     const written = JSON.parse(readFileSync(outPath, "utf8"));
     assert.equal(written.count, 3);
-    assert.equal(written.highRiskCount, 1);
+    assert.equal(written.nonLeverageableCount, 1);
     assert.equal(written.items[2].leverageable, false);
   });
 
