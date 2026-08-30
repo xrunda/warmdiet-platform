@@ -1,3 +1,5 @@
+
+
 # 三餐管家 (WarmDiet Platform)
 
 > 面向老年患者的医疗健康管理平台 —— 患者日常餐食记录 + 医生授权随诊管理。Public open-core 开源版本。
@@ -87,6 +89,7 @@ warmdiet-platform/
 │   └── scripts/            #   init-seed.cjs
 ├── worker/                 # Cloudflare Worker（在线 Demo API）
 │   └── index.ts
+├── promo-video/            # Remotion 短视频工程
 ├── k8s/                    # Kubernetes 自托管清单
 ├── Dockerfile
 ├── docker-compose.yml
